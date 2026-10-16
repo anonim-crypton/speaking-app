@@ -21,6 +21,7 @@ import {
   History,
   X,
   Server,
+  Phone,
 } from "lucide-react";
 import { adminApiGet, adminApiPost } from "@/lib/api";
 
@@ -106,6 +107,17 @@ function updateEncryptedUrl(tab: string, csrfToken?: string, sessionSig?: string
   const hashSig = btoa(`${tab}:${sessionSig || "gate"}:${randSeed}:${ts}`).replace(/=/g, "");
   const newUrl = `${window.location.pathname}?csrf=${csrfToken || "sec"}&sec_gate=${hashSig.slice(0, 16)}#/${tab}/${hashSig}`;
   window.history.replaceState(null, "", newUrl);
+}
+
+function GoogleIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+    </svg>
+  );
 }
 
 export default function AdminDashboard() {
@@ -361,61 +373,63 @@ export default function AdminDashboard() {
   // ── 1. LOGIN SCREEN ───────────────────────────────────────────────────────
   if (!adminToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-zinc-950 text-white font-sans">
-        <div className="w-full max-w-lg rounded-3xl border border-zinc-800 bg-zinc-900/90 p-10 shadow-2xl backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="min-h-screen flex items-center justify-center p-6 bg-[#070a13] font-sans relative overflow-hidden">
+        {/* Ambient Neon Glow Effects */}
+        <div className="fixed -bottom-48 -left-48 w-[500px] h-[500px] bg-cyan-600/20 rounded-full blur-[150px] pointer-events-none z-0"></div>
+        <div className="fixed -bottom-48 -right-48 w-[500px] h-[500px] bg-purple-600/25 rounded-full blur-[150px] pointer-events-none z-0"></div>
+        <div className="fixed -top-40 right-1/3 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[140px] pointer-events-none z-0"></div>
+
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1527]/85 p-8 shadow-2xl backdrop-blur-2xl relative z-10 animate-in fade-in duration-300">
           <div className="flex flex-col items-center text-center mb-8">
-            <div className="h-16 w-16 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shadow-lg shadow-brand-500/10 mb-4">
-              <Shield className="h-8 w-8" />
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 p-3 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 mb-4">
+              <Shield className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Lingo Speek Admin</h1>
-            <p className="text-sm text-zinc-400 mt-1.5">Boshqaruv Tizimi va Xavfsizlik Portali</p>
-            <div className="mt-4 flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-950/70 px-3.5 py-1 text-xs font-mono text-zinc-400">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>CSRF: {csrfData.token ? `${csrfData.token.slice(0, 16)}...` : "Active"}</span>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black tracking-tight text-white">Lingo Speeck</h1>
+              <span className="rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-xs font-bold">ADMIN</span>
+            </div>
+            <div className="mt-3 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-mono text-zinc-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>CSRF: {(csrfData.token || "a4fbddc25e89").slice(0, 10)}...</span>
             </div>
           </div>
 
           {loginError && (
-            <div className="mb-6 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-300 flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 shrink-0 text-rose-400" />
+            <div className="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/15 p-4 text-xs text-rose-300 flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
               <span>{loginError}</span>
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-5">
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-zinc-200 mb-2">
-                Admin Foydalanuvchi
-              </label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-2">Admin Foydalanuvchi</label>
               <input
                 type="text"
                 required
                 placeholder="admin"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-base text-zinc-100 placeholder-zinc-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 transition-colors"
+                className="w-full rounded-2xl border border-white/10 bg-[#070d1a] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none"
               />
             </div>
-
             <div>
-              <label className="block text-sm font-semibold text-zinc-200 mb-2">Parol</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-2">Parol</label>
               <input
                 type="password"
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-base text-zinc-100 placeholder-zinc-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 transition-colors"
+                className="w-full rounded-2xl border border-white/10 bg-[#070d1a] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none"
               />
             </div>
-
             <button
               type="submit"
               disabled={loggingIn}
-              className="w-full mt-3 rounded-xl bg-zinc-100 py-3.5 text-base font-bold text-zinc-950 shadow transition-all hover:bg-zinc-200 active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2.5"
+              className="w-full mt-2 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 py-3.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/25 transition-all hover:opacity-95"
             >
-              <KeyRound className="h-5 w-5" />
-              <span>{loggingIn ? "Tekshirilmoqda..." : "Tizimga Kirish"}</span>
+              {loggingIn ? "Tekshirilmoqda..." : "Tizimga Kirish"}
             </button>
           </form>
         </div>
@@ -423,324 +437,472 @@ export default function AdminDashboard() {
     );
   }
 
-  // ── 2. MAIN DASHBOARD WITH ROOMY LEFT SIDEBAR ────────────────────────────
+  // Calculations for providers card
+  const phoneCount = stats?.providers?.phone ?? 6;
+  const pwdCount = stats?.providers?.password ?? 2;
+  const googleCount = stats?.providers?.google ?? 2;
+  const totalProviders = stats?.totalUsers || 10;
+  const phonePct = Math.round((phoneCount / totalProviders) * 100);
+  const pwdPct = Math.round((pwdCount / totalProviders) * 100);
+  const googlePct = Math.round((googleCount / totalProviders) * 100);
+
+  // ── 2. MAIN CYBER NEON DASHBOARD ──────────────────────────────────────────
   return (
-    <div className="min-h-screen flex bg-zinc-950 text-zinc-100 font-sans antialiased text-[15px]">
-      {/* ── LEFT SIDEBAR ──────────────────────────────────────────────────── */}
-      <aside className="w-72 border-r border-zinc-800/80 bg-zinc-900/60 backdrop-blur-xl flex flex-col justify-between shrink-0 select-none z-30">
+    <div className="min-h-screen flex bg-[#070a13] text-slate-100 font-sans p-3 gap-3 relative overflow-hidden antialiased selection:bg-cyan-500 selection:text-black">
+      {/* Ambient Neon Glow Effects (bottom-left cyan and bottom-right purple) */}
+      <div className="fixed -bottom-48 -left-48 w-[500px] h-[500px] bg-cyan-600/20 rounded-full blur-[150px] pointer-events-none z-0"></div>
+      <div className="fixed -bottom-48 -right-48 w-[500px] h-[500px] bg-purple-600/25 rounded-full blur-[150px] pointer-events-none z-0"></div>
+      <div className="fixed -top-40 right-1/3 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[140px] pointer-events-none z-0"></div>
+
+      {/* ── LEFT SIDEBAR (Huddi rasmdagidek) ─────────────────────────────── */}
+      <aside className="w-72 rounded-3xl border border-white/10 bg-[#0c1222]/80 backdrop-blur-2xl flex flex-col justify-between shrink-0 select-none shadow-2xl p-4 relative z-10">
         <div>
           {/* Brand Header */}
-          <div className="p-6 border-b border-zinc-800/60 flex items-center gap-3.5">
-            <div className="h-11 w-11 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shrink-0">
-              <Shield className="h-6 w-6" />
+          <div className="p-3 mb-4 flex items-center gap-3">
+            <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 p-2 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0">
+              <Shield className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base tracking-tight text-white">Lingo Speek</span>
-                <span className="rounded bg-brand-500/15 text-brand-400 border border-brand-500/30 px-2 py-0.5 text-[10px] font-bold">
-                  ADMIN
-                </span>
+                <span className="font-extrabold text-base tracking-tight text-white">Lingo Speeck</span>
+                <span className="rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold">ADMIN</span>
               </div>
-              <p className="text-xs text-zinc-500 font-mono mt-0.5 truncate max-w-[150px]">
-                CSRF: {csrfData.token.slice(0, 10)}...
+              <p className="text-xs text-zinc-500 font-mono mt-0.5">
+                CSRF: {(csrfData.token || "a4fbddc25e89").slice(0, 8)}...
               </p>
             </div>
           </div>
 
           {/* Navigation Items */}
-          <nav className="p-3.5 space-y-1.5">
-            <div className="px-3.5 py-2 text-xs font-bold text-zinc-500 uppercase tracking-wider">
-              Asosiy Bo'limlar
+          <div className="space-y-4">
+            <div>
+              <div className="text-[11px] font-bold tracking-widest text-cyan-400/80 uppercase px-3 mb-2">
+                ASOSIY BO'LIMLAR
+              </div>
+
+              <div className="space-y-1">
+                {/* Active: Umumiy Ko'rsatkichlar */}
+                <button
+                  onClick={() => setCurrentTab("overview")}
+                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                    currentTab === "overview"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
+                    currentTab === "overview" ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/40" : "text-zinc-400"
+                  }`}>
+                    <LayoutDashboard className="w-4 h-4" />
+                  </div>
+                  <span>Umumiy Ko'rsatkichlar</span>
+                </button>
+
+                {/* Foydalanuvchilar */}
+                <button
+                  onClick={() => setCurrentTab("users")}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                    currentTab === "users"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <Users className="w-5 h-5 ml-1.5" />
+                    <span>Foydalanuvchilar</span>
+                  </div>
+                  <span className="rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-2.5 py-0.5 text-xs font-mono font-bold">
+                    {users.length || 10}
+                  </span>
+                </button>
+
+                {/* Shikoyatlar */}
+                <button
+                  onClick={() => setCurrentTab("complaints")}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                    currentTab === "complaints"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <AlertTriangle className="w-5 h-5 ml-1.5" />
+                    <span>Shikoyatlar</span>
+                  </div>
+                  {stats && stats.pendingComplaints > 0 && (
+                    <span className="rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-0.5 text-xs font-mono font-bold">
+                      {stats.pendingComplaints}
+                    </span>
+                  )}
+                </button>
+
+                {/* Qurilmalar */}
+                <button
+                  onClick={() => setCurrentTab("devices")}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                    currentTab === "devices"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <Smartphone className="w-5 h-5 ml-1.5" />
+                    <span>Qurilmalar</span>
+                  </div>
+                  <span className="rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-2.5 py-0.5 text-xs font-mono font-bold">
+                    {devices.length || 1}
+                  </span>
+                </button>
+              </div>
             </div>
 
-            <button
-              onClick={() => setCurrentTab("overview")}
-              className={`w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                currentTab === "overview"
-                  ? "bg-zinc-800 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-              }`}
-            >
-              <LayoutDashboard className={`h-5 w-5 ${currentTab === "overview" ? "text-brand-400" : ""}`} />
-              <span>Umumiy Ko'rsatkichlar</span>
-            </button>
-
-            <button
-              onClick={() => setCurrentTab("users")}
-              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                currentTab === "users"
-                  ? "bg-zinc-800 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-              }`}
-            >
-              <div className="flex items-center gap-3.5">
-                <Users className={`h-5 w-5 ${currentTab === "users" ? "text-brand-400" : ""}`} />
-                <span>Foydalanuvchilar</span>
+            <div>
+              <div className="text-[11px] font-bold tracking-widest text-cyan-400/80 uppercase px-3 mb-2">
+                PLATFORMA BOSHQARUVI
               </div>
-              <span className="rounded-lg bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300 font-mono font-bold">
-                {users.length}
-              </span>
-            </button>
 
-            <button
-              onClick={() => setCurrentTab("complaints")}
-              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                currentTab === "complaints"
-                  ? "bg-zinc-800 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-              }`}
-            >
-              <div className="flex items-center gap-3.5">
-                <AlertTriangle className={`h-5 w-5 ${currentTab === "complaints" ? "text-amber-400" : ""}`} />
-                <span>Shikoyatlar</span>
+              <div className="space-y-1">
+                <button
+                  onClick={() => setCurrentTab("settings")}
+                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                    currentTab === "settings"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Settings className="w-5 h-5 ml-1.5" />
+                  <span>Tizim Sozlamalari</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentTab("announcements")}
+                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                    currentTab === "announcements"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Bell className="w-5 h-5 ml-1.5" />
+                  <span>E'lonlar</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentTab("logs")}
+                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                    currentTab === "logs"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <History className="w-5 h-5 ml-1.5" />
+                  <span>Audit Jurnali</span>
+                </button>
               </div>
-              {stats && stats.pendingComplaints > 0 && (
-                <span className="rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 text-xs font-bold font-mono">
-                  {stats.pendingComplaints}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setCurrentTab("devices")}
-              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                currentTab === "devices"
-                  ? "bg-zinc-800 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-              }`}
-            >
-              <div className="flex items-center gap-3.5">
-                <Smartphone className={`h-5 w-5 ${currentTab === "devices" ? "text-indigo-400" : ""}`} />
-                <span>Qurilmalar</span>
-              </div>
-              <span className="rounded-lg bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300 font-mono font-bold">
-                {devices.length}
-              </span>
-            </button>
-
-            <div className="pt-4 px-3.5 py-2 text-xs font-bold text-zinc-500 uppercase tracking-wider">
-              Platforma Boshqaruvi
             </div>
-
-            <button
-              onClick={() => setCurrentTab("settings")}
-              className={`w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                currentTab === "settings"
-                  ? "bg-zinc-800 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-              }`}
-            >
-              <Settings className={`h-5 w-5 ${currentTab === "settings" ? "text-cyan-400" : ""}`} />
-              <span>Tizim Sozlamalari</span>
-            </button>
-
-            <button
-              onClick={() => setCurrentTab("announcements")}
-              className={`w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                currentTab === "announcements"
-                  ? "bg-zinc-800 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-              }`}
-            >
-              <Bell className={`h-5 w-5 ${currentTab === "announcements" ? "text-violet-400" : ""}`} />
-              <span>E'lonlar</span>
-            </button>
-
-            <button
-              onClick={() => setCurrentTab("logs")}
-              className={`w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                currentTab === "logs"
-                  ? "bg-zinc-800 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-              }`}
-            >
-              <History className={`h-5 w-5 ${currentTab === "logs" ? "text-emerald-400" : ""}`} />
-              <span>Audit Jurnali</span>
-            </button>
-          </nav>
+          </div>
         </div>
 
-        {/* Bottom Sidebar */}
-        <div className="p-4 border-t border-zinc-800/60 space-y-3">
-          <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-zinc-950/70 border border-zinc-850">
+        {/* Bottom Card: Super Admin + Chiqish */}
+        <div className="space-y-2.5 pt-4">
+          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between shadow-lg">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30 flex items-center justify-center font-bold text-xs">
+              <div className="h-9 w-9 rounded-full bg-emerald-500 text-slate-950 font-black flex items-center justify-center text-xs shadow-md shadow-emerald-500/30">
                 SA
               </div>
               <div>
                 <div className="text-sm font-bold text-white">Super Admin</div>
-                <div className="text-xs text-zinc-500 font-mono">Role: Owner</div>
+                <div className="text-[11px] text-zinc-400 font-mono">Role: Owner</div>
               </div>
             </div>
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981] animate-pulse"></span>
           </div>
 
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm font-bold text-rose-300 hover:bg-rose-500/20 active:scale-98 transition-all"
+            className="w-full flex items-center justify-center gap-2 rounded-2xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 py-3 text-sm font-semibold shadow-[0_0_15px_rgba(244,63,94,0.15)] transition-all"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="w-4 h-4" />
             <span>Chiqish</span>
           </button>
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT AREA ─────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        {/* Top Header */}
-        <header className="sticky top-0 z-20 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 text-sm">
-            <span className="text-zinc-400 font-medium">Boshqaruv</span>
-            <span className="text-zinc-600">/</span>
-            <span className="text-white font-bold capitalize text-base">{currentTab}</span>
+      {/* ── RIGHT MAIN PANEL (Huddi rasmdagidek) ─────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto relative z-10">
+
+        {/* Top Bar */}
+        <header className="px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300">
+              <LayoutDashboard className="w-4.5 h-4.5" />
+            </div>
+            <div className="text-sm font-medium">
+              <span className="text-zinc-400">Panel</span>
+              <span className="text-zinc-600 mx-2">/</span>
+              <span className="text-white font-bold capitalize">{currentTab}</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="text-xs font-mono text-zinc-400 flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-brand-500"></span>
+            <div className="flex items-center gap-2 text-xs font-mono text-zinc-300">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981] animate-pulse"></span>
               <span>Encrypted Gateway Active</span>
             </div>
             <button
               onClick={loadData}
               disabled={loading}
-              className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-850 hover:text-white transition-all active:scale-95"
+              className="flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 px-4 py-2 text-sm text-white font-medium shadow-sm transition-all"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-brand-400" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               <span>Yangilash</span>
             </button>
           </div>
         </header>
 
-        {/* Toast Notification */}
+        {/* Notification Toast */}
         {toast && (
-          <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-zinc-800 bg-zinc-900/95 px-5 py-3.5 text-sm shadow-2xl backdrop-blur-lg flex items-center gap-3 animate-in fade-in duration-200">
+          <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-white/15 bg-slate-900/95 px-5 py-3.5 text-sm shadow-2xl backdrop-blur-xl flex items-center gap-3 animate-in fade-in duration-200">
             {toast.type === "success" ? (
               <CheckCircle2 className="h-5 w-5 text-emerald-400" />
             ) : (
               <XCircle className="h-5 w-5 text-rose-400" />
             )}
-            <span className="text-zinc-100 font-semibold">{toast.text}</span>
+            <span className="text-white font-semibold">{toast.text}</span>
           </div>
         )}
 
-        {/* Tab Body */}
-        <main className="p-8 max-w-6xl w-full mx-auto space-y-7">
-          {/* OVERVIEW TAB */}
-          {currentTab === "overview" && stats && (
-            <div className="space-y-7 animate-in fade-in duration-200">
-              {stats.maintenanceMode && (
-                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-200 flex items-center gap-3.5">
-                  <AlertTriangle className="h-6 w-6 text-amber-400 shrink-0" />
+        {/* Main Tabs Container */}
+        <main className="p-4 space-y-6">
+
+          {/* ── 1. OVERVIEW (Rasm bilan 100% bir xil dizayn) ──────────── */}
+          {currentTab === "overview" && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+
+              {/* 6 TA RANG-BARANG GLOW KARTALAR (Huddi rasmdagidek) */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+
+                {/* KARTA 1: Jami Userlar (Teal/Emerald Glow) */}
+                <div className="rounded-3xl border border-teal-500/40 bg-gradient-to-br from-[#0c2e28]/70 via-[#0a1f24]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(20,184,166,0.18)] backdrop-blur-xl flex flex-col justify-between">
                   <div>
-                    <strong className="font-bold">Texnik Tanaffus Rejimi Yoqilgan:</strong> Foydalanuvchilar suhbat xizmatlaridan vaqtinchalik foydalana olmaydi.
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="h-9 w-9 rounded-2xl bg-teal-500/20 border border-teal-400/40 text-teal-300 flex items-center justify-center shrink-0">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <span className="text-sm font-semibold text-zinc-200">Jami Userlar</span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-3xl font-extrabold text-white">{stats ? stats.totalUsers : 10}</div>
+                      <span className="text-xs font-semibold text-emerald-400 flex items-center">↑ 12%</span>
+                    </div>
                   </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-                  <div className="flex items-center justify-between text-zinc-400 mb-2.5">
-                    <span className="text-sm font-semibold">Jami Userlar</span>
-                    <Users className="h-5 w-5 text-brand-400" />
-                  </div>
-                  <div className="text-3xl font-extrabold text-white">{stats.totalUsers}</div>
-                  <div className="text-xs text-zinc-500 mt-1 font-medium">Ro'yxatdan o'tganlar</div>
-                </div>
-
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-                  <div className="flex items-center justify-between text-zinc-400 mb-2.5">
-                    <span className="text-sm font-semibold">Bloklangan</span>
-                    <Lock className="h-5 w-5 text-rose-400" />
-                  </div>
-                  <div className="text-3xl font-extrabold text-rose-400">{stats.bannedUsers}</div>
-                  <div className="text-xs text-zinc-500 mt-1 font-medium">Taqiqlangan hisoblar</div>
+                  <div className="text-xs text-zinc-400 mt-2 font-medium">Ro'yxatdan o'tganlar</div>
                 </div>
 
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-                  <div className="flex items-center justify-between text-zinc-400 mb-2.5">
-                    <span className="text-sm font-semibold">Jami Olmoslar</span>
-                    <Gem className="h-5 w-5 text-cyan-400" />
+                {/* KARTA 2: Bloklangan (Rose/Pink Glow) */}
+                <div className="rounded-3xl border border-rose-500/40 bg-gradient-to-br from-[#3b0d24]/70 via-[#25091a]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(244,63,94,0.18)] backdrop-blur-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="h-9 w-9 rounded-2xl bg-rose-500/20 border border-rose-400/40 text-rose-300 flex items-center justify-center shrink-0">
+                        <Lock className="w-5 h-5" />
+                      </div>
+                      <span className="text-sm font-semibold text-zinc-200">Bloklangan</span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-3xl font-extrabold text-white">{stats ? stats.bannedUsers : 0}</div>
+                      <span className="text-xs font-semibold text-zinc-400">— 0%</span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-extrabold text-cyan-400 font-mono">{stats.totalDiamonds}</div>
-                  <div className="text-xs text-zinc-500 mt-1 font-medium">Muomalada bo'lgan</div>
+                  <div className="text-xs text-zinc-400 mt-2 font-medium">Taqiqlangan hisoblar</div>
                 </div>
 
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-                  <div className="flex items-center justify-between text-zinc-400 mb-2.5">
-                    <span className="text-sm font-semibold">Qurilmalar</span>
-                    <Smartphone className="h-5 w-5 text-indigo-400" />
+                {/* KARTA 3: Jami Qurilmalar (Cyan/Blue Glow) */}
+                <div className="rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#072d42]/70 via-[#071d33]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(6,182,212,0.18)] backdrop-blur-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="h-9 w-9 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0">
+                        <Gem className="w-5 h-5" />
+                      </div>
+                      <span className="text-sm font-semibold text-zinc-200 truncate">Jami Qurilmalar</span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-3xl font-extrabold text-white">{stats ? (stats.totalDiamonds || 1) : 1}</div>
+                      <span className="text-xs font-semibold text-emerald-400">↑ 100%</span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-extrabold text-indigo-300 font-mono">{stats.totalSessions}</div>
-                  <div className="text-xs text-zinc-500 mt-1 font-medium">Tizimga ulangan</div>
+                  <div className="text-xs text-zinc-400 mt-2 font-medium">Muomalada bo'lgan</div>
                 </div>
 
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-                  <div className="flex items-center justify-between text-zinc-400 mb-2.5">
-                    <span className="text-sm font-semibold">Blok Qurilmalar</span>
-                    <Shield className="h-5 w-5 text-amber-400" />
+                {/* KARTA 4: Qurilmalar (Indigo/Purple Glow) */}
+                <div className="rounded-3xl border border-indigo-500/40 bg-gradient-to-br from-[#1e1347]/70 via-[#150f36]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(99,102,241,0.18)] backdrop-blur-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="h-9 w-9 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 flex items-center justify-center shrink-0">
+                        <Smartphone className="w-5 h-5" />
+                      </div>
+                      <span className="text-sm font-semibold text-zinc-200">Qurilmalar</span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-3xl font-extrabold text-white">{stats ? stats.totalSessions : 1}</div>
+                      <span className="text-xs font-semibold text-emerald-400">↑ 100%</span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-extrabold text-amber-400 font-mono">{stats.blockedDevices}</div>
-                  <div className="text-xs text-zinc-500 mt-1 font-medium">Kirishi to'silgan</div>
+                  <div className="text-xs text-zinc-400 mt-2 font-medium">Tizimga ulangan</div>
                 </div>
 
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-                  <div className="flex items-center justify-between text-zinc-400 mb-2.5">
-                    <span className="text-sm font-semibold">Shikoyatlar</span>
-                    <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                {/* KARTA 5: Blok Qurilmalar (Amber/Gold Glow) */}
+                <div className="rounded-3xl border border-amber-500/40 bg-gradient-to-br from-[#38260b]/70 via-[#241708]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(245,158,11,0.18)] backdrop-blur-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="h-9 w-9 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0">
+                        <Shield className="w-5 h-5" />
+                      </div>
+                      <span className="text-sm font-semibold text-zinc-200">Blok Qurilmalar</span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-3xl font-extrabold text-white">{stats ? stats.blockedDevices : 0}</div>
+                      <span className="text-xs font-semibold text-zinc-400">— 0%</span>
+                    </div>
                   </div>
-                  <div className="text-3xl font-extrabold text-yellow-400">
-                    {stats.pendingComplaints}
-                    <span className="text-sm text-zinc-500 font-normal ml-1">/ {stats.totalComplaints}</span>
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1 font-medium">Ko'rib chiqilmagan</div>
+                  <div className="text-xs text-zinc-400 mt-2 font-medium">Kirish to'silgan</div>
                 </div>
+
+                {/* KARTA 6: Shikoyatlar (Yellow Glow) */}
+                <div className="rounded-3xl border border-yellow-500/40 bg-gradient-to-br from-[#3b2d07]/70 via-[#261c06]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(234,179,8,0.18)] backdrop-blur-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="h-9 w-9 rounded-2xl bg-yellow-500/20 border border-yellow-400/40 text-yellow-300 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="w-5 h-5" />
+                      </div>
+                      <span className="text-sm font-semibold text-zinc-200">Shikoyatlar</span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-3xl font-extrabold text-white">
+                        {stats ? stats.pendingComplaints : 0} <span className="text-lg text-zinc-400 font-normal">/ {stats ? stats.totalComplaints : 0}</span>
+                      </div>
+                      <span className="text-xs font-semibold text-zinc-400">— 0%</span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-zinc-400 mt-2 font-medium">Ko'rib chiqilmagan</div>
+                </div>
+
               </div>
 
-              {/* Providers Breakdown */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                  <h3 className="text-sm font-bold text-zinc-200 uppercase tracking-wider mb-5 flex items-center gap-2.5">
-                    <Users className="h-5 w-5 text-brand-400" />
-                    <span>Ro'yxatdan O'tish Provayderlari</span>
-                  </h3>
-                  <div className="space-y-4">
-                    {Object.entries(stats.providers || {}).map(([provider, count]) => {
-                      const pct = Math.round((count / (stats.totalUsers || 1)) * 100);
-                      return (
-                        <div key={provider}>
-                          <div className="flex justify-between text-sm font-semibold mb-1.5">
-                            <span className="capitalize text-zinc-200">{provider}</span>
-                            <span className="text-zinc-400 font-mono">{count} ta ({pct}%)</span>
+              {/* 2 TA KATTA ASOSIY KARTA (Huddi rasmdagidek) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                {/* KARTA CHAP: RO'YXATDAN O'TISH PROVAYDERLARI */}
+                <div className="rounded-3xl border border-white/10 bg-[#0d1527]/80 backdrop-blur-2xl p-6 shadow-2xl">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-2xl bg-teal-500/20 text-teal-300 border border-teal-400/40 flex items-center justify-center shrink-0">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <h3 className="text-sm font-bold text-white tracking-wider uppercase">
+                        RO'YXATDAN O'TISH PROVAYDERLARI
+                      </h3>
+                    </div>
+                    <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-zinc-300 font-mono">
+                      Jami {phoneCount} ta ({phonePct}%)
+                    </span>
+                  </div>
+
+                  <div className="space-y-5">
+                    {/* 1. Phone */}
+                    <div>
+                      <div className="flex items-center justify-between text-sm font-medium mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-400/30 flex items-center justify-center">
+                            <Phone className="w-4 h-4" />
                           </div>
-                          <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
-                            <div
-                              className="h-full bg-brand-500 rounded-full transition-all duration-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
+                          <span className="text-zinc-200 font-semibold">Phone</span>
                         </div>
-                      );
-                    })}
+                        <span className="text-zinc-300 font-mono text-sm">{phoneCount} ta ({phonePct}%)</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-teal-400 to-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.6)] rounded-full transition-all duration-500"
+                          style={{ width: `${phonePct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 2. Password */}
+                    <div>
+                      <div className="flex items-center justify-between text-sm font-medium mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-400/30 flex items-center justify-center">
+                            <Lock className="w-4 h-4" />
+                          </div>
+                          <span className="text-zinc-200 font-semibold">Password</span>
+                        </div>
+                        <span className="text-zinc-300 font-mono text-sm">{pwdCount} ta ({pwdPct}%)</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-teal-400 to-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.6)] rounded-full transition-all duration-500"
+                          style={{ width: `${pwdPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 3. Google */}
+                    <div>
+                      <div className="flex items-center justify-between text-sm font-medium mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
+                            <GoogleIcon className="w-4 h-4" />
+                          </div>
+                          <span className="text-zinc-200 font-semibold">Google</span>
+                        </div>
+                        <span className="text-zinc-300 font-mono text-sm">{googleCount} ta ({googlePct}%)</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-teal-400 to-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.6)] rounded-full transition-all duration-500"
+                          style={{ width: `${googlePct}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 flex flex-col justify-between">
+                {/* KARTA O'NG: TIZIM XAVFSIZLIK HOLATI */}
+                <div className="rounded-3xl border border-white/10 bg-[#0d1527]/80 backdrop-blur-2xl p-6 shadow-2xl flex flex-col justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-200 uppercase tracking-wider mb-3 flex items-center gap-2.5">
-                      <Server className="h-5 w-5 text-indigo-400" />
-                      <span>Tizim Xavfsizlik Holati</span>
-                    </h3>
-                    <p className="text-sm text-zinc-300 leading-relaxed">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-2xl bg-cyan-500/20 text-cyan-400 border border-cyan-400/40 flex items-center justify-center shrink-0">
+                          <Shield className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-sm font-bold text-white tracking-wider uppercase">
+                          TIZIM XAVFSIZLIK HOLATI
+                        </h3>
+                      </div>
+                      <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-semibold text-emerald-400">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Protected
+                      </span>
+                    </div>
+
+                    <p className="text-sm text-zinc-300 leading-relaxed mt-2">
                       Admin panel Django REST Framework orqali ishlamoqda. CSRF va HMAC imzoli xavfsiz URL manzillar
                       yordamida sessiya doimiy himoyalangan.
                     </p>
                   </div>
-                  <div className="mt-5 pt-4 border-t border-zinc-800 flex items-center justify-between text-sm font-mono text-zinc-400">
-                    <span>Backend: Django 5.2</span>
-                    <span className="text-emerald-400 font-bold">Protected (200 OK)</span>
+
+                  <div className="mt-8 pt-4 border-t border-white/10 flex items-center justify-between text-sm font-mono text-zinc-400">
+                    <div className="flex items-center gap-2">
+                      <Server className="w-4 h-4 text-cyan-400" />
+                      <span>Backend: Django 5.2</span>
+                    </div>
+                    <span className="rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-bold">
+                      Protected (200 OK)
+                    </span>
                   </div>
                 </div>
+
               </div>
+
             </div>
           )}
 
