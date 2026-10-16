@@ -26,6 +26,12 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
+import type { UserNavTab } from "@/components/UserSidebar";
+
+interface AccountMenuProps {
+  onSelectTab?: (tab: UserNavTab) => void;
+}
+
 /** 
  * Navbar account qismi:
  * Spiker avatar + kiritilgan ism.
@@ -33,10 +39,18 @@ import { cn } from "@/lib/utils";
  * Olmoslar soni, Profil, Do'stlar, Gaplashish tarixi, Yordam, Sozlamalar,
  * chiziq, Shikoyat bo'limi, Admin bilan bog'lanish, chiziq, Hisobdan chiqish.
  */
-export default function AccountMenu() {
+export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
   const { t } = useLanguage();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const handleTabClick = (tab: UserNavTab) => {
+    if (onSelectTab) {
+      onSelectTab(tab);
+    } else {
+      navigate("/dashboard");
+    }
+  };
 
   const displayName =
     user?.name ||
@@ -54,7 +68,7 @@ export default function AccountMenu() {
           className={cn(
             "inline-flex items-center gap-2 rounded-full border border-border/80 bg-white/[0.06] py-1 pl-1.5 pr-3",
             "transition-all duration-200 hover:border-brand-400/70 hover:bg-brand-500/15 shadow-sm",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 cursor-pointer"
           )}
           aria-label="Foydalanuvchi hisobi"
         >
@@ -66,82 +80,76 @@ export default function AccountMenu() {
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-[260px] p-2 bg-night-950/95 border-border/80 backdrop-blur-xl shadow-glow-sm">
+      <DropdownMenuContent align="end" className="w-[260px] p-2 bg-[#0e0a24]/95 border-white/[0.12] backdrop-blur-xl shadow-2xl z-50">
         {/* ── Foydalanuvchi ismi va avatari ── */}
-        <div className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-2.5">
+        <div
+          onClick={() => handleTabClick("profile")}
+          className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-2.5 cursor-pointer hover:bg-white/[0.08] transition-colors"
+        >
           <SpeakerAvatar size={38} />
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-foreground">{displayName}</p>
+            <p className="truncate text-sm font-bold text-white">{displayName}</p>
             {user?.username ? (
-              <p className="truncate text-[11.5px] font-medium text-brand-300">@{user.username}</p>
+              <p className="truncate text-[11.5px] font-medium text-violet-300">@{user.username}</p>
             ) : user?.email || user?.phone ? (
-              <p className="truncate text-[11.5px] text-muted-foreground">{user?.email || user?.phone}</p>
+              <p className="truncate text-[11.5px] text-zinc-400">{user?.email || user?.phone}</p>
             ) : null}
           </div>
         </div>
 
         {/* ── 1. Yig'gan olmoslar soni ── */}
-        <div className="mt-2 flex items-center gap-2.5 rounded-xl border border-brand-500/30 bg-gradient-to-r from-violet-600/20 to-fuchsia-500/15 px-3 py-2.5">
-          <Gem className="h-4 w-4 shrink-0 text-brand-300 animate-pulse" />
-          <span className="text-xs font-semibold text-muted-foreground">
+        <div className="mt-2 flex items-center gap-2.5 rounded-xl border border-violet-500/30 bg-gradient-to-r from-violet-600/20 to-fuchsia-500/15 px-3 py-2.5">
+          <Gem className="h-4 w-4 shrink-0 text-violet-300 animate-pulse" />
+          <span className="text-xs font-semibold text-zinc-300">
             {t.account.diamonds || "Olmoslar"}
           </span>
-          <span className="ml-auto text-base font-extrabold tabular-nums text-brand-200">
+          <span className="ml-auto text-base font-extrabold tabular-nums text-violet-200">
             {diamonds}
           </span>
         </div>
 
-        <DropdownMenuSeparator className="my-2 bg-border/60" />
+        <DropdownMenuSeparator className="my-2 bg-white/[0.08]" />
 
         {/* ── 2. Profil ── */}
         <DropdownMenuItem
-          onClick={() => navigate("/dashboard")}
-          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5"
+          onClick={() => handleTabClick("profile")}
+          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5 text-zinc-200 hover:text-white"
         >
-          <User className="h-4 w-4 shrink-0 text-brand-300" />
+          <User className="h-4 w-4 shrink-0 text-violet-400" />
           <span className="text-[13.5px] font-medium">{t.account.profile || "Profil"}</span>
         </DropdownMenuItem>
 
         {/* ── 3. Do'stlar ── */}
         <DropdownMenuItem
-          onClick={() => navigate("/dashboard")}
-          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5"
+          onClick={() => handleTabClick("friends")}
+          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5 text-zinc-200 hover:text-white"
         >
-          <Users className="h-4 w-4 shrink-0 text-brand-300" />
+          <Users className="h-4 w-4 shrink-0 text-violet-400" />
           <span className="text-[13.5px] font-medium">{t.account.friends || "Do'stlar"}</span>
         </DropdownMenuItem>
 
         {/* ── 4. Gaplashish tarixi ── */}
         <DropdownMenuItem
-          onClick={() => navigate("/dashboard")}
-          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5"
+          onClick={() => handleTabClick("history")}
+          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5 text-zinc-200 hover:text-white"
         >
-          <History className="h-4 w-4 shrink-0 text-brand-300" />
-          <span className="text-[13.5px] font-medium">{t.account.history || "Gaplashish tarixi"}</span>
+          <History className="h-4 w-4 shrink-0 text-violet-400" />
+          <span className="text-[13.5px] font-medium">{t.account.history || "Mening tarixim"}</span>
         </DropdownMenuItem>
 
         {/* ── 5. Yordam ── */}
         <DropdownMenuItem
-          onClick={() => navigate("/dashboard")}
-          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5"
+          onClick={() => handleTabClick("help")}
+          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5 text-zinc-200 hover:text-white"
         >
-          <HelpCircle className="h-4 w-4 shrink-0 text-brand-300" />
+          <HelpCircle className="h-4 w-4 shrink-0 text-violet-400" />
           <span className="text-[13.5px] font-medium">{t.account.help || "Yordam"}</span>
         </DropdownMenuItem>
 
-        {/* ── 6. Sozlamalar ── */}
+        {/* ── 6. Qurilmalarim ── */}
         <DropdownMenuItem
-          onClick={() => navigate("/dashboard")}
-          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5"
-        >
-          <Settings className="h-4 w-4 shrink-0 text-brand-300" />
-          <span className="text-[13.5px] font-medium">{t.account.settings || "Sozlamalar"}</span>
-        </DropdownMenuItem>
-
-        {/* ── 6.1. Qurilmalarim ── */}
-        <DropdownMenuItem
-          onClick={() => navigate("/dashboard?tab=devices")}
-          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5"
+          onClick={() => handleTabClick("devices")}
+          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5 text-zinc-200 hover:text-white"
         >
           <Laptop className="h-4 w-4 shrink-0 text-cyan-400" />
           <span className="text-[13.5px] font-medium">Qurilmalarim</span>
@@ -154,28 +162,28 @@ export default function AccountMenu() {
         </div>
 
         {/* ── Chiziq ── */}
-        <DropdownMenuSeparator className="my-2 bg-border/60" />
+        <DropdownMenuSeparator className="my-2 bg-white/[0.08]" />
 
         {/* ── 7. Shikoyat bo'limi ── */}
         <DropdownMenuItem
-          onClick={() => navigate("/dashboard")}
-          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5"
+          onClick={() => handleTabClick("feedback")}
+          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5 text-zinc-200 hover:text-white"
         >
           <Flag className="h-4 w-4 shrink-0 text-amber-400" />
-          <span className="text-[13.5px] font-medium">{t.account.complaints || "Shikoyat bo'limi"}</span>
+          <span className="text-[13.5px] font-medium">{t.account.complaints || "Shikoyat / Taklif"}</span>
         </DropdownMenuItem>
 
         {/* ── 8. Admin bilan bog'lanish ── */}
         <DropdownMenuItem
-          onClick={() => navigate("/dashboard")}
-          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5"
+          onClick={() => handleTabClick("help")}
+          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5 text-zinc-200 hover:text-white"
         >
           <Headset className="h-4 w-4 shrink-0 text-cyan-400" />
           <span className="text-[13.5px] font-medium">{t.account.contactAdmin || "Admin bilan bog'lanish"}</span>
         </DropdownMenuItem>
 
         {/* ── Chiziq ── */}
-        <DropdownMenuSeparator className="my-2 bg-border/60" />
+        <DropdownMenuSeparator className="my-2 bg-white/[0.08]" />
 
         {/* ── 9. Hisobdan chiqish ── */}
         <DropdownMenuItem

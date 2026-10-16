@@ -56,6 +56,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { DASHBOARD_TRANSLATIONS } from "@/i18n/dashboardTranslations";
 import UserSidebar, { type UserNavTab } from "@/components/UserSidebar";
+import AccountMenu from "@/components/AccountMenu";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import CountryFlag from "@/components/CountryFlag";
 import SpeakerAvatar from "@/components/SpeakerAvatar";
@@ -1886,6 +1887,11 @@ export default function UserHome() {
                 <Bell className="h-4 w-4" />
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-violet-400 ring-2 ring-[#080514]" />
               </button>
+
+              {/* Desktop Account Menu (Telefonda pastdagi navigatsiyada, Desktopda esa tepada chiqadi) */}
+              <div className="hidden md:block">
+                <AccountMenu onSelectTab={(tab) => setActiveTab(tab)} />
+              </div>
             </div>
           </header>
         )}

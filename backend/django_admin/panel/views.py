@@ -196,6 +196,120 @@ class AdminUsersView(APIView):
             "users": users
         })
 
+import urllib.request
+import urllib.parse
+
+def get_supabase_config():
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+    if not supabase_url or not supabase_key:
+        env_file = os.path.abspath(os.path.join(BASE_DIR, "..", ".env"))
+        if os.path.exists(env_file):
+            try:
+                with open(env_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("SUPABASE_URL="):
+                            supabase_url = line.split("=", 1)[1].strip()
+                        elif line.startswith("SUPABASE_SERVICE_KEY="):
+                            supabase_key = line.split("=", 1)[1].strip()
+            except Exception:
+                pass
+    return supabase_url, supabase_key
+
+def delete_user_from_supabase(user_id, email=None, phone=None):
+    supabase_url, supabase_key = get_supabase_config()
+    if not supabase_url or not supabase_key:
+        return False
+    
+    headers = {
+        "apikey": supabase_key,
+        "Authorization": f"Bearer {supabase_key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+
+    # 1. Delete from onboarding_answers
+    try:
+        req = urllib.request.Request(
+            f"{supabase_url}/rest/v1/onboarding_answers?user_id=eq.{user_id}",
+            headers=headers,
+            method="DELETE"
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        print(f"Supabase delete onboarding_answers: {e}")
+
+    # 2. Delete from google_accounts if exists
+    try:
+        req = urllib.request.Request(
+            f"{supabase_url}/rest/v1/google_accounts?user_id=eq.{user_id}",
+            headers=headers,
+            method="DELETE"
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        print(f"Supabase delete google_accounts: {e}")
+
+    # 3. Delete from profiles
+    try:
+        req = urllib.request.Request(
+            f"{supabase_url}/rest/v1/profiles?id=eq.{user_id}",
+            headers=headers,
+            method="DELETE"
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        print(f"Supabase delete profiles by id: {e}")
+
+    if email:
+        try:
+            req = urllib.request.Request(
+                f"{supabase_url}/rest/v1/profiles?email=eq.{urllib.parse.quote(email)}",
+                headers=headers,
+                method="DELETE"
+            )
+            urllib.request.urlopen(req, timeout=5)
+        except Exception:
+            pass
+
+    if phone:
+        try:
+            req = urllib.request.Request(
+                f"{supabase_url}/rest/v1/profiles?phone=eq.{urllib.parse.quote(phone)}",
+                headers=headers,
+                method="DELETE"
+            )
+            urllib.request.urlopen(req, timeout=5)
+        except Exception:
+            pass
+
+    return True
+
+def sync_user_to_supabase(user_id, updates):
+    supabase_url, supabase_key = get_supabase_config()
+    if not supabase_url or not supabase_key:
+        return False
+    try:
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        data = json.dumps(updates).encode("utf-8")
+        req = urllib.request.Request(
+            f"{supabase_url}/rest/v1/profiles?id=eq.{user_id}",
+            data=data,
+            headers=headers,
+            method="PATCH"
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
+    except Exception as e:
+        print(f"Supabase patch err: {e}")
+        return False
+
 class AdminUserActionView(APIView):
     def post(self, request, user_id):
         action = request.data.get("action")
@@ -207,7 +321,7 @@ class AdminUserActionView(APIView):
                 target = u
                 break
 
-        if not target:
+        if not target and action != "delete":
             return Response(
                 {"success": False, "message": "Foydalanuvchi topilmadi"},
                 status=status.HTTP_404_NOT_FOUND
@@ -216,22 +330,50 @@ class AdminUserActionView(APIView):
         if action == "ban":
             target["isBanned"] = True
             target["bannedAt"] = datetime.utcnow().isoformat()
+            sync_user_to_supabase(user_id, {"is_banned": True})
             log_admin_action("user_banned", f"Foydalanuvchi bloklandi: {target.get('name') or target.get('phone') or user_id}", user_id)
         elif action == "unban":
             target["isBanned"] = False
             target.pop("bannedAt", None)
+            sync_user_to_supabase(user_id, {"is_banned": False})
             log_admin_action("user_unbanned", f"Foydalanuvchi blokdan chiqarildi: {target.get('name') or target.get('phone') or user_id}", user_id)
         elif action == "add_diamonds":
             amount = int(request.data.get("amount", 0))
             current = target.get("diamonds", 0)
             target["diamonds"] = max(0, current + amount)
-            log_admin_action("diamonds_adjusted", f"{amount} ta olmos o'zgartirildi (Yangi balans: {target['diamonds']})", user_id)
+            sync_user_to_supabase(user_id, {"diamonds": target["diamonds"]})
+            log_admin_action("diamonds_adjusted", f"{amount} ta olmos hadya qilindi (Yangi balans: {target['diamonds']})", user_id)
+        elif action == "toggle_premium":
+            target["isPremium"] = not target.get("isPremium", False)
+            sync_user_to_supabase(user_id, {"is_premium": target["isPremium"]})
+            status_text = "yoqildi" if target["isPremium"] else "o'chirildi"
+            log_admin_action("premium_toggled", f"Premium maqomi {status_text}", user_id)
+        elif action == "send_message":
+            msg_text = request.data.get("message", "").strip()
+            if not msg_text:
+                return Response({"success": False, "message": "Xabar matni bo'sh bo'lishi mumkin emas"}, status=status.HTTP_400_BAD_REQUEST)
+            msgs = target.setdefault("adminMessages", [])
+            new_msg = {
+                "id": "msg_" + uuid.uuid4().hex[:8],
+                "text": msg_text,
+                "sentAt": datetime.utcnow().isoformat(),
+                "sender": "Admin",
+                "read": False
+            }
+            msgs.insert(0, new_msg)
+            log_admin_action("admin_message_sent", f"Foydalanuvchiga xabar: {msg_text[:40]}...", user_id)
         elif action == "toggle_verified":
             target["isVerified"] = not target.get("isVerified", False)
+            sync_user_to_supabase(user_id, {"is_verified": target["isVerified"]})
             log_admin_action("verification_toggled", f"Tasdiqlanganlik holati: {target['isVerified']}", user_id)
         elif action == "delete":
+            email = target.get("email") if target else None
+            phone = target.get("phone") if target else None
+            # 1. Supabasedan butunlay o'chirish
+            delete_user_from_supabase(user_id, email=email, phone=phone)
+            # 2. Local bazadan o'chirish
             users = [u for u in users if u.get("id") != user_id]
-            log_admin_action("user_deleted", f"Foydalanuvchi o'chirildi: {user_id}", user_id)
+            log_admin_action("user_deleted", f"Foydalanuvchi tizim va Supabasedan butunlay o'chirildi: {user_id}", user_id)
         else:
             return Response(
                 {"success": False, "message": f"Noma'lum amal: {action}"},

@@ -39,6 +39,11 @@ app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/presence", presenceRoutes);
 app.use("/api/matchmaking", matchmakingRoutes);
 
+// Redirect /admin on port 5000 directly to React Admin Panel on 5173
+app.get("/admin", (req, res) => {
+  res.redirect("http://localhost:5173/admin");
+});
+
 // Proxy to Django Admin Backend
 const DJANGO_PORT = process.env.DJANGO_PORT || 8000;
 app.use("/api/admin", async (req, res) => {

@@ -22,6 +22,7 @@ import {
   X,
   Server,
   Phone,
+  Crown,
 } from "lucide-react";
 import { adminApiGet, adminApiPost } from "@/lib/api";
 
@@ -47,6 +48,8 @@ interface UserItem {
   isBanned?: boolean;
   bannedAt?: string;
   isVerified?: boolean;
+  isPremium?: boolean;
+  adminMessages?: Array<{ id: string; text: string; date: string; read?: boolean }>;
   createdAt?: string;
 }
 
@@ -146,6 +149,10 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<UserItem[]>([]);
   const [userSearch, setUserSearch] = useState("");
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [giftDiamondsMap, setGiftDiamondsMap] = useState<Record<string, number | "">>({});
+  const [userMessageMap, setUserMessageMap] = useState<Record<string, string>>({});
+  const [deviceSearch, setDeviceSearch] = useState("");
   const [complaints, setComplaints] = useState<ComplaintItem[]>([]);
   const [devices, setDevices] = useState<DeviceItem[]>([]);
   const [settingsData, setSettingsData] = useState<PlatformSettings>({
@@ -370,6 +377,18 @@ export default function AdminDashboard() {
     );
   }, [users, userSearch]);
 
+  const filteredDevices = useMemo(() => {
+    if (!deviceSearch.trim()) return devices;
+    const q = deviceSearch.toLowerCase();
+    return devices.filter(
+      (d) =>
+        (d.deviceName && d.deviceName.toLowerCase().includes(q)) ||
+        (d.ip && d.ip.includes(q)) ||
+        (d.userId && d.userId.toLowerCase().includes(q)) ||
+        (d.userAgent && d.userAgent.toLowerCase().includes(q))
+    );
+  }, [devices, deviceSearch]);
+
   // ── 1. LOGIN SCREEN ───────────────────────────────────────────────────────
   if (!adminToken) {
     return (
@@ -484,27 +503,23 @@ export default function AdminDashboard() {
                 {/* Active: Umumiy Ko'rsatkichlar */}
                 <button
                   onClick={() => setCurrentTab("overview")}
-                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all outline-none focus:outline-none ring-0 ${
                     currentTab === "overview"
                       ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      : "text-zinc-400 border border-transparent hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
-                    currentTab === "overview" ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/40" : "text-zinc-400"
-                  }`}>
-                    <LayoutDashboard className="w-4 h-4" />
-                  </div>
+                  <LayoutDashboard className="w-5 h-5 ml-1.5" />
                   <span>Umumiy Ko'rsatkichlar</span>
                 </button>
 
                 {/* Foydalanuvchilar */}
                 <button
                   onClick={() => setCurrentTab("users")}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all outline-none focus:outline-none ring-0 ${
                     currentTab === "users"
-                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
+                      : "text-zinc-400 border border-transparent hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <div className="flex items-center gap-3.5">
@@ -519,10 +534,10 @@ export default function AdminDashboard() {
                 {/* Shikoyatlar */}
                 <button
                   onClick={() => setCurrentTab("complaints")}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all outline-none focus:outline-none ring-0 ${
                     currentTab === "complaints"
-                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
+                      : "text-zinc-400 border border-transparent hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <div className="flex items-center gap-3.5">
@@ -539,10 +554,10 @@ export default function AdminDashboard() {
                 {/* Qurilmalar */}
                 <button
                   onClick={() => setCurrentTab("devices")}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all outline-none focus:outline-none ring-0 ${
                     currentTab === "devices"
-                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
+                      : "text-zinc-400 border border-transparent hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <div className="flex items-center gap-3.5">
@@ -564,10 +579,10 @@ export default function AdminDashboard() {
               <div className="space-y-1">
                 <button
                   onClick={() => setCurrentTab("settings")}
-                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all outline-none focus:outline-none ring-0 ${
                     currentTab === "settings"
-                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
+                      : "text-zinc-400 border border-transparent hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <Settings className="w-5 h-5 ml-1.5" />
@@ -576,10 +591,10 @@ export default function AdminDashboard() {
 
                 <button
                   onClick={() => setCurrentTab("announcements")}
-                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all outline-none focus:outline-none ring-0 ${
                     currentTab === "announcements"
-                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
+                      : "text-zinc-400 border border-transparent hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <Bell className="w-5 h-5 ml-1.5" />
@@ -588,10 +603,10 @@ export default function AdminDashboard() {
 
                 <button
                   onClick={() => setCurrentTab("logs")}
-                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                  className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all outline-none focus:outline-none ring-0 ${
                     currentTab === "logs"
-                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
+                      : "text-zinc-400 border border-transparent hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <History className="w-5 h-5 ml-1.5" />
@@ -630,18 +645,8 @@ export default function AdminDashboard() {
       {/* ── RIGHT MAIN PANEL (Huddi rasmdagidek) ─────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto relative z-10">
 
-        {/* Top Bar */}
-        <header className="px-5 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300">
-              <LayoutDashboard className="w-4.5 h-4.5" />
-            </div>
-            <div className="text-sm font-medium">
-              <span className="text-zinc-400">Panel</span>
-              <span className="text-zinc-600 mx-2">/</span>
-              <span className="text-white font-bold capitalize">{currentTab}</span>
-            </div>
-          </div>
+        {/* Top Bar (Uycha va Panel/Overview olib tashlandi) */}
+        <header className="px-5 py-3 flex items-center justify-end">
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-xs font-mono text-zinc-300">
@@ -925,10 +930,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900/50 shadow-sm">
+              <div className="overflow-x-auto rounded-3xl border border-white/10 bg-[#0d1527]/80 backdrop-blur-2xl shadow-2xl">
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
-                    <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 font-bold uppercase tracking-wider text-xs">
+                    <tr className="border-b border-white/10 bg-white/5 text-zinc-400 font-bold uppercase tracking-wider text-xs">
                       <th className="py-4 px-5">Foydalanuvchi</th>
                       <th className="py-4 px-5">Aloqa</th>
                       <th className="py-4 px-5">Provayder</th>
@@ -937,7 +942,7 @@ export default function AdminDashboard() {
                       <th className="py-4 px-5 text-right">Amallar</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
+                  <tbody className="divide-y divide-white/5">
                     {filteredUsers.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-zinc-500 text-sm">
@@ -946,77 +951,278 @@ export default function AdminDashboard() {
                       </tr>
                     ) : (
                       filteredUsers.map((u) => (
-                        <tr key={u.id} className="hover:bg-zinc-800/30 transition-colors">
-                          <td className="py-4 px-5 font-semibold text-white">
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20 flex items-center justify-center font-bold text-sm uppercase">
-                                {(u.name || u.email || u.phone || "U")[0]}
-                              </div>
-                              <div>
-                                <div className="text-sm font-bold text-white">{u.name || "Nomsiz"}</div>
-                                <div className="text-xs text-zinc-500 font-mono truncate max-w-[140px]">
-                                  {u.id}
+                        <div key={u.id} className="contents">
+                          <tr
+                            onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
+                            className={`cursor-pointer transition-colors ${
+                              expandedUserId === u.id ? "bg-white/[0.08]" : "hover:bg-white/5"
+                            }`}
+                          >
+                            <td className="py-4 px-5 font-semibold text-white">
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-2xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-sm uppercase shrink-0">
+                                  {(u.name || u.email || u.phone || "U")[0]}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-white">{u.name || "Nomsiz"}</span>
+                                    {u.isPremium && (
+                                      <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold">
+                                        VIP
+                                      </span>
+                                    )}
+                                    {u.isVerified && (
+                                      <span className="text-cyan-400 text-xs font-bold">✓</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-zinc-500 font-mono truncate max-w-[140px]">
+                                    {u.id}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="py-4 px-5 text-zinc-200 font-medium">{u.email || u.phone || "—"}</td>
-                          <td className="py-4 px-5">
-                            <span className="rounded-lg bg-zinc-800 px-2.5 py-1 text-xs font-semibold text-zinc-300 capitalize">
-                              {u.provider}
-                            </span>
-                          </td>
-                          <td className="py-4 px-5 font-mono font-bold text-cyan-300 text-sm">
-                            {u.diamonds ?? 0}
-                          </td>
-                          <td className="py-4 px-5">
-                            {u.isBanned ? (
-                              <span className="rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-1 text-xs font-bold">
-                                Bloklangan
+                            </td>
+                            <td className="py-4 px-5 text-zinc-200 font-medium">{u.email || u.phone || "—"}</td>
+                            <td className="py-4 px-5">
+                              <span className="rounded-lg bg-white/5 border border-white/10 px-2.5 py-1 text-xs font-semibold text-zinc-300 capitalize">
+                                {u.provider}
                               </span>
-                            ) : (
-                              <span className="rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 text-xs font-bold">
-                                Faol
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-4 px-5 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => setDiamondModalUser(u)}
-                                className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-cyan-300 hover:bg-cyan-500/20 text-xs font-bold transition-all"
-                              >
-                                + Olmos
-                              </button>
+                            </td>
+                            <td className="py-4 px-5 font-mono font-bold text-cyan-300 text-sm">
+                              {u.diamonds ?? 0}
+                            </td>
+                            <td className="py-4 px-5">
                               {u.isBanned ? (
-                                <button
-                                  onClick={() => handleUserAction(u.id, "unban")}
-                                  className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-emerald-300 hover:bg-emerald-500/20 text-xs font-bold transition-all"
-                                >
-                                  Ochish
-                                </button>
+                                <span className="rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30 px-3 py-1 text-xs font-bold">
+                                  Bloklangan
+                                </span>
                               ) : (
-                                <button
-                                  onClick={() => handleUserAction(u.id, "ban")}
-                                  className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-rose-300 hover:bg-rose-500/20 text-xs font-bold transition-all"
-                                >
-                                  Ban
-                                </button>
+                                <span className="rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 text-xs font-bold">
+                                  Faol
+                                </span>
                               )}
-                              <button
-                                onClick={() => {
-                                  if (confirm("Ushbu foydalanuvchini o'chirmoqchimisiz?")) {
-                                    handleUserAction(u.id, "delete");
-                                  }
-                                }}
-                                className="rounded-lg border border-zinc-800 bg-zinc-900 p-2 text-zinc-400 hover:text-rose-400 hover:border-rose-500/30 transition-all"
-                                title="O'chirish"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                            <td className="py-4 px-5 text-right">
+                              <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
+                                  className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all outline-none focus:outline-none ${
+                                    expandedUserId === u.id
+                                      ? "bg-cyan-500/20 border-cyan-400/50 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+                                      : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
+                                  }`}
+                                >
+                                  <span>Boshqaruv</span>
+                                  <span className={`transition-transform duration-200 ${expandedUserId === u.id ? "rotate-180" : ""}`}>
+                                    ▼
+                                  </span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* HAR BIR FOYDALANUVCHINING DROP-DOWN BOSHQARUV KARTASI */}
+                          {expandedUserId === u.id && (
+                            <tr className="bg-[#090e1d]/90 border-y border-cyan-500/20">
+                              <td colSpan={6} className="p-5">
+                                <div className="rounded-3xl border border-white/10 bg-[#0c1428]/95 p-6 shadow-2xl space-y-6">
+                                  {/* Foydalanuvchi ma'lumoti va tezkor holat amallari */}
+                                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-4 border-b border-white/10 gap-4">
+                                    <div>
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-base font-bold text-white">{u.name || "Nomsiz foydalanuvchi"}</span>
+                                        {u.isPremium && (
+                                          <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 text-xs font-bold">
+                                            ★ Premium VIP
+                                          </span>
+                                        )}
+                                        {u.isBanned && (
+                                          <span className="rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2.5 py-0.5 text-xs font-bold">
+                                            Taqiqlangan
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-3 text-xs font-mono text-zinc-400 mt-1">
+                                        <span>ID: {u.id}</span>
+                                        <span>•</span>
+                                        <span>Balans: <strong className="text-cyan-300 font-bold">{u.diamonds ?? 0} ta olmos</strong></span>
+                                        <span>•</span>
+                                        <span>Provayder: <strong className="text-white capitalize">{u.provider}</strong></span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUserAction(u.id, "toggle_verified")}
+                                        className={`rounded-xl px-3.5 py-2 text-xs font-bold border transition-all outline-none focus:outline-none ${
+                                          u.isVerified
+                                            ? "bg-cyan-500/15 border-cyan-400/40 text-cyan-300"
+                                            : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"
+                                        }`}
+                                      >
+                                        {u.isVerified ? "✓ Tasdiqlangan" : "Tasdiqlanmagan"}
+                                      </button>
+                                      {u.isBanned ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleUserAction(u.id, "unban")}
+                                          className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3.5 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/25 transition-all outline-none focus:outline-none"
+                                        >
+                                          Blokdan Chiqarish
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleUserAction(u.id, "ban")}
+                                          className="rounded-xl border border-rose-500/40 bg-rose-500/15 px-3.5 py-2 text-xs font-bold text-rose-300 hover:bg-rose-500/25 transition-all outline-none focus:outline-none"
+                                        >
+                                          Foydalanuvchini Bloklash
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (confirm("Diqqat! Ushbu foydalanuvchi lokal tizimdan hamda Supabasedan butunlay o'chiriladi. Rozimisiz?")) {
+                                            handleUserAction(u.id, "delete");
+                                          }
+                                        }}
+                                        className="rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 px-3.5 py-2 text-xs font-bold text-rose-300 transition-all outline-none focus:outline-none"
+                                      >
+                                        O'chirish (Supabase)
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* 3 TA ASOSIY TALAB QILINGAN FUNKSIYA */}
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+                                    {/* 1. OLMOS HADYA QILISH */}
+                                    <div className="rounded-2xl border border-cyan-500/30 bg-[#081224] p-5 flex flex-col justify-between shadow-lg">
+                                      <div>
+                                        <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center gap-2">
+                                            <Gem className="w-5 h-5 text-cyan-400" />
+                                            <span className="text-sm font-bold text-white uppercase tracking-wider">Olmos Hadya Qilish</span>
+                                          </div>
+                                          <span className="text-xs font-mono text-cyan-300 font-bold">{u.diamonds ?? 0} ta</span>
+                                        </div>
+                                        <p className="text-xs text-zinc-400 mb-3">Foydalanuvchiga rag'bat sifatida hisobiga olmos hadya qiling:</p>
+                                        <div className="flex items-center gap-2 mb-3">
+                                          {[20, 50, 100, 500].map((amt) => (
+                                            <button
+                                              key={amt}
+                                              type="button"
+                                              onClick={() => setGiftDiamondsMap({ ...giftDiamondsMap, [u.id]: amt })}
+                                              className="flex-1 py-1 rounded-lg bg-white/5 hover:bg-cyan-500/20 border border-white/10 hover:border-cyan-400/40 text-xs font-mono font-bold text-zinc-200 transition-all outline-none focus:outline-none"
+                                            >
+                                              +{amt}
+                                            </button>
+                                          ))}
+                                        </div>
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          placeholder="Miqdorni kiriting (masalan: 50)"
+                                          value={giftDiamondsMap[u.id] || ""}
+                                          onChange={(e) => setGiftDiamondsMap({ ...giftDiamondsMap, [u.id]: Number(e.target.value) })}
+                                          className="w-full rounded-xl border border-white/10 bg-[#060a14] px-3.5 py-2 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none mb-3 font-mono"
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const amt = giftDiamondsMap[u.id];
+                                          if (!amt || Number(amt) <= 0) return alert("Iltimos, olmos miqdorini kiriting!");
+                                          handleUserAction(u.id, "add_diamonds", { amount: amt });
+                                          setGiftDiamondsMap({ ...giftDiamondsMap, [u.id]: "" });
+                                        }}
+                                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 hover:opacity-95 transition-all outline-none focus:outline-none"
+                                      >
+                                        ✓ Olmosni Hadya Qilish
+                                      </button>
+                                    </div>
+
+                                    {/* 2. PREMIUM MAQOMINI YOQISH / O'CHIRISH */}
+                                    <div className="rounded-2xl border border-amber-500/30 bg-[#161208] p-5 flex flex-col justify-between shadow-lg">
+                                      <div>
+                                        <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center gap-2">
+                                            <Crown className="w-5 h-5 text-amber-400" />
+                                            <span className="text-sm font-bold text-white uppercase tracking-wider">Premium VIP Maqomi</span>
+                                          </div>
+                                          <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
+                                            u.isPremium
+                                              ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                                              : "bg-white/5 text-zinc-400 border-white/10"
+                                          }`}>
+                                            {u.isPremium ? "FAOL VIP" : "ODDIY"}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs text-zinc-300 mb-4 leading-relaxed">
+                                          Premium maqomi yoqilganda foydalanuvchiga cheksiz suhbatlar, ustuvor juftlik qidirish va VIP nishoni beriladi.
+                                        </p>
+                                        <div className="p-3 rounded-xl bg-white/5 border border-white/10 mb-4 flex items-center justify-between">
+                                          <span className="text-xs text-zinc-300">Joriy Holat:</span>
+                                          <span className="text-xs font-bold text-white">
+                                            {u.isPremium ? "Cheksiz VIP Faollashtirilgan" : "Oddiy Hisob (Cheklangan)"}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUserAction(u.id, "toggle_premium")}
+                                        className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all shadow-md outline-none focus:outline-none ${
+                                          u.isPremium
+                                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30"
+                                            : "bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow-amber-500/25 hover:opacity-95"
+                                        }`}
+                                      >
+                                        {u.isPremium ? "✕ Premiumni O'chirish" : "★ Premium Maqomini Yoqish"}
+                                      </button>
+                                    </div>
+
+                                    {/* 3. ADMIN TOMONIDAN XABAR YUBORISH */}
+                                    <div className="rounded-2xl border border-purple-500/30 bg-[#140b24] p-5 flex flex-col justify-between shadow-lg">
+                                      <div>
+                                        <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center gap-2">
+                                            <Bell className="w-5 h-5 text-purple-400" />
+                                            <span className="text-sm font-bold text-white uppercase tracking-wider">Admin Xabari</span>
+                                          </div>
+                                          <span className="text-xs font-mono text-purple-300">
+                                            {(u.adminMessages?.length || 0)} ta xabar
+                                          </span>
+                                        </div>
+                                        <p className="text-xs text-zinc-400 mb-3">Foydalanuvchiga bevosita bildirishnoma yoki habar yuboring:</p>
+                                        <textarea
+                                          rows={3}
+                                          placeholder="Xabar matnini yozing..."
+                                          value={userMessageMap[u.id] || ""}
+                                          onChange={(e) => setUserMessageMap({ ...userMessageMap, [u.id]: e.target.value })}
+                                          className="w-full rounded-xl border border-white/10 bg-[#060a14] p-3 text-xs text-white placeholder-zinc-500 focus:border-purple-400 focus:outline-none mb-3 resize-none"
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const msg = userMessageMap[u.id];
+                                          if (!msg || !msg.trim()) return alert("Iltimos, xabar matnini kiriting!");
+                                          handleUserAction(u.id, "send_message", { message: msg.trim() });
+                                          setUserMessageMap({ ...userMessageMap, [u.id]: "" });
+                                        }}
+                                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold text-xs shadow-md shadow-purple-500/25 hover:opacity-95 transition-all outline-none focus:outline-none"
+                                      >
+                                        ✉ Xabarni Yuborish
+                                      </button>
+                                    </div>
+
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </div>
                       ))
                     )}
                   </tbody>
@@ -1115,19 +1321,27 @@ export default function AdminDashboard() {
 
           {/* DEVICES TAB */}
           {currentTab === "devices" && (
-            <div className="space-y-5 smooth-fade">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2.5">
-                  <Smartphone className="h-5 w-5 text-indigo-400" />
-                  <span>Ulangan Qurilmalar va Xavfsizlik Seanslari</span>
-                </h2>
-                <span className="text-sm text-zinc-400 font-mono">Jami: {devices.length} ta seans</span>
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="relative w-full sm:w-96">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                  <input
+                    type="text"
+                    placeholder="Qurilma, IP yoki User ID bo'yicha qidiruv..."
+                    value={deviceSearch}
+                    onChange={(e) => setDeviceSearch(e.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-[#0d1527] pl-10 pr-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none"
+                  />
+                </div>
+                <div className="text-sm text-zinc-300">
+                  Jami: <strong className="text-white font-mono font-bold text-base">{filteredDevices.length}</strong> ta seans
+                </div>
               </div>
 
-              <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900/50 shadow-sm">
+              <div className="overflow-x-auto rounded-3xl border border-white/10 bg-[#0d1527]/80 backdrop-blur-2xl shadow-2xl">
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
-                    <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 font-bold uppercase tracking-wider text-xs">
+                    <tr className="border-b border-white/10 bg-white/5 text-zinc-400 font-bold uppercase tracking-wider text-xs">
                       <th className="py-4 px-5">Qurilma</th>
                       <th className="py-4 px-5">IP Manzil</th>
                       <th className="py-4 px-5">Foydalanuvchi ID</th>
@@ -1136,23 +1350,34 @@ export default function AdminDashboard() {
                       <th className="py-4 px-5 text-right">Amallar</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
-                    {devices.length === 0 ? (
+                  <tbody className="divide-y divide-white/5">
+                    {filteredDevices.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-zinc-500 text-sm">
-                          Hech qanday qurilma seansi qayd etilmagan
+                          Hech qanday qurilma seansi topilmadi
                         </td>
                       </tr>
                     ) : (
-                      devices.map((d) => (
-                        <tr key={d.id} className="hover:bg-zinc-800/30 transition-colors">
+                      filteredDevices.map((d) => (
+                        <tr key={d.id} className="hover:bg-white/5 transition-colors">
                           <td className="py-4 px-5 font-semibold text-white">
-                            <div className="text-sm font-bold">{d.deviceName || "Noma'lum Qurilma"}</div>
-                            <div className="text-xs text-zinc-500 font-mono truncate max-w-[240px]">
-                              {d.userAgent}
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0">
+                                <Smartphone className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-bold text-white">{d.deviceName || "Noma'lum Qurilma"}</div>
+                                <div className="text-xs text-zinc-500 font-mono truncate max-w-[220px]">
+                                  {d.userAgent}
+                                </div>
+                              </div>
                             </div>
                           </td>
-                          <td className="py-4 px-5 font-mono text-zinc-200 font-semibold">{d.ip || "127.0.0.1"}</td>
+                          <td className="py-4 px-5">
+                            <span className="rounded-xl bg-white/5 border border-white/10 px-2.5 py-1 text-xs font-mono font-semibold text-cyan-300">
+                              {d.ip || "127.0.0.1"}
+                            </span>
+                          </td>
                           <td className="py-4 px-5 font-mono text-xs text-zinc-400 truncate max-w-[150px]">
                             {d.userId}
                           </td>
@@ -1161,11 +1386,11 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-4 px-5">
                             {d.blocked ? (
-                              <span className="rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-1 text-xs font-bold">
+                              <span className="rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30 px-3 py-1 text-xs font-bold">
                                 Bloklangan
                               </span>
                             ) : (
-                              <span className="rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 text-xs font-bold">
+                              <span className="rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 text-xs font-bold">
                                 Faol
                               </span>
                             )}
@@ -1174,22 +1399,25 @@ export default function AdminDashboard() {
                             <div className="flex items-center justify-end gap-2">
                               {d.blocked ? (
                                 <button
+                                  type="button"
                                   onClick={() => handleDeviceAction(d.id, "unblock")}
-                                  className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/20 transition-all"
+                                  className="rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/25 transition-all outline-none focus:outline-none"
                                 >
                                   Ochish
                                 </button>
                               ) : (
                                 <button
+                                  type="button"
                                   onClick={() => handleDeviceAction(d.id, "block")}
-                                  className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition-all"
+                                  className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/25 transition-all outline-none focus:outline-none"
                                 >
                                   Bloklash
                                 </button>
                               )}
                               <button
+                                type="button"
                                 onClick={() => handleDeviceAction(d.id, "revoke")}
-                                className="rounded-lg border border-zinc-800 bg-zinc-900 p-2 text-zinc-400 hover:text-rose-400 transition-all"
+                                className="rounded-xl border border-white/10 bg-white/5 hover:bg-rose-500/20 p-2 text-zinc-400 hover:text-rose-300 transition-all outline-none focus:outline-none"
                                 title="Seansni o'chirish"
                               >
                                 <Trash2 className="h-4 w-4" />

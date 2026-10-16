@@ -266,6 +266,20 @@ async function saveOnboarding({ userId, age, countryCode, purpose, gender }) {
   });
 }
 
+/** Deletes a profile and associated records from Supabase. */
+async function deleteProfile(userId) {
+  if (!client || !userId) return { ok: false, skipped: true };
+  try {
+    await client.from("onboarding_answers").delete().eq("user_id", userId);
+    await client.from("google_accounts").delete().eq("user_id", userId);
+    const { error } = await client.from("profiles").delete().eq("id", userId);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   isSupabaseEnabled,
   getSupabase,
@@ -278,4 +292,5 @@ module.exports = {
   saveOnboarding,
   extractProfileUsername,
   isUsernameTakenInSupabase,
+  deleteProfile,
 };
