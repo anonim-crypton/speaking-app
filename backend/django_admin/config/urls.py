@@ -16,9 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from panel.views import admin_gateway_view
 
 urlpatterns = [
+    path('', admin_gateway_view, name='admin_gateway'),
     path('admin/', admin.site.urls),
     path('api/admin/', include('panel.urls')),
 ]
+
 

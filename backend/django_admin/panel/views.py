@@ -2,10 +2,72 @@ import json
 import os
 import uuid
 from datetime import datetime
+from django.http import HttpResponse
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+
+def admin_gateway_view(request):
+    html = """<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <title>Lingo Speek Admin Gateway</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex items-center justify-center p-4 font-sans">
+  <div class="max-w-md w-full rounded-3xl border border-white/10 bg-slate-900/90 p-8 shadow-2xl text-center">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-5">
+      <span class="text-3xl">🛡️</span>
+    </div>
+    <h1 class="text-2xl font-black tracking-tight mb-1">Lingo Speek Admin</h1>
+    <p class="text-xs text-slate-400 mb-6">Boshqaruv Paneli & API Gateway</p>
+    
+    <div class="space-y-3">
+      <a href="http://localhost:5173/admin" class="flex items-center justify-between p-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 transition-all font-bold text-sm shadow-lg shadow-indigo-500/25">
+        <span class="flex items-center gap-2.5">
+          <span class="text-lg">⚛️</span>
+          <span class="text-left">
+            <span class="block">React Admin Panel (Asosiy UI)</span>
+            <span class="text-[11px] font-normal text-indigo-200">http://localhost:5173/admin</span>
+          </span>
+        </span>
+        <span>→</span>
+      </a>
+
+      <a href="/admin/" class="flex items-center justify-between p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all font-semibold text-sm">
+        <span class="flex items-center gap-2.5">
+          <span class="text-lg">🐍</span>
+          <span class="text-left">
+            <span class="block">Django Standart Admin</span>
+            <span class="text-[11px] font-normal text-slate-400">admin / admin123</span>
+          </span>
+        </span>
+        <span>→</span>
+      </a>
+
+      <a href="/api/admin/stats/" class="flex items-center justify-between p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all font-semibold text-sm">
+        <span class="flex items-center gap-2.5">
+          <span class="text-lg">📊</span>
+          <span class="text-left">
+            <span class="block">Django REST API Stats</span>
+            <span class="text-[11px] font-normal text-slate-400">/api/admin/stats/</span>
+          </span>
+        </span>
+        <span>→</span>
+      </a>
+    </div>
+
+    <div class="mt-6 pt-5 border-t border-white/10 text-[11px] text-slate-500">
+      <p>💡 Siz aytgan React UI dizayndagi Admin Panel <a href="http://localhost:5173/admin" class="text-indigo-400 underline font-mono">localhost:5173/admin</a> da ishlaydi.</p>
+    </div>
+  </div>
+</body>
+</html>"""
+    return HttpResponse(html)
+
 
 # Locate backend/data folder
 BASE_DIR = settings.BASE_DIR
