@@ -32,6 +32,7 @@ function ensureBackendRunning() {
 
   return {
     name: "ensure-backend-server",
+    apply: "serve" as const,
     configureServer() {
       checkAndStart();
       const timer = setInterval(checkAndStart, 5000);

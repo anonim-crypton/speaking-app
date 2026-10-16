@@ -10,6 +10,7 @@ import Register from "@/pages/Register";
 import Onboarding from "@/pages/Onboarding";
 import Dashboard from "@/pages/Dashboard";
 import UserHome from "@/pages/UserHome";
+import AdminDashboard from "@/pages/AdminDashboard";
 import { useAuth } from "@/context/AuthContext";
 import { loaderDuration, measureRtt, routeLoadDuration } from "@/lib/network";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,7 @@ export default function App() {
   const location = useLocation();
   const isOnboardingRoute = location.pathname === "/onboarding";
   const isUserDashboard = location.pathname.startsWith("/u/");
+  const isAdminRoute = location.pathname.startsWith("/admin");
 
   /* ── First visit ────────────────────────────────────────────────────────
      The loading animation runs while the real round-trip latency is measured,
@@ -110,14 +112,20 @@ export default function App() {
       <div className="neon-backdrop" aria-hidden />
 
       {/* Full-screen pages have no landing navbar */}
-      {!isOnboardingRoute && !isUserDashboard ? <Navbar /> : null}
+      {!isOnboardingRoute && !isUserDashboard && !isAdminRoute ? <Navbar /> : null}
 
-      <main className={cn("flex-1", !isUserDashboard && !isOnboardingRoute && "pb-20 lg:pb-0")}>
+      <main
+        className={cn(
+          "flex-1",
+          !isUserDashboard && !isOnboardingRoute && !isAdminRoute && "pb-20 lg:pb-0"
+        )}
+      >
         <Routes>
           <Route path="/" element={<HomeGate />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           <Route
             path="/dashboard"
             element={

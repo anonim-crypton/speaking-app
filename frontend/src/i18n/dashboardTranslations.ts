@@ -86,6 +86,10 @@ export interface DashboardTranslation {
     helpDesc: string;
     feedbackTitle: string;
     feedbackDesc: string;
+    appLanguage: string;
+    appLanguageDesc: string;
+    supportTitle: string;
+    supportDesc: string;
     logoutTitle: string;
     logoutDesc: string;
   };
@@ -248,6 +252,10 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       helpDesc: "Savollar, ko'rsatmalar va qo'llab-quvvatlash",
       feedbackTitle: "Shikoyat va Taklif",
       feedbackDesc: "Takliflaringiz yoki muammolarni yuboring",
+      appLanguage: "Ilova tili",
+      appLanguageDesc: "Interfeys tilini tanlang",
+      supportTitle: "Admin bilan bog'lanish",
+      supportDesc: "Telegram orqali tezkor yordam",
       logoutTitle: "Hisobdan chiqish",
       logoutDesc: "Tizimdan xavfsiz chiqish",
     },
@@ -426,6 +434,10 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       helpDesc: "Ответы на вопросы и техподдержка",
       feedbackTitle: "Отзывы и предложения",
       feedbackDesc: "Отправьте ваши пожелания разработчикам",
+      appLanguage: "Язык приложения",
+      appLanguageDesc: "Выберите язык интерфейса",
+      supportTitle: "Связаться с админом",
+      supportDesc: "Быстрая поддержка в Telegram",
       logoutTitle: "Выйти из аккаунта",
       logoutDesc: "Безопасный выход из системы",
     },
@@ -604,6 +616,10 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       helpDesc: "Guides, tutorials and support",
       feedbackTitle: "Suggestions & Feedback",
       feedbackDesc: "Share your thoughts with developers",
+      appLanguage: "App Language",
+      appLanguageDesc: "Select interface language",
+      supportTitle: "Contact Admin",
+      supportDesc: "Instant Telegram support",
       logoutTitle: "Sign out",
       logoutDesc: "Securely exit your account",
     },
@@ -782,6 +798,10 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       helpDesc: "Sorular, rehberler ve destek",
       feedbackTitle: "Şikayet ve Öneriler",
       feedbackDesc: "Fikirlerinizi bizimle paylaşın",
+      appLanguage: "Uygulama Dili",
+      appLanguageDesc: "Arayüz dilini seçin",
+      supportTitle: "Yönetici ile İletişim",
+      supportDesc: "Telegram üzerinden hızlı destek",
       logoutTitle: "Çıkış Yap",
       logoutDesc: "Hesaptan güvenli çıkış",
     },
@@ -960,6 +980,10 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       helpDesc: "자주 묻는 질문과 가이드",
       feedbackTitle: "의견 및 피드백",
       feedbackDesc: "개선 사항을 개발자에게 전달하세요",
+      appLanguage: "앱 언어",
+      appLanguageDesc: "인터페이스 언어 선택",
+      supportTitle: "관리자 문의",
+      supportDesc: "텔레그램 빠른 지원",
       logoutTitle: "로그아웃",
       logoutDesc: "계정에서 안전하게 나가기",
     },

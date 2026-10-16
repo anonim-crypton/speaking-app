@@ -39,6 +39,37 @@ app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/presence", presenceRoutes);
 app.use("/api/matchmaking", matchmakingRoutes);
 
+// Proxy to Django Admin Backend
+const DJANGO_PORT = process.env.DJANGO_PORT || 8000;
+app.use("/api/admin", async (req, res) => {
+  try {
+    const targetUrl = `http://127.0.0.1:${DJANGO_PORT}/api/admin${req.url}`;
+    const options = {
+      method: req.method,
+      headers: { ...req.headers, host: `127.0.0.1:${DJANGO_PORT}` },
+    };
+    if (["POST", "PUT", "PATCH"].includes(req.method) && req.body) {
+      options.headers["content-type"] = "application/json";
+      options.body = JSON.stringify(req.body);
+    }
+    const response = await fetch(targetUrl, options);
+    const data = await response.text();
+    res.status(response.status);
+    response.headers.forEach((val, key) => {
+      if (!["transfer-encoding", "content-length"].includes(key.toLowerCase())) {
+        res.setHeader(key, val);
+      }
+    });
+    res.send(data);
+  } catch (err) {
+    console.error("Django proxy error:", err.message);
+    res.status(502).json({
+      success: false,
+      message: "Django admin server bilan aloqa o'rnatib bo'lmadi. Python server ishga tushirilganligini tekshiring.",
+    });
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",

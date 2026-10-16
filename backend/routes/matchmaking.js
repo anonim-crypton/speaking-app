@@ -1,18 +1,31 @@
 const express = require("express");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const store = require("../utils/store");
+
+const COMPLAINTS_FILE = path.join(__dirname, "../data/complaints.json");
+
+function saveComplaint(record) {
+  try {
+    let list = [];
+    if (fs.existsSync(COMPLAINTS_FILE)) {
+      list = JSON.parse(fs.readFileSync(COMPLAINTS_FILE, "utf-8") || "[]");
+    }
+    list.unshift(record);
+    fs.writeFileSync(COMPLAINTS_FILE, JSON.stringify(list.slice(0, 500), null, 2), "utf-8");
+  } catch (e) {
+    console.warn("Failed to save complaint:", e);
+  }
+}
 
 const router = express.Router();
 
 const SUPPORTED_LANGUAGES = new Set(["uz", "en", "ru", "tr", "ko"]);
-const MAX_WAIT_MS = 120 * 1000; // 2 minutes max wait
-const STALE_HEARTBEAT_MS = 18 * 1000; // 18s without heartbeat -> auto-clean
+const MAX_WAIT_MS = 120 * 1000; 
+const STALE_HEARTBEAT_MS = 18 * 1000; 
 
-/**
- * 5 strictly isolated ephemeral language server pools.
- * No persistent cache — only currently online users who pressed START are kept here,
- * and they are immediately purged when matched, cancelled, timed out, or disconnected.
- */
+
 const LANGUAGE_POOLS = {
   uz: new Map(),
   en: new Map(),
@@ -21,21 +34,9 @@ const LANGUAGE_POOLS = {
   ko: new Map(),
 };
 
-/**
- * Ephemeral active rooms:
- * roomId -> {
- *   roomId,
- *   language,
- *   createdAt,
- *   participants: Map<key, { key, id, userId, clientId, name, username, avatarUrl, speaking, muted, lastSeen, role }>,
- *   messages: Array<{ id, senderKey, senderName, senderUsername, text, createdAt }>,
- *   signals: Array<{ id, fromKey, type, payload, createdAt }>,
- *   sseClients: Set<{ key, res }>
- * }
- */
+
 const activeRooms = new Map();
 
-/** Quick lookup: participantKey -> roomId */
 const keyToRoomId = new Map();
 
 function makeKey(clientId, userId) {
@@ -73,7 +74,7 @@ function broadcastToRoom(room, payload, excludeKey = null) {
     try {
       client.res.write(serialized);
     } catch {
-      /* ignore broken stream */
+      
     }
   }
 }
@@ -89,7 +90,7 @@ function destroyRoom(roomId, reason = "ended") {
       try {
         client.res.end();
       } catch {
-        /* ignore */
+        
       }
     }
     room.sseClients.clear();
@@ -99,7 +100,6 @@ function destroyRoom(roomId, reason = "ended") {
     keyToRoomId.delete(participantKey);
   }
 
-  // Wipe ephemeral chat messages and signals completely from memory
   room.messages.length = 0;
   room.signals.length = 0;
   room.participants.clear();
@@ -167,7 +167,6 @@ function tryMatchInPool(language, key) {
       continue;
     }
 
-    // Remove both from the waiting queue immediately (zero leftover cache)
     pool.delete(key);
     pool.delete(candidateKey);
 
@@ -186,7 +185,7 @@ function tryMatchInPool(language, key) {
       speaking: false,
       muted: false,
       lastSeen: now,
-      role: "caller", // candidate waited first -> initiates WebRTC offer
+      role: "caller", 
     };
 
     const p2 = {
@@ -233,11 +232,7 @@ if (typeof sweepTimer.unref === "function") {
   sweepTimer.unref();
 }
 
-/**
- * POST /api/matchmaking/join
- * Places the user exclusively in the selected language server pool (uz, en, ru, tr, ko)
- * and pairs them with another active user in that same language pool.
- */
+
 router.post("/join", (req, res) => {
   purgeStaleEntries();
   const { clientId, userId, language, name, username, avatarUrl } = req.body || {};
@@ -259,7 +254,6 @@ router.post("/join", (req, res) => {
 
   const key = makeKey(clientId, userId);
 
-  // Clean up any previous queue or match state for this user before joining fresh
   cleanupParticipant(key);
 
   const info = resolveUserInfo({ userId, clientId, name, username, avatarUrl });
@@ -274,7 +268,6 @@ router.post("/join", (req, res) => {
     lastSeen: now,
   });
 
-  // Immediately attempt to pair within this specific language server pool
   const room = tryMatchInPool(lang, key);
   if (room) {
     const selfP = room.participants.get(key);
@@ -307,10 +300,7 @@ router.post("/join", (req, res) => {
   });
 });
 
-/**
- * POST /api/matchmaking/status
- * Heartbeat + poll for current matchmaking/room state, messages, partner speaking state, and WebRTC signals.
- */
+
 router.post("/status", (req, res) => {
   purgeStaleEntries();
   const { clientId, userId, language, sinceMessageCount = 0, sinceSignalIndex = 0 } =
@@ -322,7 +312,6 @@ router.post("/status", (req, res) => {
   const key = makeKey(clientId, userId);
   const now = Date.now();
 
-  // 1. Check if in an active matched room
   const roomId = keyToRoomId.get(key);
   if (roomId) {
     const room = activeRooms.get(roomId);
@@ -362,7 +351,6 @@ router.post("/status", (req, res) => {
     });
   }
 
-  // 2. Check if waiting in the language pool
   const lang = String(language || "").trim().toLowerCase();
   const pool = LANGUAGE_POOLS[lang];
   if (!pool || !pool.has(key)) {
@@ -419,10 +407,7 @@ router.post("/status", (req, res) => {
   });
 });
 
-/**
- * GET /api/matchmaking/room-stream
- * Real-time SSE stream for instant chat messages, speaking indicator, and WebRTC signaling.
- */
+
 router.get("/room-stream", (req, res) => {
   const { roomId, clientId, userId } = req.query;
   const room = activeRooms.get(String(roomId || ""));
@@ -474,10 +459,7 @@ router.get("/room-stream", (req, res) => {
   });
 });
 
-/**
- * POST /api/matchmaking/message
- * Sends a real-time ephemeral chat message in the active room (never stored on disk/DB).
- */
+
 router.post("/message", (req, res) => {
   const { roomId, clientId, userId, text } = req.body || {};
   const cleanText = String(text || "").trim();
@@ -518,10 +500,7 @@ router.post("/message", (req, res) => {
   });
 });
 
-/**
- * POST /api/matchmaking/speaking
- * Broadcasts real-time voice activity (speaking / muted) so avatar borders glow with animated light gradient.
- */
+
 router.post("/speaking", (req, res) => {
   const { roomId, clientId, userId, speaking, muted } = req.body || {};
   const key = makeKey(clientId, userId);
@@ -549,10 +528,7 @@ router.post("/speaking", (req, res) => {
   return res.json({ success: true });
 });
 
-/**
- * POST /api/matchmaking/signal
- * Relays WebRTC audio signaling (offer, answer, ice-candidate) between the two matched speakers.
- */
+
 router.post("/signal", (req, res) => {
   const { roomId, clientId, userId, type, payload } = req.body || {};
   const key = makeKey(clientId, userId);
@@ -606,21 +582,23 @@ router.post("/complaint", (req, res) => {
       message: "Shikoyat sababini tanlang yoki batafsil yozing",
     });
   }
-  console.log(
-    `[complaint] against @${partnerUsername || "unknown"}:`,
-    reasons,
-    String(details || "").trim()
-  );
+  saveComplaint({
+    id: "comp_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6),
+    partnerUsername: partnerUsername || "unknown",
+    reporterUserId: req.body?.userId || null,
+    reasons: reasons || [],
+    details: String(details || "").trim(),
+    createdAt: new Date().toISOString(),
+    status: "pending",
+  });
+
   return res.json({
     success: true,
     message: "Shikoyatingiz qabul qilindi",
   });
 });
 
-/**
- * POST /api/matchmaking/leave
- * Immediately removes the user from their language server pool and destroys any active room (clearing all temporary chat messages).
- */
+
 router.post("/leave", (req, res) => {
   const { clientId, userId } = req.body || {};
   if (clientId || userId) {

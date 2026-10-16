@@ -5,9 +5,10 @@
   "description": "Lingo Speek — full-stack English speaking-practice website (Node.js + Express + React 19 + TypeScript + shadcn/ui)",
   "scripts": {
     "install:all": "npm install --prefix backend && npm install --prefix frontend",
-    "dev": "concurrently -n API,WEB -c blue,magenta \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev": "concurrently -n API,DJANGO,WEB -c blue,green,magenta \"npm run dev --prefix backend\" \"python backend/django_admin/manage.py runserver 8000\" \"npm run dev --prefix frontend\"",
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
+    "dev:django": "python backend/django_admin/manage.py runserver 8000",
     "build": "npm run build --prefix frontend",
     "start:backend": "npm run start --prefix backend"
   },

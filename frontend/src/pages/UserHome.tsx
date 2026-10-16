@@ -1207,8 +1207,8 @@ export default function UserHome() {
               <Globe2 className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">Ilova tili</p>
-              <p className="text-[11px] text-zinc-400">Interfeys tilini tanlang</p>
+              <p className="text-sm font-semibold text-white">{dt.profile.appLanguage}</p>
+              <p className="text-[11px] text-zinc-400">{dt.profile.appLanguageDesc}</p>
             </div>
           </div>
           <LanguageSwitcher />
@@ -1352,8 +1352,8 @@ export default function UserHome() {
               <Headset className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">Admin bilan bog'lanish</p>
-              <p className="text-[11px] text-zinc-400">Telegram orqali tezkor yordam</p>
+              <p className="text-sm font-semibold text-white">{dt.profile.supportTitle}</p>
+              <p className="text-[11px] text-zinc-400">{dt.profile.supportDesc}</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
