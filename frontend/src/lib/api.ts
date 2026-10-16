@@ -17,6 +17,11 @@ export interface AuthUser {
   countryCode: string | null;
   region: string | null;
   diamonds: number;
+  isPremium?: boolean;
+  isVerified?: boolean;
+  isBanned?: boolean;
+  diamondHistory?: Array<{ amount: number; type: string; date: string }>;
+  adminMessages?: Array<{ id: string; text: string; sender?: string; isAdmin?: boolean; createdAt?: string }>;
   onboardingCompleted: boolean;
   createdAt: string;
 }

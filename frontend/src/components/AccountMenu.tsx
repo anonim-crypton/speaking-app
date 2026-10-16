@@ -14,6 +14,7 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import SpeakerAvatar from "@/components/SpeakerAvatar";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,6 +59,7 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
     "Foydalanuvchi";
 
   const diamonds = user?.diamonds ?? 0;
+  const isPremium = Boolean(user?.isPremium);
 
   return (
     <DropdownMenu>
@@ -65,16 +67,20 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
         <button
           type="button"
           className={cn(
-            "inline-flex items-center gap-2 rounded-full border border-border/80 bg-white/[0.06] py-1 pl-1.5 pr-3",
-            "transition-all duration-200 hover:border-brand-400/70 hover:bg-brand-500/15 shadow-sm",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 cursor-pointer"
+            "inline-flex items-center gap-2 rounded-full border py-1 pl-1.5 pr-3 transition-all duration-200 cursor-pointer shadow-sm",
+            isPremium
+              ? "border-amber-400/60 bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-600/15 shadow-[0_0_15px_rgba(245,158,11,0.25)] hover:border-amber-300"
+              : "border-border/80 bg-white/[0.06] hover:border-brand-400/70 hover:bg-brand-500/15"
           )}
           aria-label="Foydalanuvchi hisobi"
         >
-          <SpeakerAvatar size={32} />
+          <div className={cn("relative shrink-0 rounded-full", isPremium && "p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_10px_rgba(245,158,11,0.5)]")}>
+            <SpeakerAvatar size={30} />
+          </div>
           <span className="max-w-[120px] truncate text-[13.5px] font-bold text-foreground">
             {displayName}
           </span>
+          {isPremium && <VerifiedBadge size={16} />}
           <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
         </button>
       </DropdownMenuTrigger>
@@ -85,10 +91,19 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
           onClick={() => handleTabClick("profile")}
           className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-2.5 cursor-pointer hover:bg-white/[0.08] transition-colors"
         >
-          <SpeakerAvatar size={38} />
+          <div className={cn("relative shrink-0 rounded-full", isPremium && "p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_12px_rgba(245,158,11,0.5)]")}>
+            <SpeakerAvatar size={36} />
+          </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-white">{displayName}</p>
-            {user?.username ? (
+            <div className="flex items-center gap-1.5">
+              <p className="truncate text-sm font-bold text-white">{displayName}</p>
+              {isPremium && <VerifiedBadge size={16} />}
+            </div>
+            {isPremium ? (
+              <span className="inline-block rounded bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-black text-amber-300 border border-amber-500/40 tracking-wider">
+                PREMIUM VIP
+              </span>
+            ) : user?.username ? (
               <p className="truncate text-[11.5px] font-medium text-violet-300">@{user.username}</p>
             ) : user?.email || user?.phone ? (
               <p className="truncate text-[11.5px] text-zinc-400">{user?.email || user?.phone}</p>

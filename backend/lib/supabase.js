@@ -280,6 +280,40 @@ async function deleteProfile(userId) {
   }
 }
 
+/** Saves a message to the Supabase messages table. */
+async function saveMessage({ userId, name, username, text, isAdmin = false }) {
+  if (!client) return { ok: false, skipped: true, error: reason };
+  try {
+    const { data, error } = await client.from("messages").insert({
+      user_id: userId,
+      name: name || null,
+      username: username || null,
+      text: text,
+      is_admin: isAdmin,
+      created_at: new Date().toISOString(),
+    }).select().maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function getMessages(userId) {
+  if (!client || !userId) return [];
+  try {
+    const { data, error } = await client
+      .from("messages")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
+}
+
 module.exports = {
   isSupabaseEnabled,
   getSupabase,
@@ -293,4 +327,6 @@ module.exports = {
   extractProfileUsername,
   isUsernameTakenInSupabase,
   deleteProfile,
+  saveMessage,
+  getMessages,
 };

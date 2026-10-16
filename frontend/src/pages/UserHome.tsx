@@ -60,6 +60,7 @@ import AccountMenu from "@/components/AccountMenu";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import CountryFlag from "@/components/CountryFlag";
 import SpeakerAvatar from "@/components/SpeakerAvatar";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import AiLoader from "@/components/ui/ai-loader";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -123,7 +124,7 @@ function getOrCreateClientId(): string {
 
 export default function UserHome() {
   const { slug } = useParams<{ slug: string }>();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const { lang } = useLanguage();
   const dt = DASHBOARD_TRANSLATIONS[lang] ?? DASHBOARD_TRANSLATIONS.uz;
 
@@ -172,6 +173,80 @@ export default function UserHome() {
   // Messages & Notifications modal state
   const [messagesModalOpen, setMessagesModalOpen] = useState(false);
   const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
+
+  // Admin <-> User Messages State
+  const [adminMessages, setAdminMessages] = useState<
+    Array<{ id: string; text: string; sender: string; isAdmin: boolean; createdAt: string; read?: boolean }>
+  >([]);
+  const [adminMessageInput, setAdminMessageInput] = useState("");
+  const [adminMessageSending, setAdminMessageSending] = useState(false);
+  const [unreadAdminCount, setUnreadAdminCount] = useState(0);
+  const adminMessagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const fetchAdminMessages = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/auth/messages`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.messages)) {
+        setAdminMessages(data.messages);
+        setUnreadAdminCount(data.unreadCount ?? 0);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminMessages();
+    const interval = setInterval(fetchAdminMessages, 8000);
+    return () => clearInterval(interval);
+  }, [token]);
+
+  const handleOpenMessagesModal = () => {
+    setMessagesModalOpen(true);
+    if (token) {
+      fetch(`${API_BASE}/auth/messages/read`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+      setUnreadAdminCount(0);
+    }
+    setTimeout(() => {
+      adminMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 150);
+  };
+
+  const handleSendAdminReply = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
+    if (!adminMessageInput.trim() || !token || adminMessageSending) return;
+    const textToSend = adminMessageInput.trim();
+    setAdminMessageSending(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text: textToSend }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminMessageInput("");
+        await fetchAdminMessages();
+        setTimeout(() => {
+          adminMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setAdminMessageSending(false);
+    }
+  };
 
   // Devices & Sessions state
   const [devices, setDevices] = useState<
@@ -1107,7 +1182,19 @@ export default function UserHome() {
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
           {/* Avatar with Glow Ring */}
           <div className="relative shrink-0">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-tr from-violet-600 via-indigo-600 to-fuchsia-500 p-0.5 shadow-[0_0_25px_rgba(139,92,246,0.5)]">
+            {user?.isPremium && (
+              <span className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 rounded-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black text-[9px] px-2.5 py-0.5 tracking-widest shadow-[0_2px_8px_rgba(245,158,11,0.5)] border border-yellow-200 uppercase whitespace-nowrap">
+                PREMIUM
+              </span>
+            )}
+            <div
+              className={cn(
+                "flex h-20 w-20 items-center justify-center rounded-full p-0.5 transition-all duration-300",
+                user?.isPremium
+                  ? "bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_35px_rgba(245,158,11,0.7)] ring-2 ring-amber-400/80"
+                  : "bg-gradient-to-tr from-violet-600 via-indigo-600 to-fuchsia-500 shadow-[0_0_25px_rgba(139,92,246,0.5)]"
+              )}
+            >
               <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0d0822] overflow-hidden">
                 <SpeakerAvatar size={76} />
               </div>
@@ -1118,6 +1205,7 @@ export default function UserHome() {
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
               <h2 className="text-xl font-bold text-white truncate">{displayName}</h2>
+              {user?.isPremium && <VerifiedBadge size={22} />}
               {user?.countryCode && (
                 <div className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.05] px-2 py-0.5 text-xs">
                   <CountryFlag code={user.countryCode} width={20} className="h-3 w-4 rounded-xs" />
@@ -1384,152 +1472,86 @@ export default function UserHome() {
   );
 
   const renderHistoryView = () => (
-    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setActiveTab("home")}
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div>
-          <h1 className="text-xl font-bold text-white">{dt.sidebar.history}</h1>
-          <p className="text-xs text-zinc-400">O'tkazilgan suhbatlar va audio mashg'ulotlar tarixi</p>
-        </div>
+    <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[58vh] text-center px-4 animate-in fade-in duration-200">
+      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-violet-500/10 text-violet-300 mb-5 shadow-[0_0_35px_rgba(139,92,246,0.25)]">
+        <History className="h-10 w-10" />
       </div>
+      <h3 className="text-xl font-bold text-white">Hozircha suhbatlar tarixi mavjud emas</h3>
+      <p className="mt-2.5 max-w-md mx-auto text-sm text-zinc-400 leading-relaxed">
+        Suhbatdoshlar bilan suhbatlashganingizdan so'ng barcha gaplashish tarixingiz shu yerda saqlanadi.
+      </p>
 
-      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 sm:p-12 shadow-2xl backdrop-blur-2xl text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/25 bg-violet-500/10 text-violet-300 mb-4 shadow-[0_0_25px_rgba(139,92,246,0.2)]">
-          <History className="h-8 w-8" />
-        </div>
-        <h3 className="text-lg font-bold text-white">Hozircha suhbatlar tarixi mavjud emas</h3>
-        <p className="mt-2 max-w-md mx-auto text-xs text-zinc-400 leading-relaxed">
-          Suhbatdoshlar bilan suhbatlashganingizdan so'ng barcha gaplashish tarixingiz shu yerda saqlanadi.
-        </p>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("home")}
-          className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-xs font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-        >
-          <Play className="h-4 w-4 fill-white" />
-          <span>Suhbatni boshlash</span>
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setActiveTab("home")}
+        className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-7 py-3 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+      >
+        <Play className="h-4 w-4 fill-white" />
+        <span>Suhbatni boshlash</span>
+      </button>
     </div>
   );
 
   const renderFriendsView = () => (
-    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setActiveTab("home")}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-white">{dt.friends.title}</h1>
-            <p className="text-xs text-zinc-400">{dt.friends.subtitle}</p>
-          </div>
-        </div>
+    <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[58vh] text-center px-4 animate-in fade-in duration-200">
+      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-sky-500/10 text-sky-400 mb-5 shadow-[0_0_35px_rgba(56,189,248,0.25)]">
+        <Users className="h-10 w-10" />
       </div>
+      <h3 className="text-xl font-bold text-white">{dt.friends.emptyTitle}</h3>
+      <p className="mt-2.5 max-w-md mx-auto text-sm text-zinc-400 leading-relaxed">
+        {dt.friends.emptyDesc}
+      </p>
 
-      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 sm:p-12 shadow-2xl backdrop-blur-2xl text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-sky-500/25 bg-sky-500/10 text-sky-400 mb-4 shadow-[0_0_25px_rgba(56,189,248,0.2)]">
-          <Users className="h-8 w-8" />
-        </div>
-        <h3 className="text-lg font-bold text-white">{dt.friends.emptyTitle}</h3>
-        <p className="mt-2 max-w-md mx-auto text-xs text-zinc-400 leading-relaxed">
-          {dt.friends.emptyDesc}
-        </p>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("home")}
-          className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-xs font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-        >
-          <Play className="h-4 w-4 fill-white" />
-          <span>{dt.friends.startMeeting}</span>
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setActiveTab("home")}
+        className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-7 py-3 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+      >
+        <Play className="h-4 w-4 fill-white" />
+        <span>{dt.friends.startMeeting}</span>
+      </button>
     </div>
   );
 
   const renderRatingView = () => (
-    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setActiveTab("profile")}
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div>
-          <h1 className="text-xl font-bold text-white">{dt.rating.title}</h1>
-          <p className="text-xs text-zinc-400">{dt.rating.subtitle}</p>
-        </div>
+    <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[58vh] text-center px-4 animate-in fade-in duration-200">
+      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-500/10 text-amber-400 mb-5 shadow-[0_0_35px_rgba(245,158,11,0.25)]">
+        <Trophy className="h-10 w-10" />
       </div>
+      <h3 className="text-xl font-bold text-white">Hozircha reyting ma'lumotlari mavjud emas</h3>
+      <p className="mt-2.5 max-w-md mx-auto text-sm text-zinc-400 leading-relaxed">
+        Foydalanuvchilar suhbatlashgan sari haftalik va oylik reyting jadvali shu yerda shakllanib boradi.
+      </p>
 
-      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 sm:p-12 shadow-2xl backdrop-blur-2xl text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-500/25 bg-amber-500/10 text-amber-400 mb-4 shadow-[0_0_25px_rgba(245,158,11,0.2)]">
-          <Trophy className="h-8 w-8" />
-        </div>
-        <h3 className="text-lg font-bold text-white">Hozircha reyting ma'lumotlari mavjud emas</h3>
-        <p className="mt-2 max-w-md mx-auto text-xs text-zinc-400 leading-relaxed">
-          Foydalanuvchilar suhbatlashgan sari haftalik va oylik reyting jadvali shu yerda shakllanib boradi.
-        </p>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("home")}
-          className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-xs font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-        >
-          <Play className="h-4 w-4 fill-white" />
-          <span>Suhbatni boshlash</span>
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setActiveTab("home")}
+        className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-7 py-3 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+      >
+        <Play className="h-4 w-4 fill-white" />
+        <span>Suhbatni boshlash</span>
+      </button>
     </div>
   );
 
   const renderAchievementsView = () => (
-    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setActiveTab("profile")}
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div>
-          <h1 className="text-xl font-bold text-white">{dt.achievements.title}</h1>
-          <p className="text-xs text-zinc-400">{dt.achievements.subtitle}</p>
-        </div>
+    <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[58vh] text-center px-4 animate-in fade-in duration-200">
+      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-500/10 text-emerald-400 mb-5 shadow-[0_0_35px_rgba(16,185,129,0.25)]">
+        <Award className="h-10 w-10" />
       </div>
+      <h3 className="text-xl font-bold text-white">Hozircha yutuqlar ochilmagan</h3>
+      <p className="mt-2.5 max-w-md mx-auto text-sm text-zinc-400 leading-relaxed">
+        Kunlik ketma-ketlik va suhbatlar orqali yangi nishonlar va sovrinlarni qo'lga kiriting.
+      </p>
 
-      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 sm:p-12 shadow-2xl backdrop-blur-2xl text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-500/25 bg-emerald-500/10 text-emerald-400 mb-4 shadow-[0_0_25px_rgba(16,185,129,0.2)]">
-          <Award className="h-8 w-8" />
-        </div>
-        <h3 className="text-lg font-bold text-white">Hozircha yutuqlar ochilmagan</h3>
-        <p className="mt-2 max-w-md mx-auto text-xs text-zinc-400 leading-relaxed">
-          Kunlik ketma-ketlik va suhbatlar orqali yangi nishonlar va sovrinlarni qo'lga kiriting.
-        </p>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("home")}
-          className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-xs font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-        >
-          <Play className="h-4 w-4 fill-white" />
-          <span>Suhbatni boshlash</span>
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setActiveTab("home")}
+        className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-7 py-3 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+      >
+        <Play className="h-4 w-4 fill-white" />
+        <span>Suhbatni boshlash</span>
+      </button>
     </div>
   );
 
@@ -1872,12 +1894,18 @@ export default function UserHome() {
               {/* Xabarlar tugmasi (Account avatar o'rniga navbar yonida) */}
               <button
                 type="button"
-                onClick={() => setMessagesModalOpen(true)}
+                onClick={handleOpenMessagesModal}
                 className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04] text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer"
                 title="Xabarlar"
               >
                 <MessageSquare className="h-4 w-4" />
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#080514]" />
+                {unreadAdminCount > 0 ? (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white shadow-lg ring-2 ring-[#080514] animate-bounce">
+                    {unreadAdminCount > 99 ? "99+" : unreadAdminCount}
+                  </span>
+                ) : (
+                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#080514]" />
+                )}
               </button>
 
               {/* Bildirishnomalar */}
@@ -2931,25 +2959,104 @@ export default function UserHome() {
         </div>
       )}
 
-      {/* ── Xabarlar modali ── */}
+      {/* ── Kengaytirilgan Xabarlar va Admin Muloqoti Modali ── */}
       {messagesModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-sm rounded-2xl border border-white/[0.1] bg-[#0e0922] p-6 shadow-2xl text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-300 mb-3">
-              <MessageSquare className="h-6 w-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-5 animate-in fade-in duration-200">
+          <div className="w-full max-w-xl h-[560px] max-h-[88vh] rounded-3xl border border-white/[0.12] bg-[#0c0820]/95 shadow-[0_20px_60px_rgba(0,0,0,0.85)] backdrop-blur-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.03] px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.25)]">
+                  <MessageSquare className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-white">Ma'muriyat bilan xabarlar</h3>
+                    <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Yordam
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">Admin xabarlarini o'qish va bevosita javob qaytarish</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMessagesModalOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <h3 className="text-base font-bold text-white">Xabarlar</h3>
-            <p className="mt-2 text-xs text-zinc-400">
-              Hozircha yangi xabarlar mavjud emas. Suhbatlar va bildirishnomalar shu yerda ko'rinadi.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setMessagesModalOpen(false)}
-              className="mt-5 w-full rounded-xl text-xs border-white/10 cursor-pointer"
+
+            {/* Chat Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs">
+              {adminMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center py-10 px-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-zinc-500 mb-3">
+                    <MessageSquare className="h-7 w-7" />
+                  </div>
+                  <p className="text-sm font-semibold text-zinc-300">Hozircha xabarlar yo'q</p>
+                  <p className="text-xs text-zinc-500 mt-1 max-w-xs">
+                    Admin tomonidan yuborilgan xabarlar shu yerda ko'rinadi. Istalgan vaqtda savol yoki taklif yozishingiz mumkin.
+                  </p>
+                </div>
+              ) : (
+                adminMessages.map((msg, i) => (
+                  <div
+                    key={msg.id || i}
+                    className={cn(
+                      "flex flex-col max-w-[85%] rounded-2xl p-3.5 shadow-md leading-relaxed transition-all",
+                      msg.isAdmin
+                        ? "mr-auto bg-[#140f2e] border border-purple-500/30 text-zinc-100 rounded-tl-sm shadow-[0_4px_20px_rgba(168,85,247,0.12)]"
+                        : "ml-auto bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-tr-sm shadow-[0_4px_20px_rgba(139,92,246,0.3)]"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      {msg.isAdmin ? (
+                        <span className="flex items-center gap-1 rounded bg-purple-500/25 px-1.5 py-0.5 text-[10px] font-bold text-purple-300 border border-purple-500/30">
+                          <ShieldCheck className="h-3 w-3" />
+                          Admin
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold opacity-80">
+                          {msg.sender || "Siz"}
+                        </span>
+                      )}
+                      <span className="text-[10px] opacity-60 ml-auto font-mono">
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-medium whitespace-pre-wrap break-words">{msg.text}</p>
+                  </div>
+                ))
+              )}
+              <div ref={adminMessagesEndRef} />
+            </div>
+
+            {/* Chat Footer / Input Form */}
+            <form
+              onSubmit={handleSendAdminReply}
+              className="flex items-center gap-2.5 border-t border-white/[0.08] bg-[#0a061a] p-3 sm:p-4"
             >
-              Yopish
-            </Button>
+              <input
+                type="text"
+                placeholder="Adminga javob yoki xabar yozing..."
+                value={adminMessageInput}
+                onChange={(e) => setAdminMessageInput(e.target.value)}
+                maxLength={500}
+                className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!adminMessageInput.trim() || adminMessageSending}
+                className="flex items-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-[0_0_15px_rgba(139,92,246,0.4)] disabled:opacity-50 hover:brightness-110 transition-all cursor-pointer shrink-0"
+              >
+                <Send className="h-4 w-4" />
+                <span className="hidden sm:inline">Yuborish</span>
+              </button>
+            </form>
           </div>
         </div>
       )}

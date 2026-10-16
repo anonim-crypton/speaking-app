@@ -11,13 +11,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
+from django.shortcuts import redirect
+
 def admin_spa_view(request):
-    template_path = os.path.join(settings.BASE_DIR, "panel", "templates", "react_admin.html")
-    if os.path.exists(template_path):
-        with open(template_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        return HttpResponse(content, content_type="text/html")
-    return HttpResponse("Admin panel template not found", status=404)
+    return redirect("http://localhost:5173/admin")
 
 # Locate backend/data folder
 BASE_DIR = settings.BASE_DIR
@@ -306,8 +303,39 @@ def sync_user_to_supabase(user_id, updates):
         )
         urllib.request.urlopen(req, timeout=5)
         return True
+    except Exception:
+        return False
+
+def save_message_to_supabase(user_id, sender_name, sender_username, text, is_admin=True):
+    supabase_url, supabase_key = get_supabase_config()
+    if not supabase_url or not supabase_key:
+        return False
+    try:
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        payload = {
+            "user_id": user_id,
+            "name": sender_name,
+            "username": sender_username,
+            "text": text,
+            "is_admin": is_admin,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"{supabase_url}/rest/v1/messages",
+            data=data,
+            headers=headers,
+            method="POST"
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
     except Exception as e:
-        print(f"Supabase patch err: {e}")
+        print(f"Supabase messages insert error: {e}")
         return False
 
 class AdminUserActionView(APIView):
@@ -339,14 +367,39 @@ class AdminUserActionView(APIView):
             log_admin_action("user_unbanned", f"Foydalanuvchi blokdan chiqarildi: {target.get('name') or target.get('phone') or user_id}", user_id)
         elif action == "add_diamonds":
             amount = int(request.data.get("amount", 0))
+            if amount <= 0:
+                return Response({"success": False, "message": "Musbat olmos miqdorini kiriting"}, status=status.HTTP_400_BAD_REQUEST)
             current = target.get("diamonds", 0)
-            target["diamonds"] = max(0, current + amount)
+            target["diamonds"] = current + amount
+            history = target.setdefault("diamondHistory", [])
+            history.insert(0, {
+                "id": str(uuid.uuid4())[:8],
+                "amount": amount,
+                "type": "gift",
+                "createdAt": datetime.utcnow().isoformat()
+            })
             sync_user_to_supabase(user_id, {"diamonds": target["diamonds"]})
-            log_admin_action("diamonds_adjusted", f"{amount} ta olmos hadya qilindi (Yangi balans: {target['diamonds']})", user_id)
+            log_admin_action("diamonds_gifted", f"{amount} ta olmos hadya qilindi (Yangi balans: {target['diamonds']})", user_id)
+        elif action == "revoke_diamonds":
+            amount = int(request.data.get("amount", 0))
+            if amount <= 0:
+                return Response({"success": False, "message": "Qaytarib olinadigan miqdorni kiriting"}, status=status.HTTP_400_BAD_REQUEST)
+            current = target.get("diamonds", 0)
+            revoked_amt = min(current, amount)
+            target["diamonds"] = max(0, current - revoked_amt)
+            history = target.setdefault("diamondHistory", [])
+            history.insert(0, {
+                "id": str(uuid.uuid4())[:8],
+                "amount": -revoked_amt,
+                "type": "revoke",
+                "createdAt": datetime.utcnow().isoformat()
+            })
+            sync_user_to_supabase(user_id, {"diamonds": target["diamonds"]})
+            log_admin_action("diamonds_revoked", f"{revoked_amt} ta olmos qaytarib olindi (Yangi balans: {target['diamonds']})", user_id)
         elif action == "toggle_premium":
             target["isPremium"] = not target.get("isPremium", False)
             sync_user_to_supabase(user_id, {"is_premium": target["isPremium"]})
-            status_text = "yoqildi" if target["isPremium"] else "o'chirildi"
+            status_text = "yoqildi" if target["isPremium"] else "bekor qilindi"
             log_admin_action("premium_toggled", f"Premium maqomi {status_text}", user_id)
         elif action == "send_message":
             msg_text = request.data.get("message", "").strip()
@@ -361,6 +414,7 @@ class AdminUserActionView(APIView):
                 "read": False
             }
             msgs.insert(0, new_msg)
+            save_message_to_supabase(user_id, "Admin", "admin", msg_text, is_admin=True)
             log_admin_action("admin_message_sent", f"Foydalanuvchiga xabar: {msg_text[:40]}...", user_id)
         elif action == "toggle_verified":
             target["isVerified"] = not target.get("isVerified", False)

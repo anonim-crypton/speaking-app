@@ -19,6 +19,14 @@ function authRequired(req, res, next) {
       return res.status(401).json({ success: false, message: "User not found" });
     }
 
+    if (user.isBanned) {
+      return res.status(403).json({
+        success: false,
+        message: "Ushbu hisob ma'muriyat (admin) tomonidan bloklangan!",
+        code: "USER_BANNED",
+      });
+    }
+
     if (payload.sid) {
       const session = sessionStore.getSession(payload.sid);
       if (!session || session.revoked) {

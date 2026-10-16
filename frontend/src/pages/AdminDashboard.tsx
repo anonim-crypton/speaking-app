@@ -25,6 +25,7 @@ import {
   Crown,
 } from "lucide-react";
 import { adminApiGet, adminApiPost } from "@/lib/api";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 
 interface AdminStats {
   totalUsers: number;
@@ -49,6 +50,7 @@ interface UserItem {
   bannedAt?: string;
   isVerified?: boolean;
   isPremium?: boolean;
+  diamondHistory?: Array<{ amount: number; type: string; date: string }>;
   adminMessages?: Array<{ id: string; text: string; date: string; read?: boolean }>;
   createdAt?: string;
 }
@@ -967,12 +969,15 @@ export default function AdminDashboard() {
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-bold text-white">{u.name || "Nomsiz"}</span>
                                     {u.isPremium && (
-                                      <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold">
-                                        VIP
-                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold">
+                                          VIP
+                                        </span>
+                                        <VerifiedBadge size={16} />
+                                      </div>
                                     )}
-                                    {u.isVerified && (
-                                      <span className="text-cyan-400 text-xs font-bold">✓</span>
+                                    {!u.isPremium && u.isVerified && (
+                                      <VerifiedBadge size={16} />
                                     )}
                                   </div>
                                   <div className="text-xs text-zinc-500 font-mono truncate max-w-[140px]">
@@ -1032,9 +1037,12 @@ export default function AdminDashboard() {
                                       <div className="flex items-center gap-3">
                                         <span className="text-base font-bold text-white">{u.name || "Nomsiz foydalanuvchi"}</span>
                                         {u.isPremium && (
-                                          <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 text-xs font-bold">
-                                            ★ Premium VIP
-                                          </span>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 text-xs font-bold">
+                                              ★ Premium VIP
+                                            </span>
+                                            <VerifiedBadge size={18} />
+                                          </div>
                                         )}
                                         {u.isBanned && (
                                           <span className="rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2.5 py-0.5 text-xs font-bold">
@@ -1129,18 +1137,32 @@ export default function AdminDashboard() {
                                           className="w-full rounded-xl border border-white/10 bg-[#060a14] px-3.5 py-2 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none mb-3 font-mono"
                                         />
                                       </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const amt = giftDiamondsMap[u.id];
-                                          if (!amt || Number(amt) <= 0) return alert("Iltimos, olmos miqdorini kiriting!");
-                                          handleUserAction(u.id, "add_diamonds", { amount: amt });
-                                          setGiftDiamondsMap({ ...giftDiamondsMap, [u.id]: "" });
-                                        }}
-                                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 hover:opacity-95 transition-all outline-none focus:outline-none"
-                                      >
-                                        ✓ Olmosni Hadya Qilish
-                                      </button>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const amt = giftDiamondsMap[u.id];
+                                            if (!amt || Number(amt) <= 0) return alert("Iltimos, olmos miqdorini kiriting!");
+                                            handleUserAction(u.id, "add_diamonds", { amount: amt });
+                                            setGiftDiamondsMap({ ...giftDiamondsMap, [u.id]: "" });
+                                          }}
+                                          className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 hover:opacity-95 transition-all outline-none focus:outline-none"
+                                        >
+                                          ✓ Hadya Qilish
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const amt = giftDiamondsMap[u.id];
+                                            if (!amt || Number(amt) <= 0) return alert("Iltimos, olmos miqdorini kiriting!");
+                                            handleUserAction(u.id, "revoke_diamonds", { amount: amt });
+                                            setGiftDiamondsMap({ ...giftDiamondsMap, [u.id]: "" });
+                                          }}
+                                          className="flex-1 py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/15 text-rose-300 font-bold text-xs hover:bg-rose-500/25 transition-all outline-none focus:outline-none"
+                                        >
+                                          ⟲ Qaytarib Olish
+                                        </button>
+                                      </div>
                                     </div>
 
                                     {/* 2. PREMIUM MAQOMINI YOQISH / O'CHIRISH */}
@@ -1217,6 +1239,49 @@ export default function AdminDashboard() {
                                       </button>
                                     </div>
 
+                                  </div>
+
+                                  {/* 4. OLMOSLAR VA AMALLAR TARIXI */}
+                                  <div className="rounded-2xl border border-white/10 bg-[#081020] p-5">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <div className="flex items-center gap-2">
+                                        <History className="w-4 h-4 text-cyan-400" />
+                                        <span className="text-xs font-bold text-white uppercase tracking-wider">Olmoslar va amallar tarixi</span>
+                                      </div>
+                                      <span className="text-xs font-mono text-zinc-400 font-semibold">
+                                        {u.diamondHistory?.length || 0} ta yozuv
+                                      </span>
+                                    </div>
+                                    {(!u.diamondHistory || u.diamondHistory.length === 0) ? (
+                                      <div className="py-4 text-center text-xs text-zinc-500 font-mono">
+                                        Hozircha amallar tarixi yo'q
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                        {u.diamondHistory.slice().reverse().map((item, idx) => (
+                                          <div
+                                            key={idx}
+                                            className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs"
+                                          >
+                                            <div className="flex items-center gap-2.5">
+                                              <span
+                                                className={`font-mono font-bold px-2 py-0.5 rounded-lg ${
+                                                  item.amount >= 0
+                                                    ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                                                    : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                                                }`}
+                                              >
+                                                {item.amount >= 0 ? `+${item.amount}` : item.amount} 💎
+                                              </span>
+                                              <span className="text-zinc-300">{item.type || "Admin amali"}</span>
+                                            </div>
+                                            <span className="text-zinc-500 text-[11px] font-mono">
+                                              {new Date(item.date).toLocaleString()}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </td>

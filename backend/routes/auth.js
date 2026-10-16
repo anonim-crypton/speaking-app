@@ -35,6 +35,11 @@ function publicUser(user) {
     purpose: user.purpose ?? user.onboarding?.purpose ?? null,
     gender: user.gender ?? user.onboarding?.gender ?? null,
     diamonds: user.diamonds || 0,
+    isPremium: Boolean(user.isPremium),
+    isVerified: Boolean(user.isVerified),
+    isBanned: Boolean(user.isBanned),
+    diamondHistory: user.diamondHistory || [],
+    adminMessages: user.adminMessages || [],
     onboardingCompleted: Boolean(user.onboardingCompleted && user.username),
     createdAt: user.createdAt,
   };
@@ -57,6 +62,9 @@ function hydrateUserFromProfile(profile) {
       purpose: profile.purpose ?? existing.purpose ?? null,
       gender: profile.gender ?? existing.gender ?? null,
       diamonds: profile.diamonds ?? existing.diamonds ?? 0,
+      isPremium: Boolean(profile.is_premium ?? existing.isPremium ?? false),
+      isVerified: Boolean(profile.is_verified ?? existing.isVerified ?? false),
+      isBanned: Boolean(profile.is_banned ?? existing.isBanned ?? false),
       onboardingCompleted: Boolean(profile.onboarding_completed),
     });
   }
@@ -75,6 +83,9 @@ function hydrateUserFromProfile(profile) {
     purpose: profile.purpose,
     gender: profile.gender,
     diamonds: profile.diamonds || 0,
+    isPremium: Boolean(profile.is_premium ?? false),
+    isVerified: Boolean(profile.is_verified ?? false),
+    isBanned: Boolean(profile.is_banned ?? false),
     onboardingCompleted: Boolean(profile.onboarding_completed),
   });
 }
@@ -304,6 +315,14 @@ router.post("/google", async (req, res) => {
       console.warn("[supabase] google_accounts upsert failed:", googleSaved.error);
     }
 
+    if (user.isBanned) {
+      return res.status(403).json({
+        success: false,
+        message: "Ushbu hisob ma'muriyat (admin) tomonidan bloklangan!",
+        code: "USER_BANNED",
+      });
+    }
+
     const sessionRes = sessionStore.createSession({
       userId: user.id,
       ip: req.ip,
@@ -360,6 +379,14 @@ router.post("/login", async (req, res) => {
         return res
           .status(401)
           .json({ success: false, message: "Phone number is not registered", code: "PHONE_NOT_REGISTERED" });
+      }
+
+      if (user.isBanned) {
+        return res.status(403).json({
+          success: false,
+          message: "Ushbu hisob ma'muriyat (admin) tomonidan bloklangan!",
+          code: "USER_BANNED",
+        });
       }
 
       // Ensure synced in Supabase profiles in background
@@ -444,6 +471,14 @@ router.post("/login", async (req, res) => {
         success: false,
         message: "Incorrect password",
         field: "password",
+      });
+    }
+
+    if (user.isBanned) {
+      return res.status(403).json({
+        success: false,
+        message: "Ushbu hisob ma'muriyat (admin) tomonidan bloklangan!",
+        code: "USER_BANNED",
       });
     }
 
@@ -651,6 +686,14 @@ router.post("/verify-otp", async (req, res) => {
       }
     }
 
+    if (user.isBanned) {
+      return res.status(403).json({
+        success: false,
+        message: "Ushbu hisob ma'muriyat (admin) tomonidan bloklangan!",
+        code: "USER_BANNED",
+      });
+    }
+
     const sessionRes = sessionStore.createSession({
       userId: user.id,
       ip: req.ip,
@@ -675,6 +718,100 @@ router.post("/verify-otp", async (req, res) => {
   } catch (err) {
     console.error("verify-otp error:", err);
     return res.status(500).json({ success: false, message: "Verification failed" });
+  }
+});
+
+/* ─────────────────────────────── User Messages (Admin <-> User) ─────── */
+router.get("/messages", authRequired, async (req, res) => {
+  try {
+    const user = store.findById(req.user.id) || req.user;
+    const localMsgs = user.adminMessages || [];
+    const remoteMsgs = await supabase.getMessages(user.id);
+
+    // Merge remote and local if remote exists
+    const mergedMap = new Map();
+    localMsgs.forEach((m) => mergedMap.set(m.id || `${m.createdAt}_${m.text}`, m));
+    remoteMsgs.forEach((rm) => {
+      const key = rm.id || `${rm.created_at}_${rm.text}`;
+      if (!mergedMap.has(key)) {
+        mergedMap.set(key, {
+          id: String(rm.id),
+          text: rm.text,
+          isAdmin: Boolean(rm.is_admin),
+          sender: rm.is_admin ? "Admin" : (rm.name || user.name || "Siz"),
+          createdAt: rm.created_at,
+          read: true,
+        });
+      }
+    });
+
+    const allMessages = Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    const unreadCount = allMessages.filter((m) => m.isAdmin && !m.read).length;
+
+    return res.json({
+      success: true,
+      messages: allMessages,
+      unreadCount,
+    });
+  } catch (err) {
+    console.error("Get messages error:", err);
+    return res.status(500).json({ success: false, message: "Failed to fetch messages" });
+  }
+});
+
+router.post("/messages", authRequired, async (req, res) => {
+  try {
+    const { text } = req.body || {};
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ success: false, message: "Xabar matni kiritilishi shart" });
+    }
+
+    const cleanText = String(text).trim();
+    const user = store.findById(req.user.id) || req.user;
+    const newMsg = {
+      id: "msg_" + Date.now(),
+      text: cleanText,
+      isAdmin: false,
+      sender: user.name || user.username || "Foydalanuvchi",
+      createdAt: new Date().toISOString(),
+      read: true,
+    };
+
+    const currentList = user.adminMessages || [];
+    currentList.push(newMsg);
+    store.updateUser(user.id, { adminMessages: currentList });
+
+    // Save to Supabase messages table
+    void supabase.saveMessage({
+      userId: user.id,
+      name: user.name,
+      username: user.username,
+      text: cleanText,
+      isAdmin: false,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: newMsg,
+      messages: currentList,
+    });
+  } catch (err) {
+    console.error("Send message error:", err);
+    return res.status(500).json({ success: false, message: "Failed to send message" });
+  }
+});
+
+router.post("/messages/read", authRequired, async (req, res) => {
+  try {
+    const user = store.findById(req.user.id) || req.user;
+    const currentList = (user.adminMessages || []).map((m) => ({ ...m, read: true }));
+    store.updateUser(user.id, { adminMessages: currentList });
+    return res.json({ success: true, unreadCount: 0 });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: "Failed to mark as read" });
   }
 });
 
