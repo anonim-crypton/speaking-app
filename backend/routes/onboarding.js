@@ -86,7 +86,7 @@ router.get("/check-username", authRequired, async (req, res) => {
  */
 router.post("/", authRequired, async (req, res) => {
   try {
-    const { age, name, username, countryCode, purpose, gender } = req.body || {};
+    const { age, name, username, avatarUrl, countryCode, purpose, gender } = req.body || {};
 
     // 1. Validate Name (from body or existing user record)
     const rawName = name !== undefined && String(name).trim() ? String(name).trim() : req.user.name;
@@ -113,6 +113,16 @@ router.post("/", authRequired, async (req, res) => {
         success: false,
         message: "Username can only contain letters, numbers, _ and .",
         code: "USERNAME_INVALID",
+      });
+    }
+
+    // 3. Validate Mandatory Avatar
+    const finalAvatarUrl = (avatarUrl && String(avatarUrl).trim()) || req.user.avatarUrl;
+    if (!finalAvatarUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "Profil rasmi majburiy",
+        code: "AVATAR_REQUIRED",
       });
     }
 
@@ -165,6 +175,7 @@ router.post("/", authRequired, async (req, res) => {
       store.updateUser(req.user.id, {
         name: cleanName,
         username: cleanUsername,
+        avatarUrl: finalAvatarUrl,
         countryCode: upperCountry,
         age: ageNumber,
         purpose,
@@ -173,6 +184,7 @@ router.post("/", authRequired, async (req, res) => {
         onboarding: {
           name: cleanName,
           username: cleanUsername,
+          avatarUrl: finalAvatarUrl,
           age: ageNumber,
           countryCode: upperCountry,
           purpose,
@@ -186,6 +198,7 @@ router.post("/", authRequired, async (req, res) => {
       id: updated.id,
       name: cleanName,
       username: cleanUsername,
+      avatarUrl: finalAvatarUrl,
       email: updated.email || null,
       phone: updated.phone || null,
       passwordHash: updated.passwordHash || null,
@@ -226,6 +239,7 @@ router.post("/", authRequired, async (req, res) => {
         slug: userSlug(updated.id),
         name: cleanName,
         username: cleanUsername,
+        avatarUrl: finalAvatarUrl,
         email: updated.email || null,
         phone: updated.phone || null,
         provider: updated.provider || "password",
@@ -235,6 +249,8 @@ router.post("/", authRequired, async (req, res) => {
         purpose,
         gender,
         diamonds: updated.diamonds || 0,
+        isPremium: Boolean(updated.isPremium),
+        isVerified: Boolean(updated.isVerified),
         onboardingCompleted: true,
         createdAt: updated.createdAt,
       },

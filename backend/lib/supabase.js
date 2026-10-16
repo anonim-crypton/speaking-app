@@ -155,6 +155,7 @@ async function saveProfile({
   gender = null,
   diamonds = undefined,
   onboardingCompleted = undefined,
+  avatarUrl = null,
 }) {
   if (!client) return { ok: false, skipped: true, error: reason };
   const validId = id && UUID_RE.test(String(id)) ? id : crypto.randomUUID();
@@ -165,6 +166,7 @@ async function saveProfile({
   const basePayload = {
     id: validId,
     ...(name !== undefined ? { name } : {}),
+    ...(avatarUrl !== undefined && avatarUrl !== null ? { avatar_url: avatarUrl } : {}),
     ...(email !== undefined && email !== null ? { email } : {}),
     ...(phone !== undefined && phone !== null ? { phone } : {}),
     ...(passwordHash !== undefined && passwordHash !== null

@@ -61,6 +61,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import CountryFlag from "@/components/CountryFlag";
 import SpeakerAvatar from "@/components/SpeakerAvatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import VipUserCard from "@/components/VipUserCard";
 import AiLoader from "@/components/ui/ai-loader";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,8 @@ interface MatchedPartner {
   username: string;
   avatarUrl?: string | null;
   language: string;
+  isPremium?: boolean;
+  isVerified?: boolean;
 }
 
 interface ChatMessage {
@@ -1196,7 +1199,7 @@ export default function UserHome() {
               )}
             >
               <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0d0822] overflow-hidden">
-                <SpeakerAvatar size={76} />
+                <SpeakerAvatar size={76} src={user?.avatarUrl} />
               </div>
             </div>
             <span className="absolute bottom-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#0d0822]" />
@@ -1938,78 +1941,38 @@ export default function UserHome() {
                 {/* ── Top Header Row: Mening profilim (chapda) va Speaker sherigim profili (o'ngda) ── */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Chap tomonda tepada: Mening profilim */}
-                  <div className="flex items-center gap-3.5 rounded-2xl border border-white/[0.08] bg-[#0b071b]/90 p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
-                    <div className="relative shrink-0">
-                      <SpeakerAvatar size={48} />
-                      <span
-                        className={cn(
-                          "absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full ring-2 ring-[#0b071b]",
-                          isMicMuted ? "bg-red-500" : "bg-emerald-500"
-                        )}
-                      >
-                        {isMicMuted ? (
-                          <MicOff className="h-2.5 w-2.5 text-white" />
-                        ) : (
-                          <Mic className="h-2.5 w-2.5 text-white" />
-                        )}
-                      </span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-md border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-300">
-                          Siz
-                        </span>
-                        <p className="truncate text-sm font-bold text-white">{displayName}</p>
-                      </div>
-                      <p className="mt-0.5 truncate text-xs font-mono font-medium text-violet-300">
-                        @{displayUsername}
-                      </p>
-                    </div>
-                  </div>
+                  <VipUserCard
+                    name={displayName}
+                    username={displayUsername}
+                    avatarUrl={user?.avatarUrl}
+                    isPremium={Boolean(user?.isPremium)}
+                    isVerified={Boolean(user?.isVerified || user?.isPremium)}
+                    roleBadge="Siz"
+                    isMicMuted={isMicMuted}
+                  />
 
                   {/* O'ng tomonda tepada: Speaker sherigim profili */}
-                  <div className="flex items-center justify-between gap-3.5 rounded-2xl border border-white/[0.08] bg-[#0b071b]/90 p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="relative shrink-0">
-                        {matchedPartner.avatarUrl ? (
-                          <img
-                            src={matchedPartner.avatarUrl}
-                            alt={matchedPartner.name}
-                            className="h-12 w-12 rounded-full object-cover ring-2 ring-emerald-400/60"
-                          />
-                        ) : (
-                          <SpeakerAvatar size={48} />
-                        )}
-                        <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#0b071b]">
-                          <UserCheck className="h-2.5 w-2.5 text-white" />
+                  <VipUserCard
+                    name={matchedPartner.name}
+                    username={matchedPartner.username}
+                    avatarUrl={matchedPartner.avatarUrl}
+                    isPremium={Boolean(matchedPartner.isPremium)}
+                    isVerified={Boolean(matchedPartner.isVerified || matchedPartner.isPremium)}
+                    roleBadge="Sherik"
+                    isPartner
+                    rightExtra={
+                      <div className="shrink-0 flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-1.5">
+                        <CountryFlag
+                          code={speakerOption.flagCode}
+                          width={20}
+                          className="h-3.5 w-5 rounded-[2px]"
+                        />
+                        <span className="text-xs font-semibold text-white">
+                          {speakerOption.name}
                         </span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
-                            Sherik
-                          </span>
-                          <p className="truncate text-sm font-bold text-white">
-                            {matchedPartner.name}
-                          </p>
-                        </div>
-                        <p className="mt-0.5 truncate text-xs font-mono font-medium text-violet-300">
-                          @{matchedPartner.username}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-1.5">
-                      <CountryFlag
-                        code={speakerOption.flagCode}
-                        width={20}
-                        className="h-3.5 w-5 rounded-[2px]"
-                      />
-                      <span className="text-xs font-semibold text-white">
-                        {speakerOption.name}
-                      </span>
-                    </div>
-                  </div>
+                    }
+                  />
                 </div>
 
                 {/* ── Main Meeting Area: Tagma-tag Katta Avatarlar + Boshqaruv Tugmalari (Markazda) ── */}
@@ -2021,13 +1984,17 @@ export default function UserHome() {
                       <div
                         className={cn(
                           "relative rounded-full transition-all duration-300",
-                          isMySpeaking
+                          user?.isPremium
+                            ? isMySpeaking
+                              ? "p-[4px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_45px_rgba(245,158,11,0.95)] scale-105 animate-pulse"
+                              : "p-[3.5px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_30px_rgba(245,158,11,0.65)] ring-2 ring-amber-400/80"
+                            : isMySpeaking
                             ? "p-[4px] bg-gradient-to-tr from-violet-400 via-fuchsia-400 to-indigo-400 shadow-[0_0_40px_rgba(168,85,247,0.85)] scale-105 animate-pulse"
                             : "p-[3px] bg-white/10"
                         )}
                       >
                         <div className="overflow-hidden rounded-full h-28 w-28 sm:h-32 sm:w-32 bg-[#120b2d]">
-                          <SpeakerAvatar size={128} />
+                          <SpeakerAvatar size={128} src={user?.avatarUrl} />
                         </div>
                         {isMySpeaking && (
                           <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-violet-500 shadow-glow">
@@ -2036,7 +2003,10 @@ export default function UserHome() {
                         )}
                       </div>
                       <div className="text-center">
-                        <p className="text-sm font-bold text-white">{displayName}</p>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <p className="text-sm font-bold text-white">{displayName}</p>
+                          {user?.isPremium && <VerifiedBadge size={16} />}
+                        </div>
                         <p className="text-xs font-mono text-violet-300">@{displayUsername}</p>
                       </div>
                     </div>
@@ -2052,21 +2022,17 @@ export default function UserHome() {
                       <div
                         className={cn(
                           "relative rounded-full transition-all duration-300",
-                          isPartnerSpeaking
+                          matchedPartner?.isPremium
+                            ? isPartnerSpeaking
+                              ? "p-[4px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_45px_rgba(245,158,11,0.95)] scale-105 animate-pulse"
+                              : "p-[3.5px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_30px_rgba(245,158,11,0.65)] ring-2 ring-amber-400/80"
+                            : isPartnerSpeaking
                             ? "p-[4px] bg-gradient-to-tr from-cyan-400 via-violet-400 to-fuchsia-400 shadow-[0_0_40px_rgba(56,189,248,0.85)] scale-105 animate-pulse"
                             : "p-[3px] bg-white/10"
                         )}
                       >
                         <div className="overflow-hidden rounded-full h-28 w-28 sm:h-32 sm:w-32 bg-[#120b2d]">
-                          {matchedPartner.avatarUrl ? (
-                            <img
-                              src={matchedPartner.avatarUrl}
-                              alt={matchedPartner.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <SpeakerAvatar size={128} />
-                          )}
+                          <SpeakerAvatar size={128} src={matchedPartner.avatarUrl} />
                         </div>
                         {isPartnerSpeaking && (
                           <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 shadow-glow">
@@ -2075,7 +2041,10 @@ export default function UserHome() {
                         )}
                       </div>
                       <div className="text-center">
-                        <p className="text-sm font-bold text-white">{matchedPartner.name}</p>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <p className="text-sm font-bold text-white">{matchedPartner.name}</p>
+                          {matchedPartner?.isPremium && <VerifiedBadge size={16} />}
+                        </div>
                         <p className="text-xs font-mono text-violet-300">@{matchedPartner.username}</p>
                       </div>
                     </div>

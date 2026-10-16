@@ -1,6 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const fs = require("fs");
+const path = require("path");
 
 const store = require("../utils/store");
 const sessionStore = require("../utils/sessionStore");
@@ -26,6 +28,7 @@ function publicUser(user) {
     slug: userSlug(user.id),
     name: user.name || null,
     username: user.username || null,
+    avatarUrl: user.avatarUrl || user.onboarding?.avatarUrl || null,
     email: user.email || null,
     phone: user.phone || null,
     provider: user.provider || "password",
@@ -55,6 +58,7 @@ function hydrateUserFromProfile(profile) {
     return store.updateUser(profile.id, {
       name: profile.name || existing.name,
       username: extractedUsername || existing.username || null,
+      avatarUrl: profile.avatar_url || existing.avatarUrl || null,
       email: profile.email || existing.email,
       phone: profile.phone || existing.phone,
       countryCode: profile.country_code || existing.countryCode,
@@ -72,6 +76,7 @@ function hydrateUserFromProfile(profile) {
     id: profile.id,
     name: profile.name,
     username: extractedUsername,
+    avatarUrl: profile.avatar_url || null,
     email: profile.email,
     phone: profile.phone,
     passwordHash: profile.password_hash,
@@ -812,6 +817,61 @@ router.post("/messages/read", authRequired, async (req, res) => {
     return res.json({ success: true, unreadCount: 0 });
   } catch (err) {
     return res.status(500).json({ success: false, message: "Failed to mark as read" });
+  }
+});
+
+/**
+ * POST /api/auth/upload-avatar
+ * Accepts base64 image, writes to backend/media/avatars/, saves URL to user and Supabase.
+ */
+router.post("/upload-avatar", authRequired, async (req, res) => {
+  try {
+    const { image } = req.body || {};
+    if (!image || typeof image !== "string") {
+      return res.status(400).json({ success: false, message: "Rasm ma'lumotlari kiritilmadi" });
+    }
+
+    const matches = image.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+    let ext = "jpg";
+    let buffer;
+    if (matches) {
+      ext = matches[1].toLowerCase();
+      if (ext === "jpeg") ext = "jpg";
+      if (ext === "svg+xml") ext = "svg";
+      buffer = Buffer.from(matches[2], "base64");
+    } else {
+      buffer = Buffer.from(image, "base64");
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ success: false, message: "Yaroqsiz rasm formati" });
+    }
+
+    const uploadDir = path.join(__dirname, "../media/avatars");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filename = `avatar_${req.user.id}_${Date.now()}.${ext}`;
+    const filePath = path.join(uploadDir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    const avatarUrl = `/media/avatars/${filename}`;
+
+    // Update local store
+    store.updateUser(req.user.id, { avatarUrl });
+
+    // Update Supabase
+    void supabase.updateRow("profiles", "id", req.user.id, { avatar_url: avatarUrl });
+
+    return res.json({
+      success: true,
+      avatarUrl,
+      message: "Profil rasmi muvaffaqiyatli saqlandi",
+    });
+  } catch (err) {
+    console.error("Upload avatar error:", err);
+    return res.status(500).json({ success: false, message: "Rasmni yuklashda xatolik yuz berdi" });
   }
 });
 

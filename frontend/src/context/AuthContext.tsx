@@ -14,6 +14,8 @@ export interface OnboardingAnswers {
   name?: string;
   /** Unique username (minimum 5 characters). */
   username: string;
+  /** User profile picture URL (mandatory). */
+  avatarUrl: string;
   countryCode: string;
   purpose: "friends" | "dating" | "language";
   gender: "male" | "female" | "gay" | "unspecified";
@@ -50,6 +52,7 @@ interface AuthContextValue {
   ) => Promise<AuthResponse>;
   signInWithGoogle: (email: string, name?: string) => Promise<AuthResponse>;
   checkUsername: (username: string) => Promise<{ available: boolean; username: string }>;
+  uploadAvatar: (base64Image: string) => Promise<{ success: boolean; avatarUrl: string }>;
   completeOnboarding: (answers: OnboardingAnswers) => Promise<void>;
   logout: () => void;
 }
@@ -217,6 +220,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const uploadAvatar = async (base64Image: string) => {
+    if (!token) throw new Error("Not signed in");
+    const data = await apiPost<{ success: boolean; avatarUrl: string; message: string }>(
+      "/api/auth/upload-avatar",
+      { image: base64Image },
+      token
+    );
+    if (data.avatarUrl) {
+      setUser((prev) => (prev ? { ...prev, avatarUrl: data.avatarUrl } : prev));
+    }
+    return data;
+  };
+
   const completeOnboarding = async (answers: OnboardingAnswers) => {
     if (!token) throw new Error("Not signed in");
     const data = await apiPost<{ success: boolean; user: AuthUser }>(
@@ -255,6 +271,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         verifyOtp,
         signInWithGoogle,
         checkUsername,
+        uploadAvatar,
         completeOnboarding,
         logout,
       }}

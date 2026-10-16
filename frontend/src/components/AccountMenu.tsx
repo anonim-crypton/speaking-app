@@ -75,7 +75,7 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
           aria-label="Foydalanuvchi hisobi"
         >
           <div className={cn("relative shrink-0 rounded-full", isPremium && "p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_10px_rgba(245,158,11,0.5)]")}>
-            <SpeakerAvatar size={30} />
+            <SpeakerAvatar size={30} src={user?.avatarUrl} />
           </div>
           <span className="max-w-[120px] truncate text-[13.5px] font-bold text-foreground">
             {displayName}
@@ -92,7 +92,7 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
           className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-2.5 cursor-pointer hover:bg-white/[0.08] transition-colors"
         >
           <div className={cn("relative shrink-0 rounded-full", isPremium && "p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_12px_rgba(245,158,11,0.5)]")}>
-            <SpeakerAvatar size={36} />
+            <SpeakerAvatar size={36} src={user?.avatarUrl} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">

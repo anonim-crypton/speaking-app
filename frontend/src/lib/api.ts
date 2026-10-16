@@ -11,6 +11,7 @@ export interface AuthUser {
   slug: string;
   name: string | null;
   username?: string | null;
+  avatarUrl?: string | null;
   email: string | null;
   phone: string | null;
   provider: AuthProviderKind;

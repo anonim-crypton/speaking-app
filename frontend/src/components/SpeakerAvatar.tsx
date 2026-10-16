@@ -1,16 +1,41 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
  * Default profile picture: a speaker wearing headphones with a microphone —
  * matching the Lingo Speek brand mark.
+ * If `src` is passed, renders the uploaded image with fallback to the SVG icon.
  */
 export default function SpeakerAvatar({
   className,
   size = 36,
+  src,
 }: {
   className?: string;
   size?: number;
+  src?: string | null;
 }) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  if (src && !imgFailed) {
+    return (
+      <span
+        className={cn(
+          "relative grid shrink-0 place-items-center overflow-hidden rounded-full bg-[#120b2d]",
+          className
+        )}
+        style={{ width: size, height: size }}
+      >
+        <img
+          src={src}
+          alt="Avatar"
+          className="h-full w-full object-cover rounded-full"
+          onError={() => setImgFailed(true)}
+        />
+      </span>
+    );
+  }
+
   return (
     <span
       className={cn(

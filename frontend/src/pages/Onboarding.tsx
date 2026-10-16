@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
   AtSign,
+  Camera,
+  CheckCircle2,
   GraduationCap,
   Heart,
   HelpCircle,
   Loader2,
   Sparkles,
+  UploadCloud,
   User,
   UserRound,
   Users,
@@ -29,7 +32,7 @@ import { cn } from "@/lib/utils";
 type Purpose = OnboardingAnswers["purpose"];
 type Gender = OnboardingAnswers["gender"];
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 function OptionCard({
   selected,
@@ -72,13 +75,15 @@ function OptionCard({
 export default function Onboarding() {
   const { t } = useLanguage();
   const { m, errorText } = useMessages();
-  const { isAuthed, loading, user, checkUsername, completeOnboarding } = useAuth();
+  const { isAuthed, loading, user, checkUsername, uploadAvatar, completeOnboarding } = useAuth();
   const { country: detectedCountry } = useRegion();
   const navigate = useNavigate();
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState(0);
   const [phase, setPhase] = useState<"questions" | "saving" | "done">("questions");
   const [checkingUsername, setCheckingUsername] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Step 0 asks Name for phone & google users (or if user.name is missing);
   // for email/password users who already typed their name at registration, asks Age while keeping their name.
@@ -87,6 +92,7 @@ export default function Onboarding() {
 
   const [name, setName] = useState(user?.name || "");
   const [username, setUsername] = useState(user?.username || "");
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
   const [age, setAge] = useState("");
   const [country, setCountry] = useState<string | null>(
     user?.countryCode || detectedCountry
@@ -102,12 +108,53 @@ export default function Onboarding() {
     if (user?.username && !username) {
       setUsername(user.username);
     }
-  }, [user?.name, user?.username]);
+    if (user?.avatarUrl && !avatarUrl) {
+      setAvatarUrl(user.avatarUrl);
+    }
+  }, [user?.name, user?.username, user?.avatarUrl]);
 
   const cleanUsername = useMemo(
     () => username.trim().replace(/^@+/, "").toLowerCase(),
     [username]
   );
+
+  const handleAvatarFile = async (file: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Faqat rasm fayllarini yuklash mumkin (JPG, PNG, WebP)");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Rasm hajmi 10 MB dan oshmasligi kerak");
+      return;
+    }
+    setError("");
+    setUploadingAvatar(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target?.result as string;
+        try {
+          const res = await uploadAvatar(base64);
+          if (res.avatarUrl) {
+            setAvatarUrl(res.avatarUrl);
+          }
+        } catch (err) {
+          setError(errorText(err));
+        } finally {
+          setUploadingAvatar(false);
+        }
+      };
+      reader.onerror = () => {
+        setError("Faylni o'qishda xatolik yuz berdi");
+        setUploadingAvatar(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setError(errorText(err));
+      setUploadingAvatar(false);
+    }
+  };
 
   const canProceed = useMemo(() => {
     if (step === 0) {
@@ -118,10 +165,11 @@ export default function Onboarding() {
     if (step === 1) {
       return cleanUsername.length >= 5 && /^[a-z0-9_.]{5,30}$/.test(cleanUsername);
     }
-    if (step === 2) return Boolean(country);
-    if (step === 3) return Boolean(purpose);
+    if (step === 2) return Boolean(avatarUrl && avatarUrl.trim());
+    if (step === 3) return Boolean(country);
+    if (step === 4) return Boolean(purpose);
     return Boolean(gender);
-  }, [step, askNameInStep0, name, age, cleanUsername, country, purpose, gender]);
+  }, [step, askNameInStep0, name, age, cleanUsername, avatarUrl, country, purpose, gender]);
 
   if (loading) return <LoadingScreen visible label={t.common.loading} />;
   if (!isAuthed) return <Navigate to="/register" replace />;
@@ -134,6 +182,10 @@ export default function Onboarding() {
     if (!canProceed) {
       if (step === 1 && cleanUsername.length < 5) {
         setError(m("USERNAME_TOO_SHORT"));
+        return;
+      }
+      if (step === 2 && !avatarUrl) {
+        setError("Iltimos, davom etish uchun profil rasmingizni yuklang (majburiy)");
         return;
       }
       setError(t.onboarding.required);
@@ -158,7 +210,7 @@ export default function Onboarding() {
       return;
     }
 
-    /* ── 5-savol yakunlandi: saqlash, loading, so'ngra tabriklash oynasi ── */
+    /* ── 6-savol yakunlandi: saqlash, loading, so'ngra tabriklash oynasi ── */
     const startedAt =
       typeof performance !== "undefined" ? performance.now() : Date.now();
     setPhase("saving");
@@ -167,6 +219,7 @@ export default function Onboarding() {
       await completeOnboarding({
         name: finalName,
         username: cleanUsername,
+        avatarUrl,
         ...(age && Number(age) >= 10 ? { age: Number(age) } : {}),
         countryCode: country as string,
         purpose: purpose as Purpose,
@@ -192,6 +245,7 @@ export default function Onboarding() {
   const titles = [
     askNameInStep0 ? m("nameQuestion") : t.onboarding.ageTitle,
     m("usernameQuestion"),
+    "Profil rasmingizni yuklang",
     t.onboarding.countryTitle || "Davlatingizni tanlang",
     t.onboarding.purposeTitle || "Bu saytga nima uchun kirdingiz?",
     t.onboarding.genderTitle || "Gender (jinsi)",
@@ -311,8 +365,101 @@ export default function Onboarding() {
             </div>
           ) : null}
 
-          {/* 3-savol: Davlatini tanlash */}
+          {/* 3-savol: Profil rasmini yuklash (majburiy) */}
           {step === 2 ? (
+            <div className="flex flex-col items-center gap-6 py-2">
+              <div className="relative group">
+                <div
+                  className={cn(
+                    "relative flex h-36 w-36 sm:h-40 sm:w-40 items-center justify-center rounded-full p-1.5 transition-all duration-300",
+                    avatarUrl
+                      ? "bg-gradient-to-tr from-emerald-400 via-teal-300 to-emerald-500 shadow-[0_0_35px_rgba(16,185,129,0.5)]"
+                      : "bg-gradient-to-tr from-violet-500 via-purple-500 to-fuchsia-500 shadow-[0_0_30px_rgba(168,85,247,0.4)]"
+                  )}
+                >
+                  <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-[#0d0822]">
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt="Profil rasmi"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-zinc-400">
+                        <Camera className="h-12 w-12 text-violet-300/80 mb-1" />
+                        <span className="text-[11px] font-semibold text-zinc-400">Rasm yo'q</span>
+                      </div>
+                    )}
+
+                    {uploadingAvatar && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-xs">
+                        <Loader2 className="h-8 w-8 text-amber-300 animate-spin mb-1" />
+                        <span className="text-xs font-bold text-amber-200">Yuklanmoqda...</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {avatarUrl && (
+                  <span className="absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg ring-4 ring-[#0d0822]">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </span>
+                )}
+              </div>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleAvatarFile(file);
+                }}
+              />
+
+              <div className="flex flex-col items-center gap-3 text-center max-w-sm">
+                <Button
+                  type="button"
+                  size="lg"
+                  disabled={uploadingAvatar}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={cn(
+                    "h-12 px-6 rounded-2xl font-bold gap-2 text-sm transition-all duration-200 cursor-pointer",
+                    avatarUrl
+                      ? "border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                      : "bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white hover:opacity-95 shadow-glow"
+                  )}
+                >
+                  {uploadingAvatar ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Yuklanmoqda...</span>
+                    </>
+                  ) : avatarUrl ? (
+                    <>
+                      <Camera className="h-4 w-4" />
+                      <span>Rasmni almashtirish</span>
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="h-5 w-5" />
+                      <span>Rasmni tanlash (Majburiy)</span>
+                    </>
+                  )}
+                </Button>
+
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {avatarUrl
+                    ? "Rasm muvaffaqiyatli yuklandi! Keyingi savolga o'tishingiz mumkin."
+                    : "Suhbatdoshlaringiz va boshqa foydalanuvchilar sizni ko'rishi uchun rasmingizni yuklang (majburiy)"}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {/* 4-savol: Davlatini tanlash */}
+          {step === 3 ? (
             <div className="space-y-2">
               <CountrySelect
                 value={country}
@@ -323,8 +470,8 @@ export default function Onboarding() {
             </div>
           ) : null}
 
-          {/* 4-savol: Bu saytga nima uchun kirdingiz? */}
-          {step === 3 ? (
+          {/* 5-savol: Bu saytga nima uchun kirdingiz? */}
+          {step === 4 ? (
             <div className="grid gap-3">
               <OptionCard
                 selected={purpose === "friends"}
@@ -347,8 +494,8 @@ export default function Onboarding() {
             </div>
           ) : null}
 
-          {/* 5-savol: Gender yani jinsi */}
-          {step === 4 ? (
+          {/* 6-savol: Gender yani jinsi */}
+          {step === 5 ? (
             <div className="grid gap-3">
               <OptionCard
                 selected={gender === "male"}

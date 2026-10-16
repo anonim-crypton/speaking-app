@@ -25,7 +25,9 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+app.use("/media", express.static(path.join(__dirname, "media")));
 app.use(require("./utils/errorCodes").errorCodes);
 
 app.use((req, res, next) => {
