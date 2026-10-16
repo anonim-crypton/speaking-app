@@ -22,7 +22,8 @@ export type UserNavTab =
   | "achievements"
   | "settings"
   | "help"
-  | "feedback";
+  | "feedback"
+  | "profile";
 
 interface UserSidebarProps {
   activeTab: UserNavTab;

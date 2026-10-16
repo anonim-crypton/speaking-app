@@ -29,6 +29,20 @@ import {
   Send,
   Flag,
   UserCheck,
+  Home,
+  FileText,
+  Trophy,
+  Award,
+  Settings,
+  HelpCircle,
+  LogOut,
+  ArrowLeft,
+  ChevronRight,
+  Phone,
+  Mail,
+  Shield,
+  Star,
+  BookOpen,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -99,7 +113,7 @@ function getOrCreateClientId(): string {
 
 export default function UserHome() {
   const { slug } = useParams<{ slug: string }>();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const [activeTab, setActiveTab] = useState<UserNavTab>("home");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -150,6 +164,8 @@ export default function UserHome() {
   const [dailyProgress, setDailyProgress] = useState<number>(0);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSent, setFeedbackSent] = useState(false);
 
   const displayName =
     user?.name ||
@@ -895,6 +911,702 @@ export default function UserHome() {
     setDiamonds((d) => d + 10);
   };
 
+  /* ══════════════════════════════════════════════════════════════════
+      TAB VIEWS: Mobil va kompyuter uchun to'liq saxifalar
+     ══════════════════════════════════════════════════════════════════ */
+
+  const renderProfileView = () => (
+    <div className="mx-auto max-w-2xl flex flex-col gap-5 animate-in fade-in duration-200">
+      {/* ── Profile Header Card ── */}
+      <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-br from-[#120c2d]/90 via-[#0a071c]/95 to-[#0e0924]/90 p-6 shadow-2xl backdrop-blur-2xl">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-violet-600/20 blur-3xl"
+        />
+
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
+          {/* Avatar with Glow Ring */}
+          <div className="relative shrink-0">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-tr from-violet-600 via-indigo-600 to-fuchsia-500 p-0.5 shadow-[0_0_25px_rgba(139,92,246,0.5)]">
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0d0822] overflow-hidden">
+                <SpeakerAvatar size={76} />
+              </div>
+            </div>
+            <span className="absolute bottom-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#0d0822]" />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+              <h2 className="text-xl font-bold text-white truncate">{displayName}</h2>
+              {user?.countryCode && (
+                <div className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.05] px-2 py-0.5 text-xs">
+                  <CountryFlag code={user.countryCode} width={20} className="h-3 w-4 rounded-xs" />
+                  <span className="text-zinc-300 font-semibold">{user.countryCode}</span>
+                </div>
+              )}
+            </div>
+            <p className="mt-0.5 text-xs font-mono font-medium text-violet-300">
+              @{displayUsername}
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs text-zinc-400">
+              {user?.email && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1">
+                  <Mail className="h-3.5 w-3.5 text-zinc-400" />
+                  <span className="truncate max-w-[200px]">{user.email}</span>
+                </span>
+              )}
+              {user?.phone && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1">
+                  <Phone className="h-3.5 w-3.5 text-zinc-400" />
+                  <span>{user.phone}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Quick Stats Grid ── */}
+        <div className="mt-6 grid grid-cols-3 gap-2.5 pt-5 border-t border-white/[0.08]">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center">
+            <div className="flex items-center justify-center gap-1 text-sm font-bold text-violet-300">
+              <span>{diamonds}</span>
+              <Gem className="h-3.5 w-3.5 text-violet-400" />
+            </div>
+            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">Olmoslar</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center">
+            <div className="flex items-center justify-center gap-1 text-sm font-bold text-amber-300">
+              <span>0 kun</span>
+              <Flame className="h-3.5 w-3.5 text-amber-400" />
+            </div>
+            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">Streak</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center">
+            <div className="flex items-center justify-center gap-1 text-sm font-bold text-emerald-300">
+              <span>#1</span>
+              <Trophy className="h-3.5 w-3.5 text-emerald-400" />
+            </div>
+            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">O'rningiz</p>
+          </div>
+        </div>
+
+        {/* ── Action Buttons for Balance & Premium ── */}
+        <div className="mt-4 grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => setDepositModalOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] hover:bg-white/[0.08] hover:border-violet-400/40 py-2.5 px-3 text-xs font-semibold text-white transition-all cursor-pointer"
+          >
+            <Plus className="h-4 w-4 text-violet-400" />
+            <span>Hisobni to'ldirish</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPremiumModalOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-gradient-to-r from-amber-500/90 via-purple-600/90 to-indigo-600/90 hover:brightness-110 py-2.5 px-3 text-xs font-semibold text-white shadow-[0_0_20px_rgba(168,85,247,0.3)] transition-all cursor-pointer"
+          >
+            <Crown className="h-4 w-4 text-amber-200" />
+            <span>Premium xarid qilish</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Barcha Menyu Tugmalari (Chap menyudan ko'chirilgan) ── */}
+      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-3.5 sm:p-4 shadow-xl backdrop-blur-2xl flex flex-col gap-1.5">
+        <p className="px-3 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+          Ilova bo'limlari va sozlamalar
+        </p>
+
+        {/* 1. Reyting */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("rating")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-400 group-hover:scale-105 transition-transform">
+              <Trophy className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Reyting jadvali</p>
+              <p className="text-[11px] text-zinc-400">Eng faol foydalanuvchilar bilan bellashing</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
+        {/* 2. Yutuqlar */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("achievements")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 group-hover:scale-105 transition-transform">
+              <Award className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Yutuqlar va medallar</p>
+              <p className="text-[11px] text-zinc-400">Erishilgan marralar va nishonlar</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
+        {/* 3. Sozlamalar */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("settings")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-400 group-hover:scale-105 transition-transform">
+              <Settings className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Sozlamalar</p>
+              <p className="text-[11px] text-zinc-400">Mikrofon, bildirishnomalar va xavfsizlik</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
+        {/* 4. Yordam */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("help")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 group-hover:scale-105 transition-transform">
+              <HelpCircle className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Yordam markazi (FAQ)</p>
+              <p className="text-[11px] text-zinc-400">Savollar, ko'rsatmalar va qo'llab-quvvatlash</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
+        {/* 5. Shikoyat / Taklif */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("feedback")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400 group-hover:scale-105 transition-transform">
+              <MessageSquare className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Shikoyat va Taklif</p>
+              <p className="text-[11px] text-zinc-400">Takliflaringiz yoki muammolarni yuboring</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
+        {/* 6. Chiqish */}
+        <div className="pt-2 mt-1 border-t border-white/[0.06]">
+          <button
+            type="button"
+            onClick={logout}
+            className="w-full flex items-center justify-between rounded-2xl p-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all cursor-pointer group"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 group-hover:scale-105 transition-transform">
+                <LogOut className="h-5 w-5" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-semibold text-red-400">Hisobdan chiqish</p>
+                <p className="text-[11px] text-red-400/60">Tizimdan xavfsiz chiqish</p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-red-400/60 group-hover:text-red-300 group-hover:translate-x-0.5 transition-all" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderExercisesView = () => (
+    <div className="mx-auto max-w-4xl flex flex-col gap-6 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("home")}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-white">Mening mashqlarim</h1>
+            <p className="text-xs text-zinc-400">So'zlashuv va nutq ko'nikmalarini oshirish mashqlari</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {[
+          {
+            title: "Kundalik mavzular",
+            desc: "Sayohat, IT, Ish, Do'stlik va Madaniyat mavzularida so'zlashuvlar",
+            icon: MessageSquare,
+            color: "violet",
+            badge: "Tavsiya",
+          },
+          {
+            title: "Lug'at boyligi",
+            desc: "Eng ko'p qo'llaniladigan 500 ta ibora va so'zlar to'plami",
+            icon: BookOpen,
+            color: "emerald",
+            badge: "Yangi",
+          },
+          {
+            title: "Talaffuz testi",
+            desc: "Mikrofon orqali talaffuz aniqligini tekshirish va baholash",
+            icon: Mic,
+            color: "amber",
+            badge: "Mashhur",
+          },
+          {
+            title: "Jonli dialog mashqi",
+            desc: "Sherik bilan birgalikda rolli o'yinlar va amaliy muloqot",
+            icon: Users,
+            color: "sky",
+            badge: "Faol",
+          },
+        ].map((item, idx) => {
+          const Icon = item.icon;
+          return (
+            <div
+              key={idx}
+              className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/80 p-5 shadow-xl backdrop-blur-2xl flex flex-col justify-between hover:border-violet-500/40 transition-all cursor-pointer"
+              onClick={() => setActiveTab("home")}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-violet-300">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-300">
+                    {item.badge}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white">{item.title}</h3>
+                <p className="mt-1 text-xs text-zinc-400 leading-relaxed">{item.desc}</p>
+              </div>
+
+              <button
+                type="button"
+                className="mt-5 w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-white hover:bg-white/[0.08] transition-colors"
+              >
+                <span>Mashqni boshlash</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderFriendsView = () => (
+    <div className="mx-auto max-w-3xl flex flex-col gap-6 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("home")}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-white">Do'stlar va Sheriklar</h1>
+            <p className="text-xs text-zinc-400">Siz bilan muloqot qilgan va birga til o'rganayotgan do'stlaringiz</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 shadow-2xl backdrop-blur-2xl text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/25 bg-violet-500/10 text-violet-300 mb-4 shadow-[0_0_25px_rgba(139,92,246,0.2)]">
+          <Users className="h-8 w-8" />
+        </div>
+        <h3 className="text-lg font-bold text-white">Hozircha do'stlaringiz ro'yxati bo'sh</h3>
+        <p className="mt-1.5 max-w-sm mx-auto text-xs text-zinc-400 leading-relaxed">
+          Jonli suhbatlar o'tkazing va muloqot davomida suhbatdoshlarni do'stlar safiga qo'shing.
+        </p>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("home")}
+          className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-xs font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+        >
+          <Play className="h-4 w-4 fill-white" />
+          <span>Yangi suhbat boshlash</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderRatingView = () => (
+    <div className="mx-auto max-w-3xl flex flex-col gap-6 animate-in fade-in duration-200">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("profile")}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div>
+          <h1 className="text-xl font-bold text-white">Haftalik Reyting</h1>
+          <p className="text-xs text-zinc-400">Eng ko'p vaqt suhbatlashgan faol foydalanuvchilar</p>
+        </div>
+      </div>
+
+      {/* Podium Top 3 */}
+      <div className="grid grid-cols-3 gap-3 items-end pt-6">
+        {/* 2-o'rin */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/80 p-4 text-center backdrop-blur-2xl flex flex-col items-center">
+          <div className="relative mb-2">
+            <SpeakerAvatar size={48} />
+            <span className="absolute -top-2.5 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-slate-300 text-[11px] font-black text-slate-900 shadow-md">
+              2
+            </span>
+          </div>
+          <p className="text-xs font-bold text-white truncate max-w-full">Shaxboz</p>
+          <p className="text-[10px] text-zinc-400">14 soat</p>
+        </div>
+
+        {/* 1-o'rin (Oltin) */}
+        <div className="rounded-3xl border border-amber-500/35 bg-gradient-to-b from-amber-500/15 to-[#0b071b]/95 p-5 text-center backdrop-blur-2xl flex flex-col items-center shadow-[0_0_30px_rgba(245,158,11,0.2)] scale-105">
+          <div className="relative mb-2">
+            <Crown className="h-6 w-6 text-amber-400 mx-auto mb-1 animate-bounce" />
+            <SpeakerAvatar size={56} />
+            <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-[11px] font-black text-amber-950 shadow-md">
+              1
+            </span>
+          </div>
+          <p className="text-sm font-black text-amber-300 truncate max-w-full">Jasur_English</p>
+          <p className="text-[11px] text-zinc-300 font-semibold">22 soat</p>
+        </div>
+
+        {/* 3-o'rin */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/80 p-4 text-center backdrop-blur-2xl flex flex-col items-center">
+          <div className="relative mb-2">
+            <SpeakerAvatar size={48} />
+            <span className="absolute -top-2.5 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-amber-700 text-[11px] font-black text-white shadow-md">
+              3
+            </span>
+          </div>
+          <p className="text-xs font-bold text-white truncate max-w-full">Malika</p>
+          <p className="text-[10px] text-zinc-400">11 soat</p>
+        </div>
+      </div>
+
+      {/* Sizning o'rningiz */}
+      <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600 text-xs font-bold text-white">
+            #1
+          </span>
+          <div>
+            <p className="text-sm font-bold text-white">{displayName} (Siz)</p>
+            <p className="text-xs text-violet-300">0 daqiqa gaplashildi</p>
+          </div>
+        </div>
+        <span className="text-xs font-bold text-amber-300">{diamonds} 💎</span>
+      </div>
+    </div>
+  );
+
+  const renderAchievementsView = () => (
+    <div className="mx-auto max-w-3xl flex flex-col gap-6 animate-in fade-in duration-200">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("profile")}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div>
+          <h1 className="text-xl font-bold text-white">Yutuqlar va Medallar</h1>
+          <p className="text-xs text-zinc-400">Muloqotlar davomida erishgan barcha natijalaringiz</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {[
+          {
+            title: "Ilk Qadam",
+            desc: "Dasturda birinchi suhbatni to'liq yakunlang",
+            icon: Star,
+            unlocked: true,
+            progress: "100%",
+          },
+          {
+            title: "7 Kunlik Olov",
+            desc: "Ketma-ket 7 kun davomida speaking mashg'ulotida bo'ling",
+            icon: Flame,
+            unlocked: false,
+            progress: "1/7 kun",
+          },
+          {
+            title: "Poliglot",
+            desc: "Kamida 3 xil tildagi suhbat xonalarida ishtirok eting",
+            icon: Globe2,
+            unlocked: false,
+            progress: "1/3 til",
+          },
+          {
+            title: "Olmos Ustasi",
+            desc: "Balansda 500 ta olmos to'plang",
+            icon: Gem,
+            unlocked: false,
+            progress: `${diamonds}/500`,
+          },
+        ].map((ach, i) => {
+          const Icon = ach.icon;
+          return (
+            <div
+              key={i}
+              className={cn(
+                "rounded-3xl border p-5 backdrop-blur-2xl flex items-start gap-4 transition-all",
+                ach.unlocked
+                  ? "border-emerald-500/30 bg-emerald-500/10"
+                  : "border-white/[0.08] bg-[#0b071b]/80 opacity-80"
+              )}
+            >
+              <div
+                className={cn(
+                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border",
+                  ach.unlocked
+                    ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-300"
+                    : "border-white/10 bg-white/[0.04] text-zinc-400"
+                )}
+              >
+                <Icon className="h-6 w-6" />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white">{ach.title}</h3>
+                  <span
+                    className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                      ach.unlocked
+                        ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
+                        : "border-white/10 bg-white/[0.04] text-zinc-400"
+                    )}
+                  >
+                    {ach.progress}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-zinc-400 leading-relaxed">{ach.desc}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderSettingsView = () => (
+    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("profile")}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div>
+          <h1 className="text-xl font-bold text-white">Sozlamalar</h1>
+          <p className="text-xs text-zinc-400">Ovoz, bildirishnomalar va shaxsiy parametrlarni sozlang</p>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 shadow-2xl backdrop-blur-2xl flex flex-col gap-4">
+        {/* Mikrofon */}
+        <div className="flex items-center justify-between py-2 border-b border-white/[0.06]">
+          <div className="flex items-center gap-3">
+            <Mic className="h-5 w-5 text-violet-400" />
+            <div>
+              <p className="text-sm font-semibold text-white">Mikrofon sezgirligi</p>
+              <p className="text-xs text-zinc-400">Nutqni aniq qabul qilish rejimi</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-emerald-400">Avtomatik</span>
+        </div>
+
+        {/* Bildirishnomalar */}
+        <div className="flex items-center justify-between py-2 border-b border-white/[0.06]">
+          <div className="flex items-center gap-3">
+            <Bell className="h-5 w-5 text-sky-400" />
+            <div>
+              <p className="text-sm font-semibold text-white">Bildirishnomalar</p>
+              <p className="text-xs text-zinc-400">Yangi suhbatlar va xabarnomalar</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-emerald-400">Yoqilgan</span>
+        </div>
+
+        {/* Til */}
+        <div className="flex items-center justify-between py-2 border-b border-white/[0.06]">
+          <div className="flex items-center gap-3">
+            <Globe2 className="h-5 w-5 text-amber-400" />
+            <div>
+              <p className="text-sm font-semibold text-white">Ilova tili</p>
+              <p className="text-xs text-zinc-400">Interfeys tili</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-white">O'zbekcha</span>
+        </div>
+
+        {/* Xavfsizlik */}
+        <div className="flex items-center justify-between py-2">
+          <div className="flex items-center gap-3">
+            <Shield className="h-5 w-5 text-emerald-400" />
+            <div>
+              <p className="text-sm font-semibold text-white">Xavfsizlik va maxfiylik</p>
+              <p className="text-xs text-zinc-400">WebRTC orqali shifrlangan ovozli aloqa</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-emerald-400">Himoyalangan</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderHelpView = () => (
+    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("profile")}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div>
+          <h1 className="text-xl font-bold text-white">Yordam Markazi (FAQ)</h1>
+          <p className="text-xs text-zinc-400">Tez-tez beriladigan savollar va yechimlar</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {[
+          {
+            q: "Suhbatdosh qanday tanlanadi?",
+            a: "Kerakli tilni tanlab 'START' tugmasini bosganingizda, tizim shu tilda suhbatlashmoqchi bo'lgan foydalanuvchini avtomatik bog'laydi.",
+          },
+          {
+            q: "Ovoz eshitilmasa nima qilish kerak?",
+            a: "Brauzerda mikrofonga ruxsat berilganiga ishonch hosil qiling va ekrandagi mikrofon tugmasi yoqilganini tekshiring.",
+          },
+          {
+            q: "Olmoslar nima uchun kerak?",
+            a: "Olmoslar orqali kunlik suhbatlar chegarasini oshirish, sovg'alar yuborish va premium imkoniyatlardan foydalanish mumkin.",
+          },
+          {
+            q: "Qoidabuzarlik holatida nima qilish kerak?",
+            a: "Suhbat xonasida 'Shikoyat bildirish' bo'limi mavjud. Sababni tanlab darhol moderatorlarga xabar yuborishingiz mumkin.",
+          },
+        ].map((item, idx) => (
+          <div
+            key={idx}
+            className="rounded-2xl border border-white/[0.08] bg-[#0b071b]/80 p-4 backdrop-blur-xl"
+          >
+            <h3 className="text-sm font-bold text-white mb-1.5">{item.q}</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">{item.a}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderFeedbackView = () => (
+    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("profile")}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div>
+          <h1 className="text-xl font-bold text-white">Shikoyat va Takliflar</h1>
+          <p className="text-xs text-zinc-400">Ilovani yaxshilash bo'yicha fikringiz biz uchun muhim</p>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-6 shadow-2xl backdrop-blur-2xl">
+        {feedbackSent ? (
+          <div className="py-8 text-center animate-in zoom-in-95 duration-200">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-400 mb-3">
+              <Check className="h-7 w-7" />
+            </div>
+            <h3 className="text-base font-bold text-white">Taklifingiz qabul qilindi!</h3>
+            <p className="mt-1 text-xs text-zinc-400">
+              Fikringiz uchun tashakkur. Biz har bir taklifni ko'rib chiqamiz.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setFeedbackSent(false);
+                setFeedbackText("");
+              }}
+              className="mt-4 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-xs font-semibold text-zinc-200 hover:bg-white/10"
+            >
+              Yangi taklif yozish
+            </button>
+          </div>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (feedbackText.trim()) setFeedbackSent(true);
+            }}
+            className="flex flex-col gap-4"
+          >
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-2">
+                Fikr yoki shikoyatingizni yozing:
+              </label>
+              <textarea
+                rows={5}
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Ilovani yaxshilash bo'yicha fikr yoki duch kelgan xatolikni batafsil yozing..."
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-xs text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!feedbackText.trim()}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-violet-500/40 bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-xs font-bold text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] disabled:opacity-50 transition-all cursor-pointer"
+            >
+              <Send className="h-4 w-4" />
+              <span>Yuborish</span>
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-[#06040f] text-foreground font-sans antialiased">
       {/* ── Hidden audio element for WebRTC voice playback ── */}
@@ -903,44 +1615,46 @@ export default function UserHome() {
       {/* ── Website Neon Backdrop ── */}
       <div className="neon-backdrop" aria-hidden />
 
-      {/* ── 1. Left Sidebar (hidden in full meeting mode for immersion) ── */}
+      {/* ── 1. Left Sidebar (hidden in full meeting mode for immersion, and hidden on mobile) ── */}
       {!inMeetingRoom && (
         <UserSidebar
           activeTab={activeTab}
           onSelectTab={setActiveTab}
           isCollapsed={sidebarCollapsed}
           onOpenPremium={() => setPremiumModalOpen(true)}
+          className="hidden md:flex"
         />
       )}
 
       {/* ── 2. Viewport ── */}
-      <div className="relative flex min-w-0 flex-1 flex-col overflow-y-auto bg-transparent">
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-transparent pb-20 md:pb-0">
         {/* iOS 26 Liquid Glass Translucent Sticky Navbar (Only on dashboard) */}
         {!inMeetingRoom && (
-          <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/[0.1] bg-white/[0.025] px-6 sm:px-8 backdrop-blur-2xl backdrop-saturate-[190%] shadow-[0_8px_32px_rgba(0,0,0,0.28),inset_0_1px_0_0_rgba(255,255,255,0.16)]">
-            <div className="flex items-center gap-3.5">
+          <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/[0.1] bg-white/[0.025] px-4 sm:px-8 backdrop-blur-2xl backdrop-saturate-[190%] shadow-[0_8px_32px_rgba(0,0,0,0.28),inset_0_1px_0_0_rgba(255,255,255,0.16)]">
+            <div className="flex items-center gap-2.5 sm:gap-3.5">
               <button
                 type="button"
                 onClick={() => setSidebarCollapsed((v) => !v)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04] text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:bg-white/[0.08] hover:text-white transition-all"
+                className="hidden md:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04] text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:bg-white/[0.08] hover:text-white transition-all"
                 title="Menyuni yig'ish / ochish"
               >
                 <PanelLeft className="h-4 w-4" />
               </button>
 
-              <div className="inline-flex items-center gap-2.5 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3.5 py-1.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] backdrop-blur-xl">
+              <div className="inline-flex items-center gap-2 sm:gap-2.5 rounded-xl border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 sm:px-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] backdrop-blur-xl">
                 <span className="relative flex h-2.5 w-2.5 shrink-0">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(160,185,129,0.9)]" />
                 </span>
-                <div className="flex items-center gap-1.5 text-xs">
+                <div className="flex items-center gap-1 sm:gap-1.5 text-xs">
                   <span className="font-bold text-white tabular-nums">{onlineCount}</span>
-                  <span className="font-medium text-zinc-300">ta foydalanuvchi onlayn</span>
+                  <span className="hidden sm:inline font-medium text-zinc-300">ta foydalanuvchi onlayn</span>
+                  <span className="sm:hidden font-medium text-zinc-300">onlayn</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3">
               <button
                 type="button"
                 className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04] text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:bg-white/[0.08] hover:text-white transition-all"
@@ -955,8 +1669,8 @@ export default function UserHome() {
           </header>
         )}
 
-        {/* ── 3. Content Body (Switches between Dashboard and Meeting Chat Room) ── */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-transparent">
+        {/* ── 3. Content Body (Switches between Dashboard, Tab Views and Meeting Chat Room) ── */}
+        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 bg-transparent max-w-full overflow-x-hidden">
           <div className="mx-auto max-w-[1440px]">
             {/* ════════════════════════════════════════════════════════════════
                 A. MEETING CHAT ROOM (To'liq Meeting Chat Saxifasi)
@@ -1323,6 +2037,22 @@ export default function UserHome() {
                   </div>
                 </div>
               </div>
+            ) : activeTab === "profile" ? (
+              renderProfileView()
+            ) : activeTab === "exercises" ? (
+              renderExercisesView()
+            ) : activeTab === "friends" ? (
+              renderFriendsView()
+            ) : activeTab === "rating" ? (
+              renderRatingView()
+            ) : activeTab === "achievements" ? (
+              renderAchievementsView()
+            ) : activeTab === "settings" ? (
+              renderSettingsView()
+            ) : activeTab === "help" ? (
+              renderHelpView()
+            ) : activeTab === "feedback" ? (
+              renderFeedbackView()
             ) : (
               /* ════════════════════════════════════════════════════════════════
                   B. MAIN DASHBOARD VIEW (START Bosishdan oldingi va keyingi)
@@ -1748,6 +2478,93 @@ export default function UserHome() {
           </div>
         </main>
       </div>
+
+      {/* ── 4. Mobile Bottom Navigation Bar (md:hidden) ── */}
+      {!inMeetingRoom && (
+        <nav
+          aria-label="Pastki mobil navigatsiya"
+          className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-white/[0.1] bg-[#090518]/95 px-2 backdrop-blur-2xl backdrop-saturate-[180%] md:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.5)]"
+        >
+          {/* 1. Bosh sahifa */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("home")}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
+              activeTab === "home" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
+            )}
+          >
+            <div
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
+                activeTab === "home" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+              )}
+            >
+              <Home className="h-4 w-4" />
+            </div>
+            <span className="text-[10px] font-medium tracking-tight">Bosh sahifa</span>
+          </button>
+
+          {/* 2. Mening mashqlarim */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("exercises")}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
+              activeTab === "exercises" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
+            )}
+          >
+            <div
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
+                activeTab === "exercises" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+              )}
+            >
+              <FileText className="h-4 w-4" />
+            </div>
+            <span className="text-[10px] font-medium tracking-tight">Mashqlarim</span>
+          </button>
+
+          {/* 3. Do'stlar */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("friends")}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
+              activeTab === "friends" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
+            )}
+          >
+            <div
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
+                activeTab === "friends" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+              )}
+            >
+              <Users className="h-4 w-4" />
+            </div>
+            <span className="text-[10px] font-medium tracking-tight">Do'stlar</span>
+          </button>
+
+          {/* 4. Profil (faqat avatar) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className="flex flex-1 flex-col items-center justify-center py-1 transition-all cursor-pointer"
+            title="Mening profilim"
+          >
+            <div
+              className={cn(
+                "relative flex h-9 w-9 items-center justify-center rounded-full transition-all overflow-hidden p-0.5",
+                activeTab === "profile"
+                  ? "ring-2 ring-violet-400 ring-offset-2 ring-offset-[#090518] shadow-[0_0_14px_rgba(139,92,246,0.7)] scale-105"
+                  : "ring-1 ring-white/25 hover:ring-white/50 opacity-80 hover:opacity-100"
+              )}
+            >
+              <SpeakerAvatar size={32} />
+            </div>
+          </button>
+        </nav>
+      )}
 
       {/* ── Transition Loader Overlay (ai-loader — only animation, without text) ── */}
       {transitionLoading && (
