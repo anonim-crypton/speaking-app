@@ -1,0 +1,93 @@
+const BASE = ""; // same-origin; Vite proxies /api to the Express backend
+
+export type AuthProviderKind = "password" | "phone" | "google";
+
+export interface AuthUser {
+  id: string;
+  /** Unguessable per-user URL segment, e.g. /u/<slug>. */
+  slug: string;
+  name: string | null;
+  username?: string | null;
+  email: string | null;
+  phone: string | null;
+  provider: AuthProviderKind;
+  countryCode: string | null;
+  region: string | null;
+  diamonds: number;
+  onboardingCompleted: boolean;
+  createdAt: string;
+}
+
+export interface AuthResponse {
+  success: boolean;
+  message: string;
+  token: string;
+  user: AuthUser;
+  created?: boolean;
+}
+
+export interface GeoResponse {
+  success: boolean;
+  country: string | null;
+  region?: string | null;
+  phoneOnly?: boolean;
+  source?: string;
+}
+
+export class ApiError extends Error {
+  code?: string;
+  retryAfter?: number;
+  detail?: string;
+
+  constructor(message: string, code?: string, retryAfter?: number, detail?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.retryAfter = retryAfter;
+    this.detail = detail;
+  }
+}
+
+async function handle<T>(res: Response): Promise<T> {
+  let data: unknown = null;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    const body = data as
+      | { message?: string; code?: string; retryAfter?: number; detail?: string }
+      | null;
+    throw new ApiError(
+      body?.message || "Something went wrong",
+      body?.code,
+      body?.retryAfter,
+      body?.detail
+    );
+  }
+  return data as T;
+}
+
+export async function apiGet<T>(path: string, token?: string | null): Promise<T> {
+  const res = await fetch(BASE + path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return handle<T>(res);
+}
+
+export async function apiPost<T>(
+  path: string,
+  body: unknown,
+  token?: string | null
+): Promise<T> {
+  const res = await fetch(BASE + path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  return handle<T>(res);
+}
