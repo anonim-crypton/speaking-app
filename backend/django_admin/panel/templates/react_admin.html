@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lingo Speek Admin Panel</title>
+  <title>Lingo Speek — Admin Dashboard</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -13,32 +13,42 @@
         extend: {
           colors: {
             brand: {
-              50: '#f0fdf4',
-              100: '#dcfce7',
-              400: '#4ade80',
-              500: '#22c55e',
-              600: '#16a34a',
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+            },
+            zinc: {
+              850: '#1e1e24',
+              900: '#18181b',
+              950: '#09090b',
             }
           }
         }
       }
     }
   </script>
-  <!-- React & Babel -->
+  <!-- React 18 & Babel -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    * {
+      box-sizing: border-box;
+    }
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      background-color: #030712;
-      color: #f3f4f6;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #09090b;
+      color: #fafafa;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
     }
     .font-mono {
       font-family: 'JetBrains Mono', monospace;
     }
-    /* Hide scrollbar for Chrome, Safari and Opera */
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -46,66 +56,239 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
+    /* Smooth transitions */
+    .smooth-fade {
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen">
+<body class="bg-zinc-950 text-zinc-100 min-h-screen antialiased selection:bg-brand-500 selection:text-white">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useMemo, useCallback } = React;
 
     const API_BASE = "/api/admin";
 
-    async function apiRequest(path, method = "GET", body = null, token = null) {
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE}${path}`, {
-        method,
-        headers,
-        body: body ? JSON.stringify(body) : null
-      });
-      return await res.json();
+    // ── Modern SVG Icons (shadcn / Lucide style) ──────────────────────────
+    function Icon({ name, className = "w-4 h-4" }) {
+      const icons = {
+        shield: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+          </svg>
+        ),
+        dashboard: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+          </svg>
+        ),
+        users: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+          </svg>
+        ),
+        alert: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        ),
+        device: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+          </svg>
+        ),
+        settings: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        ),
+        bell: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+          </svg>
+        ),
+        history: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        logout: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+          </svg>
+        ),
+        refresh: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+          </svg>
+        ),
+        lock: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+          </svg>
+        ),
+        unlock: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+          </svg>
+        ),
+        diamond: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 3h12l4 6-10 12L2 9l4-6z" />
+          </svg>
+        ),
+        trash: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+          </svg>
+        ),
+        check: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        x: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ),
+        search: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          </svg>
+        ),
+        plus: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        ),
+      };
+      return icons[name] || null;
+    }
+
+    // ── Shifrlangan / Hashlangan URL funksiyasi ──────────────────────────
+    function updateEncryptedUrl(tab, csrfToken, sessionSig) {
+      if (typeof window === "undefined") return;
+      const ts = Date.now().toString(36);
+      const randSeed = Math.random().toString(36).substring(2, 8);
+      const hashSig = btoa(`${tab}:${sessionSig || 'gate'}:${randSeed}:${ts}`).replace(/=/g, '');
+      const newUrl = `${window.location.pathname}?csrf=${csrfToken || 'sec'}&sec_gate=${hashSig.slice(0, 16)}#/${tab}/${hashSig}`;
+      window.history.replaceState(null, '', newUrl);
     }
 
     function App() {
       const [adminToken, setAdminToken] = useState(() => localStorage.getItem("lingo_admin_token"));
+      const [csrfData, setCsrfData] = useState(() => ({
+        token: localStorage.getItem("lingo_admin_csrf") || "",
+        sig: localStorage.getItem("lingo_admin_sig") || ""
+      }));
+
+      // Login form state
       const [username, setUsername] = useState("");
       const [password, setPassword] = useState("");
       const [loginError, setLoginError] = useState("");
       const [loggingIn, setLoggingIn] = useState(false);
 
+      // Current Sidebar Tab
       const [currentTab, setCurrentTab] = useState("overview");
       const [loading, setLoading] = useState(false);
-      const [message, setMessage] = useState(null);
+      const [toast, setToast] = useState(null);
 
+      // Data States
       const [stats, setStats] = useState(null);
       const [users, setUsers] = useState([]);
       const [userSearch, setUserSearch] = useState("");
       const [complaints, setComplaints] = useState([]);
       const [devices, setDevices] = useState([]);
+      const [settingsData, setSettingsData] = useState({
+        maintenanceMode: false,
+        defaultSignupDiamonds: 50,
+        matchCostDiamonds: 0,
+        dailyRewardDiamonds: 20,
+        allowGuestMatch: true,
+        chatMessageFilter: true,
+        platformNotice: ""
+      });
+      const [announcements, setAnnouncements] = useState([]);
+      const [auditLogs, setAuditLogs] = useState([]);
 
+      // Modals
       const [diamondModalUser, setDiamondModalUser] = useState(null);
       const [diamondAmount, setDiamondAmount] = useState("50");
+      const [newAnnouncement, setNewAnnouncement] = useState({ title: "", body: "", priority: "info" });
+      const [showAnnounceModal, setShowAnnounceModal] = useState(false);
 
       const notify = (text, type = "success") => {
-        setMessage({ text, type });
-        setTimeout(() => setMessage(null), 3500);
+        setToast({ text, type });
+        setTimeout(() => setToast(null), 3500);
       };
+
+      // Fetch or update CSRF token on startup & set encrypted login URL
+      useEffect(() => {
+        fetch(`${API_BASE}/csrf/`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              const csrf = data.csrfToken;
+              const sig = data.urlSignature;
+              setCsrfData({ token: csrf, sig });
+              localStorage.setItem("lingo_admin_csrf", csrf);
+              localStorage.setItem("lingo_admin_sig", sig);
+              if (!adminToken) {
+                updateEncryptedUrl("auth-gate", csrf, sig);
+              }
+            }
+          })
+          .catch(() => {});
+      }, [adminToken]);
+
+      // Update URL whenever tab changes
+      useEffect(() => {
+        if (adminToken) {
+          updateEncryptedUrl(currentTab, csrfData.token, csrfData.sig);
+        }
+      }, [currentTab, adminToken, csrfData]);
+
+      const api = useCallback(async (path, method = "GET", body = null) => {
+        const headers = {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfData.token || ""
+        };
+        if (adminToken) headers["Authorization"] = `Bearer ${adminToken}`;
+        const res = await fetch(`${API_BASE}${path}`, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : null
+        });
+        return await res.json();
+      }, [adminToken, csrfData]);
 
       const handleLogin = async (e) => {
         e.preventDefault();
         setLoginError("");
         setLoggingIn(true);
         try {
-          const res = await apiRequest("/login/", "POST", { username, password });
+          const res = await api("/login/", "POST", { username, password });
           if (res.success && res.token) {
             localStorage.setItem("lingo_admin_token", res.token);
             setAdminToken(res.token);
+            if (res.csrfToken) {
+              setCsrfData({ token: res.csrfToken, sig: res.urlSignature });
+              localStorage.setItem("lingo_admin_csrf", res.csrfToken);
+              localStorage.setItem("lingo_admin_sig", res.urlSignature);
+              updateEncryptedUrl("overview", res.csrfToken, res.urlSignature);
+            }
             notify("Admin panelga muvaffaqiyatli kirdingiz!");
           } else {
             setLoginError(res.message || "Kirish rad etildi");
           }
-        } catch (err) {
+        } catch {
           setLoginError("Server bilan aloqa o'rnatib bo'lmadi");
         } finally {
           setLoggingIn(false);
@@ -115,69 +298,113 @@
       const handleLogout = () => {
         localStorage.removeItem("lingo_admin_token");
         setAdminToken(null);
+        updateEncryptedUrl("auth-gate", csrfData.token, csrfData.sig);
       };
 
-      const loadData = async () => {
+      const loadData = useCallback(async () => {
         if (!adminToken) return;
         setLoading(true);
         try {
-          const [statsRes, usersRes, complaintsRes, devicesRes] = await Promise.all([
-            apiRequest("/stats/", "GET", null, adminToken),
-            apiRequest("/users/", "GET", null, adminToken),
-            apiRequest("/complaints/", "GET", null, adminToken),
-            apiRequest("/devices/", "GET", null, adminToken),
+          const [statsRes, usersRes, complaintsRes, devicesRes, settingsRes, annRes, logsRes] = await Promise.all([
+            api("/stats/"),
+            api("/users/"),
+            api("/complaints/"),
+            api("/devices/"),
+            api("/settings/"),
+            api("/announcements/"),
+            api("/logs/")
           ]);
           if (statsRes.success) setStats(statsRes.stats);
           if (usersRes.success) setUsers(usersRes.users || []);
           if (complaintsRes.success) setComplaints(complaintsRes.complaints || []);
           if (devicesRes.success) setDevices(devicesRes.devices || []);
-        } catch (err) {
-          notify("Ma'lumotlarni yuklashda xatolik", "error");
+          if (settingsRes.success && settingsRes.settings) setSettingsData(settingsRes.settings);
+          if (annRes.success) setAnnouncements(annRes.announcements || []);
+          if (logsRes.success) setAuditLogs(logsRes.logs || []);
+        } catch {
+          notify("Ma'lumotlarni yuklashda xatolik yuz berdi", "error");
         } finally {
           setLoading(false);
         }
-      };
+      }, [adminToken, api]);
 
       useEffect(() => {
         if (adminToken) {
           loadData();
         }
-      }, [adminToken]);
+      }, [adminToken, loadData]);
 
+      // User Actions
       const handleUserAction = async (userId, action, extra = {}) => {
         try {
-          const res = await apiRequest(`/users/${userId}/action/`, "POST", { action, ...extra }, adminToken);
+          const res = await api(`/users/${userId}/action/`, "POST", { action, ...extra });
           if (res.success) {
-            notify(res.message || "Amal bajarildi");
+            notify(res.message || "Amal muvaffaqiyatli bajarildi");
             loadData();
             setDiamondModalUser(null);
+          } else {
+            notify(res.message || "Xatolik", "error");
           }
-        } catch (err) {
-          notify("Xatolik yuz berdi", "error");
+        } catch {
+          notify("Amalni bajarishda xatolik", "error");
         }
       };
 
+      // Complaint Actions
       const handleComplaintAction = async (complaintId, action) => {
         try {
-          const res = await apiRequest(`/complaints/${complaintId}/action/`, "POST", { action }, adminToken);
+          const res = await api(`/complaints/${complaintId}/action/`, "POST", { action });
           if (res.success) {
             notify(res.message || "Shikoyat holati yangilandi");
             loadData();
           }
-        } catch (err) {
+        } catch {
           notify("Xatolik yuz berdi", "error");
         }
       };
 
+      // Device Actions
       const handleDeviceAction = async (sessionId, action) => {
         try {
-          const res = await apiRequest(`/devices/${sessionId}/action/`, "POST", { action }, adminToken);
+          const res = await api(`/devices/${sessionId}/action/`, "POST", { action });
           if (res.success) {
             notify(res.message || "Qurilma holati yangilandi");
             loadData();
           }
-        } catch (err) {
+        } catch {
           notify("Xatolik yuz berdi", "error");
+        }
+      };
+
+      // Save Settings
+      const handleSaveSettings = async (e) => {
+        e.preventDefault();
+        try {
+          const res = await api("/settings/", "POST", settingsData);
+          if (res.success) {
+            notify(res.message || "Sozlamalar saqlandi");
+            loadData();
+          }
+        } catch {
+          notify("Sozlamalarni saqlashda xatolik", "error");
+        }
+      };
+
+      // Create Announcement
+      const handleCreateAnnouncement = async (e) => {
+        e.preventDefault();
+        try {
+          const res = await api("/announcements/", "POST", newAnnouncement);
+          if (res.success) {
+            notify(res.message || "E'lon tarqatildi");
+            setShowAnnounceModal(false);
+            setNewAnnouncement({ title: "", body: "", priority: "info" });
+            loadData();
+          } else {
+            notify(res.message || "Xatolik", "error");
+          }
+        } catch {
+          notify("E'lonni yuborishda xatolik", "error");
         }
       };
 
@@ -192,34 +419,37 @@
         );
       }, [users, userSearch]);
 
-      // LOGIN SCREEN
+      // ── 1. LOGIN SCREEN (shadcn/ui style with CSRF badge) ───────────────
       if (!adminToken) {
         return (
-          <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950">
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-xl">
+          <div className="min-h-screen flex items-center justify-center p-4 bg-zinc-950">
+            <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/90 p-8 shadow-2xl backdrop-blur-xl smooth-fade">
               <div className="flex flex-col items-center text-center mb-8">
-                <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-brand-500/30 mb-4 text-3xl">
-                  🛡️
+                <div className="h-12 w-12 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shadow-lg shadow-brand-500/10 mb-4">
+                  <Icon name="shield" className="w-6 h-6" />
                 </div>
-                <h1 className="text-2xl font-black tracking-tight text-white">
+                <h1 className="text-xl font-bold tracking-tight text-white">
                   Lingo Speek Admin
                 </h1>
-                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5 font-medium">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Django Backend & React Admin UI
+                <p className="text-xs text-zinc-400 mt-1">
+                  Boshqaruv Tizimi va Xavfsizlik Portali
                 </p>
+                <div className="mt-3 flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-950/60 px-2.5 py-0.5 text-[10px] font-mono text-zinc-500">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>CSRF: {csrfData.token ? `${csrfData.token.slice(0, 12)}...` : 'Generating...'}</span>
+                </div>
               </div>
 
               {loginError && (
-                <div className="mb-6 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3.5 text-xs text-rose-300 flex items-center gap-2">
-                  <span>⚠️</span>
+                <div className="mb-6 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3.5 text-xs text-rose-300 flex items-center gap-2.5">
+                  <Icon name="alert" className="w-4 h-4 shrink-0 text-rose-400" />
                   <span>{loginError}</span>
                 </div>
               )}
 
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
                     Admin Foydalanuvchi
                   </label>
                   <input
@@ -228,12 +458,12 @@
                     placeholder="admin"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
                     Parol
                   </label>
                   <input
@@ -242,16 +472,17 @@
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 transition-colors"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={loggingIn}
-                  className="w-full mt-2 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-500/25 transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-50"
+                  className="w-full mt-2 rounded-lg bg-zinc-100 py-2.5 text-sm font-semibold text-zinc-950 shadow transition-all hover:bg-zinc-200 active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {loggingIn ? "Tekshirilmoqda..." : "Tizimga Kirish"}
+                  <Icon name="lock" className="w-4 h-4" />
+                  <span>{loggingIn ? "Tekshirilmoqda..." : "Tizimga Kirish"}</span>
                 </button>
               </form>
             </div>
@@ -259,549 +490,863 @@
         );
       }
 
-      // MAIN ADMIN DASHBOARD
+      // ── 2. MAIN ADMIN DASHBOARD WITH LEFT SIDEBAR ───────────────────────
       return (
-        <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans">
-          {/* Header */}
-          <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-900/80 backdrop-blur-md px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-xl shadow-md">
-                🛡️
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-base tracking-tight text-white">
-                    Lingo Speek
-                  </span>
-                  <span className="rounded-full bg-brand-500/20 px-2 py-0.5 text-[10px] font-bold text-brand-300 border border-brand-500/30">
-                    ADMIN PANEL
-                  </span>
-                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 flex items-center gap-1 border border-emerald-500/30">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Django Online
-                  </span>
+        <div className="min-h-screen flex bg-zinc-950 text-zinc-100 antialiased font-sans">
+          
+          {/* ── LEFT SIDEBAR (Speaker saytidagidek chap menubar) ───────────── */}
+          <aside className="w-64 border-r border-zinc-800/80 bg-zinc-900/60 backdrop-blur-xl flex flex-col justify-between shrink-0 select-none z-30">
+            <div>
+              {/* Brand Header */}
+              <div className="p-5 border-b border-zinc-800/60 flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shrink-0">
+                  <Icon name="shield" className="w-5 h-5" />
                 </div>
-                <p className="text-[11px] text-slate-400">Sayt Boshqaruvi va Xavfsizlik Tizimi</p>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-sm tracking-tight text-white">Lingo Speek</span>
+                    <span className="rounded bg-brand-500/15 text-brand-400 border border-brand-500/30 px-1.5 py-0.2 text-[9px] font-bold">
+                      ADMIN
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 font-mono mt-0.5 truncate max-w-[140px]">
+                    CSRF: {csrfData.token.slice(0, 8)}...
+                  </p>
+                </div>
               </div>
+
+              {/* Navigation Items (4 ta asosiy + qo'shimcha boshqaruvlar) */}
+              <nav className="p-3 space-y-1">
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                  Asosiy Bo'limlar
+                </div>
+
+                <button
+                  onClick={() => setCurrentTab("overview")}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                    currentTab === "overview"
+                      ? "bg-zinc-800 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
+                >
+                  <Icon name="dashboard" className={`w-4 h-4 ${currentTab === "overview" ? "text-brand-400" : ""}`} />
+                  <span>Umumiy Ko'rsatkichlar</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentTab("users")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                    currentTab === "users"
+                      ? "bg-zinc-800 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon name="users" className={`w-4 h-4 ${currentTab === "users" ? "text-brand-400" : ""}`} />
+                    <span>Foydalanuvchilar</span>
+                  </div>
+                  <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400 font-mono">
+                    {users.length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentTab("complaints")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                    currentTab === "complaints"
+                      ? "bg-zinc-800 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon name="alert" className={`w-4 h-4 ${currentTab === "complaints" ? "text-amber-400" : ""}`} />
+                    <span>Shikoyatlar</span>
+                  </div>
+                  {stats && stats.pendingComplaints > 0 && (
+                    <span className="rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.2 text-[10px] font-bold">
+                      {stats.pendingComplaints}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setCurrentTab("devices")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                    currentTab === "devices"
+                      ? "bg-zinc-800 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon name="device" className={`w-4 h-4 ${currentTab === "devices" ? "text-indigo-400" : ""}`} />
+                    <span>Qurilmalar</span>
+                  </div>
+                  <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400 font-mono">
+                    {devices.length}
+                  </span>
+                </button>
+
+                <div className="pt-3 px-3 py-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                  Platforma Boshqaruvi
+                </div>
+
+                <button
+                  onClick={() => setCurrentTab("settings")}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                    currentTab === "settings"
+                      ? "bg-zinc-800 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
+                >
+                  <Icon name="settings" className={`w-4 h-4 ${currentTab === "settings" ? "text-cyan-400" : ""}`} />
+                  <span>Tizim Sozlamalari</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentTab("announcements")}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                    currentTab === "announcements"
+                      ? "bg-zinc-800 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
+                >
+                  <Icon name="bell" className={`w-4 h-4 ${currentTab === "announcements" ? "text-violet-400" : ""}`} />
+                  <span>E'lonlar</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentTab("logs")}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                    currentTab === "logs"
+                      ? "bg-zinc-800 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+                  }`}
+                >
+                  <Icon name="history" className={`w-4 h-4 ${currentTab === "logs" ? "text-emerald-400" : ""}`} />
+                  <span>Audit Jurnali</span>
+                </button>
+              </nav>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={loadData}
-                disabled={loading}
-                className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10 active:scale-95 transition-all"
-              >
-                <span>{loading ? "⌛" : "🔄"}</span>
-                <span>Yangilash</span>
-              </button>
+            {/* Bottom Admin User & LOGOUT BUTTON (Aynan chap tomondagi menubarga ulandi) */}
+            <div className="p-3 border-t border-zinc-800/60 space-y-2">
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-950/60 border border-zinc-850">
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30 flex items-center justify-center font-bold text-[10px]">
+                    SA
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white">Super Admin</div>
+                    <div className="text-[10px] text-zinc-500 font-mono">Role: Owner</div>
+                  </div>
+                </div>
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              </div>
+
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition-all active:scale-95"
+                className="w-full flex items-center justify-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 active:scale-98 transition-all"
               >
-                <span>🚪</span>
+                <Icon name="logout" className="w-3.5 h-3.5" />
                 <span>Chiqish</span>
               </button>
             </div>
-          </header>
+          </aside>
 
-          {/* Toast Notification */}
-          {message && (
-            <div
-              className={`fixed bottom-6 right-6 z-50 rounded-2xl px-4 py-3 text-sm shadow-2xl flex items-center gap-2 border ${
-                message.type === "success"
-                  ? "bg-emerald-950/90 text-emerald-200 border-emerald-500/30"
-                  : "bg-rose-950/90 text-rose-200 border-rose-500/30"
-              } backdrop-blur-lg`}
-            >
-              <span>{message.type === "success" ? "✅" : "❌"}</span>
-              <span>{message.text}</span>
-            </div>
-          )}
+          {/* ── MAIN CONTENT AREA ─────────────────────────────────────────── */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+            {/* Top Toolbar */}
+            <header className="sticky top-0 z-20 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md px-6 py-3.5 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-zinc-400">Panel</span>
+                <span className="text-zinc-600">/</span>
+                <span className="text-white font-semibold capitalize">{currentTab}</span>
+              </div>
 
-          {/* Navigation Tabs */}
-          <div className="border-b border-white/5 bg-slate-900/40 px-6 py-2.5">
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-              <button
-                onClick={() => setCurrentTab("overview")}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-                  currentTab === "overview"
-                    ? "bg-brand-500 text-white shadow-md shadow-brand-500/25"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <span>📊</span>
-                <span>Umumiy Ko'rsatkichlar</span>
-              </button>
-              <button
-                onClick={() => setCurrentTab("users")}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-                  currentTab === "users"
-                    ? "bg-brand-500 text-white shadow-md shadow-brand-500/25"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <span>👥</span>
-                <span>Foydalanuvchilar ({users.length})</span>
-              </button>
-              <button
-                onClick={() => setCurrentTab("complaints")}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-                  currentTab === "complaints"
-                    ? "bg-brand-500 text-white shadow-md shadow-brand-500/25"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <span>⚠️</span>
-                <span>Shikoyatlar ({complaints.length})</span>
-                {stats && stats.pendingComplaints > 0 && (
-                  <span className="rounded-full bg-rose-500 px-1.5 py-0.2 text-[10px] text-white">
-                    {stats.pendingComplaints}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setCurrentTab("devices")}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-                  currentTab === "devices"
-                    ? "bg-brand-500 text-white shadow-md shadow-brand-500/25"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <span>📱</span>
-                <span>Qurilmalar ({devices.length})</span>
-              </button>
-            </div>
-          </div>
+              <div className="flex items-center gap-3">
+                <div className="text-[11px] font-mono text-zinc-500 flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500"></span>
+                  <span>Encrypted Gateway Active</span>
+                </div>
+                <button
+                  onClick={loadData}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-850 hover:text-white transition-all active:scale-95"
+                >
+                  <Icon name="refresh" className={`w-3.5 h-3.5 ${loading ? "animate-spin text-brand-400" : ""}`} />
+                  <span>Yangilash</span>
+                </button>
+              </div>
+            </header>
 
-          {/* Content */}
-          <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
-            {/* OVERVIEW */}
-            {currentTab === "overview" && stats && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                      <span className="text-xs font-medium">Jami Userlar</span>
-                      <span>👥</span>
+            {/* Notification Toast */}
+            {toast && (
+              <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-zinc-800 bg-zinc-900/95 px-4 py-3 text-xs shadow-2xl backdrop-blur-lg flex items-center gap-2.5 smooth-fade">
+                <Icon
+                  name={toast.type === "success" ? "check" : "x"}
+                  className={`w-4 h-4 ${toast.type === "success" ? "text-emerald-400" : "text-rose-400"}`}
+                />
+                <span className="text-zinc-200 font-medium">{toast.text}</span>
+              </div>
+            )}
+
+            {/* Main Tabs Body */}
+            <main className="p-6 max-w-6xl w-full mx-auto space-y-6">
+
+              {/* ── TAB 1: OVERVIEW ───────────────────────────────────────── */}
+              {currentTab === "overview" && stats && (
+                <div className="space-y-6 smooth-fade">
+                  {/* Status Banner */}
+                  {stats.maintenanceMode && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300 flex items-center gap-3">
+                      <Icon name="alert" className="w-5 h-5 text-amber-400 shrink-0" />
+                      <div>
+                        <strong>Texnik Tanaffus Rejimi Yoqilgan:</strong> Oddiy foydalanuvchilar suhbat xizmatlaridan vaqtinchalik foydalana olmaydi.
+                      </div>
                     </div>
-                    <div className="text-2xl font-black text-white">{stats.totalUsers}</div>
-                    <div className="text-[11px] text-slate-500 mt-1">Ro'yxatdan o'tganlar</div>
+                  )}
+
+                  {/* 6 Stats Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-4">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-xs font-medium">Jami Userlar</span>
+                        <Icon name="users" className="w-4 h-4 text-brand-400" />
+                      </div>
+                      <div className="text-2xl font-bold text-white">{stats.totalUsers}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">Ro'yxatdan o'tganlar</div>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-4">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-xs font-medium">Bloklangan</span>
+                        <Icon name="lock" className="w-4 h-4 text-rose-400" />
+                      </div>
+                      <div className="text-2xl font-bold text-rose-400">{stats.bannedUsers}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">Taqiqlangan hisoblar</div>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-4">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-xs font-medium">Jami Olmoslar</span>
+                        <Icon name="diamond" className="w-4 h-4 text-cyan-400" />
+                      </div>
+                      <div className="text-2xl font-bold text-cyan-400">{stats.totalDiamonds}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">Muomalada bo'lgan</div>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-4">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-xs font-medium">Qurilmalar</span>
+                        <Icon name="device" className="w-4 h-4 text-indigo-400" />
+                      </div>
+                      <div className="text-2xl font-bold text-indigo-300">{stats.totalSessions}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">Tizimga ulangan</div>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-4">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-xs font-medium">Blok Qurilmalar</span>
+                        <Icon name="shield" className="w-4 h-4 text-amber-400" />
+                      </div>
+                      <div className="text-2xl font-bold text-amber-400">{stats.blockedDevices}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">Kirishi to'silgan</div>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-4">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-xs font-medium">Shikoyatlar</span>
+                        <Icon name="alert" className="w-4 h-4 text-yellow-400" />
+                      </div>
+                      <div className="text-2xl font-bold text-yellow-400">
+                        {stats.pendingComplaints}
+                        <span className="text-xs text-zinc-500 font-normal ml-1">/ {stats.totalComplaints}</span>
+                      </div>
+                      <div className="text-[11px] text-zinc-500 mt-1">Ko'rib chiqilmagan</div>
+                    </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                      <span className="text-xs font-medium">Bloklangan</span>
-                      <span>🔒</span>
+                  {/* Auth Providers Breakdown */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+                      <h3 className="text-xs font-bold text-zinc-200 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <Icon name="users" className="w-4 h-4 text-brand-400" />
+                        <span>Ro'yxatdan O'tish Provayderlari</span>
+                      </h3>
+                      <div className="space-y-3">
+                        {Object.entries(stats.providers || {}).map(([provider, count]) => {
+                          const pct = Math.round((count / (stats.totalUsers || 1)) * 100);
+                          return (
+                            <div key={provider}>
+                              <div className="flex justify-between text-xs font-medium mb-1">
+                                <span className="capitalize text-zinc-300">{provider}</span>
+                                <span className="text-zinc-400 font-mono">{count} ta ({pct}%)</span>
+                              </div>
+                              <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                                <div
+                                  className="h-full bg-brand-500 rounded-full transition-all duration-500"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="text-2xl font-black text-rose-400">{stats.bannedUsers}</div>
-                    <div className="text-[11px] text-slate-500 mt-1">Taqiqlangan hisoblar</div>
-                  </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                      <span className="text-xs font-medium">Jami Olmoslar</span>
-                      <span>💎</span>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-xs font-bold text-zinc-200 uppercase tracking-wider mb-2 flex items-center gap-2">
+                          <Icon name="shield" className="w-4 h-4 text-indigo-400" />
+                          <span>Tizim Xavfsizlik Holati</span>
+                        </h3>
+                        <p className="text-xs text-zinc-400 leading-relaxed">
+                          Admin panel Django REST Framework orqali ishlamoqda. CSRF va HMAC imzoli xavfsiz URL manzillar
+                          yordamida sessiya doimiy himoyalangan.
+                        </p>
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between text-xs font-mono text-zinc-500">
+                        <span>Backend: Django 5.2</span>
+                        <span className="text-emerald-400 font-medium">Protected (200 OK)</span>
+                      </div>
                     </div>
-                    <div className="text-2xl font-black text-cyan-400">{stats.totalDiamonds}</div>
-                    <div className="text-[11px] text-slate-500 mt-1">Muomalada bo'lgan</div>
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                      <span className="text-xs font-medium">Qurilmalar</span>
-                      <span>📱</span>
-                    </div>
-                    <div className="text-2xl font-black text-indigo-300">{stats.totalSessions}</div>
-                    <div className="text-[11px] text-slate-500 mt-1">Tizimga ulangan</div>
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                      <span className="text-xs font-medium">Blok Qurilmalar</span>
-                      <span>🛑</span>
-                    </div>
-                    <div className="text-2xl font-black text-amber-400">{stats.blockedDevices}</div>
-                    <div className="text-[11px] text-slate-500 mt-1">Kirishi to'silgan</div>
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                    <div className="flex items-center justify-between text-slate-400 mb-2">
-                      <span className="text-xs font-medium">Shikoyatlar</span>
-                      <span>⚠️</span>
-                    </div>
-                    <div className="text-2xl font-black text-yellow-400">
-                      {stats.pendingComplaints}
-                      <span className="text-xs text-slate-500 font-normal ml-1">/ {stats.totalComplaints}</span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-1">Ko'rib chiqilmagan</div>
                   </div>
                 </div>
+              )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-6">
-                    <h3 className="text-sm font-bold text-white mb-4">
-                      📋 Ro'yxatdan O'tish Usullari (Auth Providers)
-                    </h3>
-                    <div className="space-y-3">
-                      {Object.entries(stats.providers || {}).map(([provider, count]) => {
-                        const pct = Math.round((count / (stats.totalUsers || 1)) * 100);
-                        return (
-                          <div key={provider}>
-                            <div className="flex justify-between text-xs font-semibold mb-1">
-                              <span className="capitalize text-slate-300">{provider}</span>
-                              <span className="text-slate-400">{count} ta ({pct}%)</span>
-                            </div>
-                            <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-brand-500 to-indigo-500 rounded-full"
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
+              {/* ── TAB 2: USERS MANAGEMENT ───────────────────────────────── */}
+              {currentTab === "users" && (
+                <div className="space-y-4 smooth-fade">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="relative w-full sm:w-80">
+                      <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <input
+                        type="text"
+                        placeholder="Ism, email, tel yoki ID bo'yicha qidiruv..."
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900 pl-9 pr-3.5 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:border-brand-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="text-xs text-zinc-400">
+                      Topildi: <strong className="text-white font-mono">{filteredUsers.length}</strong> ta foydalanuvchi
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-6 flex flex-col justify-between">
+                  <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/50 shadow-sm">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 font-semibold uppercase tracking-wider">
+                          <th className="py-3 px-4">Foydalanuvchi</th>
+                          <th className="py-3 px-4">Aloqa</th>
+                          <th className="py-3 px-4">Provayder</th>
+                          <th className="py-3 px-4">Olmoslar</th>
+                          <th className="py-3 px-4">Holat</th>
+                          <th className="py-3 px-4 text-right">Amallar</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/60">
+                        {filteredUsers.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-8 text-center text-zinc-500">
+                              Foydalanuvchi topilmadi
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredUsers.map((u) => (
+                            <tr key={u.id} className="hover:bg-zinc-800/30 transition-colors">
+                              <td className="py-3.5 px-4 font-medium text-white">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="h-7 w-7 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20 flex items-center justify-center font-bold text-xs uppercase">
+                                    {(u.name || u.email || u.phone || "U")[0]}
+                                  </div>
+                                  <div>
+                                    <div>{u.name || "Nomsiz"}</div>
+                                    <div className="text-[10px] text-zinc-500 font-mono truncate max-w-[120px]">
+                                      {u.id}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 text-zinc-300">
+                                {u.email || u.phone || "—"}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-300 capitalize">
+                                  {u.provider}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 font-mono font-semibold text-cyan-300">
+                                {u.diamonds ?? 0}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                {u.isBanned ? (
+                                  <span className="rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 text-[10px] font-semibold">
+                                    Bloklangan
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold">
+                                    Faol
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => setDiamondModalUser(u)}
+                                    title="Olmos berish"
+                                    className="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-cyan-300 hover:bg-cyan-500/20 text-[11px] font-medium transition-all"
+                                  >
+                                    + Olmos
+                                  </button>
+                                  {u.isBanned ? (
+                                    <button
+                                      onClick={() => handleUserAction(u.id, "unban")}
+                                      className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-medium transition-all"
+                                    >
+                                      Ochish
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleUserAction(u.id, "ban")}
+                                      className="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-300 hover:bg-rose-500/20 text-[11px] font-medium transition-all"
+                                    >
+                                      Ban
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      if (confirm("Ushbu foydalanuvchini o'chirmoqchimisiz?")) {
+                                        handleUserAction(u.id, "delete");
+                                      }
+                                    }}
+                                    className="rounded-md border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-400 hover:text-rose-400 hover:border-rose-500/30 transition-all"
+                                    title="O'chirish"
+                                  >
+                                    <Icon name="trash" className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ── TAB 3: COMPLAINTS ─────────────────────────────────────── */}
+              {currentTab === "complaints" && (
+                <div className="space-y-4 smooth-fade">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
+                      <Icon name="alert" className="w-4 h-4 text-amber-400" />
+                      <span>Kelib tushgan shikoyatlar</span>
+                    </h2>
+                    <span className="text-xs text-zinc-500 font-mono">Jami: {complaints.length} ta</span>
+                  </div>
+
+                  {complaints.length === 0 ? (
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-12 text-center text-zinc-500 text-xs">
+                      Hozircha hech qanday shikoyat kelib tushmagan.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {complaints.map((c) => (
+                        <div
+                          key={c.id}
+                          className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-3 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="text-xs font-semibold text-white">
+                                Hamkor: <span className="text-rose-400 font-bold">{c.partnerUsername}</span>
+                              </div>
+                              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                                {new Date(c.createdAt).toLocaleString()}
+                              </div>
+                            </div>
+                            <span
+                              className={`rounded px-2 py-0.5 text-[10px] font-semibold border ${
+                                c.status === "resolved"
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                  : c.status === "dismissed"
+                                  ? "bg-zinc-800 text-zinc-400 border-zinc-700"
+                                  : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                              }`}
+                            >
+                              {c.status === "resolved"
+                                ? "Hal qilindi"
+                                : c.status === "dismissed"
+                                ? "Rad etildi"
+                                : "Kutilmoqda"}
+                            </span>
+                          </div>
+
+                          {c.reasons && c.reasons.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {c.reasons.map((r, i) => (
+                                <span
+                                  key={i}
+                                  className="rounded bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 text-[10px] font-medium text-rose-300"
+                                >
+                                  {r}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {c.details && (
+                            <p className="rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-xs text-zinc-300 italic">
+                              "{c.details}"
+                            </p>
+                          )}
+
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+                            <button
+                              onClick={() => handleComplaintAction(c.id, "dismissed")}
+                              className="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-400 hover:text-white transition-all"
+                            >
+                              Rad etish
+                            </button>
+                            <button
+                              onClick={() => handleComplaintAction(c.id, "resolved")}
+                              className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-all"
+                            >
+                              Hal qilindi
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── TAB 4: DEVICES ────────────────────────────────────────── */}
+              {currentTab === "devices" && (
+                <div className="space-y-4 smooth-fade">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
+                      <Icon name="device" className="w-4 h-4 text-indigo-400" />
+                      <span>Ulangan Qurilmalar va Xavfsizlik Seanslari</span>
+                    </h2>
+                    <span className="text-xs text-zinc-500 font-mono">Jami: {devices.length} ta seans</span>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/50 shadow-sm">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 font-semibold uppercase tracking-wider">
+                          <th className="py-3 px-4">Qurilma</th>
+                          <th className="py-3 px-4">IP Manzil</th>
+                          <th className="py-3 px-4">Foydalanuvchi ID</th>
+                          <th className="py-3 px-4">Oxirgi Faollik</th>
+                          <th className="py-3 px-4">Holat</th>
+                          <th className="py-3 px-4 text-right">Amallar</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/60">
+                        {devices.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-8 text-center text-zinc-500">
+                              Hech qanday qurilma seansi qayd etilmagan
+                            </td>
+                          </tr>
+                        ) : (
+                          devices.map((d) => (
+                            <tr key={d.id} className="hover:bg-zinc-800/30 transition-colors">
+                              <td className="py-3.5 px-4 font-medium text-white">
+                                <div>{d.deviceName || "Noma'lum Qurilma"}</div>
+                                <div className="text-[10px] text-zinc-500 font-mono truncate max-w-[200px]">
+                                  {d.userAgent}
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 font-mono text-zinc-300">
+                                {d.ip || "127.0.0.1"}
+                              </td>
+                              <td className="py-3.5 px-4 font-mono text-[11px] text-zinc-400 truncate max-w-[140px]">
+                                {d.userId}
+                              </td>
+                              <td className="py-3.5 px-4 text-zinc-400 text-[11px] font-mono">
+                                {new Date(d.lastActive || d.createdAt).toLocaleString()}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                {d.blocked ? (
+                                  <span className="rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 text-[10px] font-semibold">
+                                    Bloklangan
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold">
+                                    Faol
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {d.blocked ? (
+                                    <button
+                                      onClick={() => handleDeviceAction(d.id, "unblock")}
+                                      className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-all"
+                                    >
+                                      Ochish
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleDeviceAction(d.id, "block")}
+                                      className="rounded-md border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/20 transition-all"
+                                    >
+                                      Bloklash
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeviceAction(d.id, "revoke")}
+                                    className="rounded-md border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-400 hover:text-rose-400 transition-all"
+                                    title="Seansni o'chirish"
+                                  >
+                                    <Icon name="trash" className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ── TAB 5: PLATFORM SETTINGS ──────────────────────────────── */}
+              {currentTab === "settings" && (
+                <div className="space-y-6 smooth-fade max-w-2xl">
+                  <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
                     <div>
-                      <h3 className="text-sm font-bold text-white mb-2">
-                        ✨ Django REST & React Integratsiyasi
-                      </h3>
-                      <p className="text-xs text-slate-400 leading-relaxed">
-                        Ushbu Admin Panel React arxitekturasi asosida to'liq dinamik ishlaydi va barcha
-                        ma'lumotlarni Django REST Framework orqali markaziy ma'lumotlar omboridan boshqaradi.
-                        Foydalanuvchini bloklash, olmoslar berish, seanslarni cheklash darhol tizimda aks etadi.
+                      <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Icon name="settings" className="w-4 h-4 text-cyan-400" />
+                        <span>Platforma Sozlamalari</span>
+                      </h2>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Foydalanuvchilar qoidalari, olmoslar narxi va sayt holati
                       </p>
                     </div>
-                    <div className="mt-4 p-3 rounded-xl bg-white/5 border border-white/5 text-[11px] text-slate-400 flex items-center justify-between">
-                      <span>Server: Django 5.2 REST</span>
-                      <span className="text-emerald-400 font-semibold">Tizim barqaror</span>
-                    </div>
                   </div>
-                </div>
-              </div>
-            )}
 
-            {/* USERS */}
-            {currentTab === "users" && (
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <div className="relative w-full sm:w-80">
-                    <input
-                      type="text"
-                      placeholder="Ism, email, tel yoki ID bo'yicha qidiruv..."
-                      value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-brand-400 focus:outline-none"
-                    />
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    Jami: <strong className="text-white">{filteredUsers.length}</strong> ta foydalanuvchi
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-white/10 bg-white/5 text-slate-400 uppercase tracking-wider font-semibold">
-                        <th className="py-3 px-4">Foydalanuvchi</th>
-                        <th className="py-3 px-4">Aloqa</th>
-                        <th className="py-3 px-4">Provayder</th>
-                        <th className="py-3 px-4">Olmoslar</th>
-                        <th className="py-3 px-4">Holat</th>
-                        <th className="py-3 px-4 text-right">Amallar</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {filteredUsers.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-8 text-center text-slate-500">
-                            Foydalanuvchi topilmadi
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredUsers.map((u) => (
-                          <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                            <td className="py-3.5 px-4 font-semibold text-white">
-                              <div>{u.name || "Nomsiz"}</div>
-                              <div className="text-[10px] text-slate-500 font-mono truncate max-w-[120px]">
-                                {u.id}
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 text-slate-300">
-                              {u.email || u.phone || "—"}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <span className="rounded-md bg-white/5 px-2 py-0.5 text-[11px] font-medium text-slate-300 capitalize">
-                                {u.provider}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4 font-bold text-cyan-300">
-                              💎 {u.diamonds ?? 0}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              {u.isBanned ? (
-                                <span className="rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-0.5 text-[10px] font-bold">
-                                  Bloklangan
-                                </span>
-                              ) : (
-                                <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold">
-                                  Faol
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3.5 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <button
-                                  onClick={() => setDiamondModalUser(u)}
-                                  className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-300 hover:bg-cyan-500/20 text-[11px] font-bold"
-                                >
-                                  + Olmos
-                                </button>
-                                {u.isBanned ? (
-                                  <button
-                                    onClick={() => handleUserAction(u.id, "unban")}
-                                    className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-bold"
-                                  >
-                                    Ochish
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleUserAction(u.id, "ban")}
-                                    className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-rose-300 hover:bg-rose-500/20 text-[11px] font-bold"
-                                  >
-                                    Ban
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => {
-                                    if (confirm("Ushbu foydalanuvchini o'chirmoqchimisiz?")) {
-                                      handleUserAction(u.id, "delete");
-                                    }
-                                  }}
-                                  className="rounded-lg border border-white/10 bg-white/5 p-1 text-slate-400 hover:text-rose-400 hover:bg-white/10 text-[11px]"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* COMPLAINTS */}
-            {currentTab === "complaints" && (
-              <div className="space-y-4">
-                <h2 className="text-sm font-bold text-white">
-                  ⚠️ Kelib tushgan shikoyatlar
-                </h2>
-                {complaints.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-12 text-center text-slate-500 text-xs">
-                    Hozircha hech qanday shikoyat kelib tushmagan.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {complaints.map((c) => (
-                      <div
-                        key={c.id}
-                        className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 space-y-3 shadow-lg"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="text-xs font-bold text-white">
-                              Hamkor: <span className="text-rose-400 font-extrabold">{c.partnerUsername}</span>
-                            </div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">
-                              {new Date(c.createdAt).toLocaleString()}
-                            </div>
-                          </div>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                              c.status === "resolved"
-                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                                : c.status === "dismissed"
-                                ? "bg-slate-500/20 text-slate-400 border-white/10"
-                                : "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
-                            }`}
-                          >
-                            {c.status === "resolved"
-                              ? "Hal qilindi"
-                              : c.status === "dismissed"
-                              ? "Rad etildi"
-                              : "Kutilmoqda"}
-                          </span>
-                        </div>
-
-                        {c.reasons && c.reasons.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {c.reasons.map((r, i) => (
-                              <span
-                                key={i}
-                                className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 text-[10px] font-medium text-rose-300"
-                              >
-                                {r}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {c.details && (
-                          <p className="rounded-xl bg-white/5 border border-white/5 p-3 text-xs text-slate-300 italic">
-                            "{c.details}"
-                          </p>
-                        )}
-
-                        <div className="flex items-center justify-end gap-2 pt-1 border-t border-white/5">
-                          <button
-                            onClick={() => handleComplaintAction(c.id, "dismissed")}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-400 hover:text-white"
-                          >
-                            Rad etish
-                          </button>
-                          <button
-                            onClick={() => handleComplaintAction(c.id, "resolved")}
-                            className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20"
-                          >
-                            Hal qilindi deb belgilash
-                          </button>
+                  <form onSubmit={handleSaveSettings} className="space-y-5">
+                    {/* Maintenance Mode Toggle */}
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-semibold text-white">Texnik Tanaffus Rejimi (Maintenance Mode)</div>
+                        <div className="text-[11px] text-zinc-400 mt-0.5">
+                          Yoqilganda oddiy foydalanuvchilar audio matchmaking qila olmaydi
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={settingsData.maintenanceMode}
+                          onChange={(e) => setSettingsData({ ...settingsData, maintenanceMode: e.target.checked })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                      </label>
+                    </div>
 
-            {/* DEVICES */}
-            {currentTab === "devices" && (
-              <div className="space-y-4">
-                <h2 className="text-sm font-bold text-white">
-                  📱 Ulangan Qurilmalar va Seanslar
-                </h2>
-                <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-white/10 bg-white/5 text-slate-400 uppercase tracking-wider font-semibold">
-                        <th className="py-3 px-4">Qurilma</th>
-                        <th className="py-3 px-4">IP Manzil</th>
-                        <th className="py-3 px-4">Foydalanuvchi ID</th>
-                        <th className="py-3 px-4">Oxirgi Faollik</th>
-                        <th className="py-3 px-4">Holat</th>
-                        <th className="py-3 px-4 text-right">Amallar</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {devices.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-8 text-center text-slate-500">
-                            Hech qanday qurilma seansi qayd etilmagan
-                          </td>
+                    {/* Default Signup Diamonds */}
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-2">
+                      <label className="block text-xs font-semibold text-white">
+                        Ro'yxatdan o'tganda beriladigan olmoslar (boshlang'ich bonus)
+                      </label>
+                      <input
+                        type="number"
+                        value={settingsData.defaultSignupDiamonds}
+                        onChange={(e) => setSettingsData({ ...settingsData, defaultSignupDiamonds: parseInt(e.target.value) || 0 })}
+                        className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-xs text-white focus:border-brand-500 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Match Cost Diamonds */}
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-2">
+                      <label className="block text-xs font-semibold text-white">
+                        Har bir suhbat uchun olinadigan olmos narxi (0 = bepul)
+                      </label>
+                      <input
+                        type="number"
+                        value={settingsData.matchCostDiamonds}
+                        onChange={(e) => setSettingsData({ ...settingsData, matchCostDiamonds: parseInt(e.target.value) || 0 })}
+                        className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-xs text-white focus:border-brand-500 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Daily Reward Diamonds */}
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-2">
+                      <label className="block text-xs font-semibold text-white">
+                        Kunlik kirish uchun mukofot (Daily reward diamonds)
+                      </label>
+                      <input
+                        type="number"
+                        value={settingsData.dailyRewardDiamonds}
+                        onChange={(e) => setSettingsData({ ...settingsData, dailyRewardDiamonds: parseInt(e.target.value) || 0 })}
+                        className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-xs text-white focus:border-brand-500 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Platform Notice */}
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-2">
+                      <label className="block text-xs font-semibold text-white">
+                        Bosh sahifada ko'rinadigan global bildirishnoma matni
+                      </label>
+                      <textarea
+                        rows="3"
+                        value={settingsData.platformNotice}
+                        onChange={(e) => setSettingsData({ ...settingsData, platformNotice: e.target.value })}
+                        className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-xs text-white focus:border-brand-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-zinc-100 px-5 py-2.5 text-xs font-bold text-zinc-950 shadow hover:bg-zinc-200 transition-all active:scale-95"
+                    >
+                      Sozlamalarni Saqlash
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* ── TAB 6: ANNOUNCEMENTS ─────────────────────────────────── */}
+              {currentTab === "announcements" && (
+                <div className="space-y-4 smooth-fade">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
+                        <Icon name="bell" className="w-4 h-4 text-violet-400" />
+                        <span>Foydalanuvchilarga E'lon Tarqatish</span>
+                      </h2>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Barcha foydalanuvchilar ekranida ko'rsatiladigan bildirishnomalar
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowAnnounceModal(true)}
+                      className="rounded-lg bg-violet-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-violet-600/20 hover:bg-violet-500 transition-all flex items-center gap-1.5"
+                    >
+                      <Icon name="plus" className="w-3.5 h-3.5" />
+                      <span>Yangi E'lon Yaratish</span>
+                    </button>
+                  </div>
+
+                  {announcements.length === 0 ? (
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-12 text-center text-zinc-500 text-xs">
+                      Hozircha hech qanday e'lon tarqatilmagan.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {announcements.map((a) => (
+                        <div key={a.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-white">{a.title}</span>
+                            <span className="text-[10px] text-zinc-500 font-mono">
+                              {new Date(a.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-300 leading-relaxed">{a.body}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── TAB 7: AUDIT LOGS ────────────────────────────────────── */}
+              {currentTab === "logs" && (
+                <div className="space-y-4 smooth-fade">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
+                      <Icon name="history" className="w-4 h-4 text-emerald-400" />
+                      <span>Admin Harakatlari Audit Jurnali</span>
+                    </h2>
+                    <span className="text-xs text-zinc-500 font-mono">Jami yozuvlar: {auditLogs.length} ta</span>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/50 shadow-sm">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 font-semibold uppercase tracking-wider">
+                          <th className="py-3 px-4">Vaqt</th>
+                          <th className="py-3 px-4">Admin</th>
+                          <th className="py-3 px-4">Amal turi</th>
+                          <th className="py-3 px-4">Batafsil ma'lumot</th>
                         </tr>
-                      ) : (
-                        devices.map((d) => (
-                          <tr key={d.id} className="hover:bg-white/5 transition-colors">
-                            <td className="py-3.5 px-4 font-semibold text-white">
-                              <div>{d.deviceName || "Noma'lum Qurilma"}</div>
-                              <div className="text-[10px] text-slate-500 font-mono truncate max-w-[200px]">
-                                {d.userAgent}
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 font-mono text-slate-300">
-                              {d.ip || "127.0.0.1"}
-                            </td>
-                            <td className="py-3.5 px-4 font-mono text-[11px] text-slate-400 truncate max-w-[140px]">
-                              {d.userId}
-                            </td>
-                            <td className="py-3.5 px-4 text-slate-400 text-[11px]">
-                              {new Date(d.lastActive || d.createdAt).toLocaleString()}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              {d.blocked ? (
-                                <span className="rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-0.5 text-[10px] font-bold">
-                                  Bloklangan
-                                </span>
-                              ) : (
-                                <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold">
-                                  Faol
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3.5 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                {d.blocked ? (
-                                  <button
-                                    onClick={() => handleDeviceAction(d.id, "unblock")}
-                                    className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
-                                  >
-                                    Blokdan chiqarish
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleDeviceAction(d.id, "block")}
-                                    className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/20"
-                                  >
-                                    Bloklash
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleDeviceAction(d.id, "revoke")}
-                                  className="rounded-lg border border-white/10 bg-white/5 p-1 text-slate-400 hover:text-rose-400 hover:bg-white/10 text-[11px]"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/60 font-mono">
+                        {auditLogs.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="py-8 text-center text-zinc-500">
+                              Audit jurnali bo'sh
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ) : (
+                          auditLogs.map((l) => (
+                            <tr key={l.id} className="hover:bg-zinc-800/30">
+                              <td className="py-3 px-4 text-zinc-400 text-[11px]">
+                                {new Date(l.timestamp).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-4 text-brand-400 font-semibold">
+                                {l.admin}
+                              </td>
+                              <td className="py-3 px-4 text-zinc-300 capitalize">
+                                {l.action.replace(/_/g, ' ')}
+                              </td>
+                              <td className="py-3 px-4 text-zinc-300 font-sans text-xs">
+                                {l.details}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
-          </main>
+              )}
+            </main>
+          </div>
 
-          {/* Diamond Modal */}
+          {/* ── MODALS ────────────────────────────────────────────────────── */}
+          {/* 1. Diamond Modal */}
           {diamondModalUser && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-              <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl space-y-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+              <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-4 smooth-fade">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-white">
-                    💎 Olmos Balansini Boshqarish
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Icon name="diamond" className="w-4 h-4 text-cyan-400" />
+                    <span>Olmos Balansini Boshqarish</span>
                   </h3>
-                  <button
-                    onClick={() => setDiamondModalUser(null)}
-                    className="text-slate-500 hover:text-white"
-                  >
-                    ✕
+                  <button onClick={() => setDiamondModalUser(null)} className="text-zinc-500 hover:text-white">
+                    <Icon name="x" className="w-4 h-4" />
                   </button>
                 </div>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-zinc-400">
                   Foydalanuvchi: <strong className="text-white">{diamondModalUser.name || diamondModalUser.email || diamondModalUser.phone}</strong>
                   <br />
-                  Hozirgi balans: <strong className="text-cyan-400 font-mono">💎 {diamondModalUser.diamonds ?? 0}</strong>
+                  Hozirgi balans: <strong className="text-cyan-400 font-mono">{diamondModalUser.diamonds ?? 0} ta</strong>
                 </p>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider mb-1">
-                    Miqdor (+ / -)
+                  <label className="block text-[11px] font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+                    Qo'shiladigan miqdor (+ / -)
                   </label>
                   <input
                     type="number"
                     value={diamondAmount}
                     onChange={(e) => setDiamondAmount(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-brand-400 focus:outline-none"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:border-brand-500 focus:outline-none"
                   />
                 </div>
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <button
                     onClick={() => setDiamondModalUser(null)}
-                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+                    className="rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-1.5 text-xs text-zinc-400 hover:text-white"
                   >
                     Bekor qilish
                   </button>
@@ -811,7 +1356,7 @@
                       if (isNaN(amt)) return;
                       handleUserAction(diamondModalUser.id, "add_diamonds", { amount: amt });
                     }}
-                    className="rounded-xl bg-cyan-500 px-4 py-1.5 text-xs font-bold text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-cyan-400"
+                    className="rounded-lg bg-cyan-500 px-4 py-1.5 text-xs font-bold text-zinc-950 shadow hover:bg-cyan-400 transition-all"
                   >
                     Saqlash
                   </button>
@@ -819,6 +1364,63 @@
               </div>
             </div>
           )}
+
+          {/* 2. Announcement Modal */}
+          {showAnnounceModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+              <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-4 smooth-fade">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Icon name="bell" className="w-4 h-4 text-violet-400" />
+                    <span>Yangi Global E'lon</span>
+                  </h3>
+                  <button onClick={() => setShowAnnounceModal(false)} className="text-zinc-500 hover:text-white">
+                    <Icon name="x" className="w-4 h-4" />
+                  </button>
+                </div>
+                <form onSubmit={handleCreateAnnouncement} className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1">Sarlavha</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Masalan: Yangi audio mashqlar qo'shildi!"
+                      value={newAnnouncement.title}
+                      onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-white focus:border-brand-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1">Xabar matni</label>
+                    <textarea
+                      required
+                      rows="3"
+                      placeholder="Barcha foydalanuvchilarga ko'rinadigan matn..."
+                      value={newAnnouncement.body}
+                      onChange={(e) => setNewAnnouncement({ ...newAnnouncement, body: e.target.value })}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-white focus:border-brand-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAnnounceModal(false)}
+                      className="rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-1.5 text-xs text-zinc-400 hover:text-white"
+                    >
+                      Bekor qilish
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-violet-600 px-4 py-1.5 text-xs font-bold text-white shadow hover:bg-violet-500 transition-all"
+                    >
+                      Tarqatish
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
         </div>
       );
     }

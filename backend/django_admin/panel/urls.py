@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    AdminCsrfTokenView,
     AdminLoginView,
     AdminStatsView,
     AdminUsersView,
@@ -8,9 +9,13 @@ from .views import (
     AdminComplaintActionView,
     AdminDevicesView,
     AdminDeviceActionView,
+    AdminSettingsView,
+    AdminAnnouncementsView,
+    AdminLogsView,
 )
 
 urlpatterns = [
+    path('csrf/', AdminCsrfTokenView.as_view(), name='admin_csrf'),
     path('login/', AdminLoginView.as_view(), name='admin_login'),
     path('stats/', AdminStatsView.as_view(), name='admin_stats'),
     path('users/', AdminUsersView.as_view(), name='admin_users'),
@@ -19,4 +24,7 @@ urlpatterns = [
     path('complaints/<str:complaint_id>/action/', AdminComplaintActionView.as_view(), name='admin_complaint_action'),
     path('devices/', AdminDevicesView.as_view(), name='admin_devices'),
     path('devices/<str:session_id>/action/', AdminDeviceActionView.as_view(), name='admin_device_action'),
+    path('settings/', AdminSettingsView.as_view(), name='admin_settings'),
+    path('announcements/', AdminAnnouncementsView.as_view(), name='admin_announcements'),
+    path('logs/', AdminLogsView.as_view(), name='admin_logs'),
 ]
