@@ -88,7 +88,9 @@ export default function Navbar() {
             </Link>
 
             <div className="flex items-center gap-2">
-              <LanguageSwitcher />
+              <div className="hidden md:block">
+                <LanguageSwitcher />
+              </div>
               <AccountMenu />
             </div>
           </div>

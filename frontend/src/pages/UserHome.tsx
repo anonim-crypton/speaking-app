@@ -1864,7 +1864,10 @@ export default function UserHome() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <LanguageSwitcher />
+              {/* Til tanlash tugmasi (Telefonda navbardan yashirilgan, Desktopda ko'rinadi) */}
+              <div className="hidden md:block">
+                <LanguageSwitcher />
+              </div>
 
               {/* Xabarlar tugmasi (Account avatar o'rniga navbar yonida) */}
               <button
