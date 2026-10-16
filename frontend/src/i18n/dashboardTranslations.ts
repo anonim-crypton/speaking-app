@@ -2,10 +2,12 @@ export interface DashboardTranslation {
   sidebar: {
     home: string;
     exercises: string;
+    history: string;
     friends: string;
     rating: string;
     achievements: string;
     settings: string;
+    devices: string;
     help: string;
     feedback: string;
     profile: string;
@@ -161,11 +163,13 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
   uz: {
     sidebar: {
       home: "Bosh sahifa",
-      exercises: "Mening mashqlarim",
+      exercises: "Mening tarixim",
+      history: "Mening tarixim",
       friends: "Do'stlar",
       rating: "Reyting",
       achievements: "Yutuqlar",
       settings: "Sozlamalar",
+      devices: "Qurilmalarim",
       help: "Yordam",
       feedback: "Shikoyat / Taklif",
       profile: "Profil",
@@ -337,11 +341,13 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
   ru: {
     sidebar: {
       home: "Главная",
-      exercises: "Мои упражнения",
+      exercises: "Моя история",
+      history: "Моя история",
       friends: "Друзья",
       rating: "Рейтинг",
       achievements: "Достижения",
       settings: "Настройки",
+      devices: "Мои устройства",
       help: "Помощь",
       feedback: "Отзывы и жалобы",
       profile: "Профиль",
@@ -513,11 +519,13 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
   en: {
     sidebar: {
       home: "Home",
-      exercises: "My Exercises",
+      exercises: "My History",
+      history: "My History",
       friends: "Friends",
       rating: "Leaderboard",
       achievements: "Achievements",
       settings: "Settings",
+      devices: "My Devices",
       help: "Help",
       feedback: "Feedback",
       profile: "Profile",
@@ -689,11 +697,13 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
   tr: {
     sidebar: {
       home: "Ana Sayfa",
-      exercises: "Egzersizlerim",
+      exercises: "Geçmişim",
+      history: "Geçmişim",
       friends: "Arkadaşlar",
       rating: "Sıralama",
       achievements: "Başarılar",
       settings: "Ayarlar",
+      devices: "Cihazlarım",
       help: "Yardım",
       feedback: "Geri Bildirim",
       profile: "Profil",
@@ -865,11 +875,13 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
   ko: {
     sidebar: {
       home: "홈",
-      exercises: "내 연습",
+      exercises: "내 기록",
+      history: "내 기록",
       friends: "친구",
       rating: "랭킹",
       achievements: "업적",
       settings: "설정",
+      devices: "내 기기",
       help: "도움말",
       feedback: "피드백",
       profile: "프로필",

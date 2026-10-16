@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const store = require("../utils/store");
+const sessionStore = require("../utils/sessionStore");
 const supabase = require("../lib/supabase");
 const { authRequired, JWT_SECRET } = require("../middleware/auth");
 const { userSlug } = require("../utils/slug");
@@ -14,8 +15,8 @@ const PHONE_REGIONS = new Set(["UZ"]);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const signToken = (user) =>
-  jwt.sign({ id: user.id, email: user.email, phone: user.phone }, JWT_SECRET, {
+const signToken = (user, sid = null) =>
+  jwt.sign({ id: user.id, email: user.email, phone: user.phone, sid }, JWT_SECRET, {
     expiresIn: "7d",
   });
 
@@ -303,10 +304,24 @@ router.post("/google", async (req, res) => {
       console.warn("[supabase] google_accounts upsert failed:", googleSaved.error);
     }
 
+    const sessionRes = sessionStore.createSession({
+      userId: user.id,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    if (sessionRes.error === "DEVICE_BLOCKED") {
+      return res.status(403).json({
+        success: false,
+        message: "Sizning qurilmangiz bu hisob tomonidan bloklangan.",
+        code: "DEVICE_BLOCKED",
+      });
+    }
+    const sid = sessionRes.session ? sessionRes.session.id : null;
+
     return res.status(created ? 201 : 200).json({
       success: true,
       message: created ? "Google account created" : "Signed in with Google",
-      token: signToken(user),
+      token: signToken(user, sid),
       user: publicUser(user),
       created,
     });
@@ -364,10 +379,24 @@ router.post("/login", async (req, res) => {
         })
         .catch(() => {});
 
+      const sessionRes = sessionStore.createSession({
+        userId: user.id,
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+      if (sessionRes.error === "DEVICE_BLOCKED") {
+        return res.status(403).json({
+          success: false,
+          message: "Sizning qurilmangiz bu hisob tomonidan bloklangan.",
+          code: "DEVICE_BLOCKED",
+        });
+      }
+      const sid = sessionRes.session ? sessionRes.session.id : null;
+
       return res.json({
         success: true,
         message: "Login successful",
-        token: signToken(user),
+        token: signToken(user, sid),
         user: publicUser(user),
       });
     }
@@ -434,10 +463,24 @@ router.post("/login", async (req, res) => {
       onboardingCompleted: Boolean(user.onboardingCompleted && user.username),
     });
 
+    const sessionRes = sessionStore.createSession({
+      userId: user.id,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    if (sessionRes.error === "DEVICE_BLOCKED") {
+      return res.status(403).json({
+        success: false,
+        message: "Sizning qurilmangiz bu hisob tomonidan bloklangan.",
+        code: "DEVICE_BLOCKED",
+      });
+    }
+    const sid = sessionRes.session ? sessionRes.session.id : null;
+
     return res.json({
       success: true,
       message: "Login successful",
-      token: signToken(user),
+      token: signToken(user, sid),
       user: publicUser(user),
     });
   } catch (err) {
@@ -448,7 +491,28 @@ router.post("/login", async (req, res) => {
 
 /* ─────────────────────────────── current user ───────────────────────── */
 router.get("/me", authRequired, (req, res) => {
-  res.json({ success: true, user: publicUser(req.user) });
+  res.json({ success: true, user: publicUser(req.user), sid: req.sid || null });
+});
+
+/* ─────────────────────────────── devices & sessions ─────────────────── */
+router.get("/devices", authRequired, (req, res) => {
+  const devices = sessionStore.getUserSessions(req.user.id, req.sid);
+  res.json({ success: true, devices });
+});
+
+router.post("/devices/:id/revoke", authRequired, (req, res) => {
+  const ok = sessionStore.revokeSession(req.user.id, req.params.id);
+  res.json({ success: ok, message: ok ? "Seans o'chirildi" : "Seans topilmadi" });
+});
+
+router.post("/devices/:id/block", authRequired, (req, res) => {
+  const ok = sessionStore.blockSession(req.user.id, req.params.id);
+  res.json({ success: ok, message: ok ? "Qurilma bloklandi" : "Seans topilmadi" });
+});
+
+router.post("/devices/:id/unblock", authRequired, (req, res) => {
+  const ok = sessionStore.unblockSession(req.user.id, req.params.id);
+  res.json({ success: ok, message: ok ? "Qurilma blokdan chiqarildi" : "Seans topilmadi" });
 });
 
 /* ─────────────────────────────── phone OTP (Uzbekistan) ─────────────── */
@@ -587,10 +651,24 @@ router.post("/verify-otp", async (req, res) => {
       }
     }
 
+    const sessionRes = sessionStore.createSession({
+      userId: user.id,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    if (sessionRes.error === "DEVICE_BLOCKED") {
+      return res.status(403).json({
+        success: false,
+        message: "Sizning qurilmangiz bu hisob tomonidan bloklangan.",
+        code: "DEVICE_BLOCKED",
+      });
+    }
+    const sid = sessionRes.session ? sessionRes.session.id : null;
+
     return res.status(201).json({
       success: true,
       message: "Phone verified",
-      token: signToken(user),
+      token: signToken(user, sid),
       user: publicUser(user),
       onBoardingRequired: true,
     });

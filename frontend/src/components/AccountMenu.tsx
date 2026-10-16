@@ -5,6 +5,7 @@ import {
   Headset,
   HelpCircle,
   History,
+  Laptop,
   LogOut,
   Settings,
   User,
@@ -13,6 +14,7 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import SpeakerAvatar from "@/components/SpeakerAvatar";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -135,6 +137,21 @@ export default function AccountMenu() {
           <Settings className="h-4 w-4 shrink-0 text-brand-300" />
           <span className="text-[13.5px] font-medium">{t.account.settings || "Sozlamalar"}</span>
         </DropdownMenuItem>
+
+        {/* ── 6.1. Qurilmalarim ── */}
+        <DropdownMenuItem
+          onClick={() => navigate("/dashboard?tab=devices")}
+          className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5"
+        >
+          <Laptop className="h-4 w-4 shrink-0 text-cyan-400" />
+          <span className="text-[13.5px] font-medium">Qurilmalarim</span>
+        </DropdownMenuItem>
+
+        {/* ── Tilni almashtirish ── */}
+        <div className="flex items-center justify-between px-2.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] my-1.5">
+          <span className="text-xs font-semibold text-zinc-300">Til:</span>
+          <LanguageSwitcher />
+        </div>
 
         {/* ── Chiziq ── */}
         <DropdownMenuSeparator className="my-2 bg-border/60" />

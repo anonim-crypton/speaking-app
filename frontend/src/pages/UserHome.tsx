@@ -43,13 +43,19 @@ import {
   Shield,
   Star,
   BookOpen,
+  History,
+  Laptop,
+  Smartphone,
+  Trash2,
+  Ban,
+  ShieldAlert,
+  Headset,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { DASHBOARD_TRANSLATIONS } from "@/i18n/dashboardTranslations";
 import UserSidebar, { type UserNavTab } from "@/components/UserSidebar";
-import AccountMenu from "@/components/AccountMenu";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import CountryFlag from "@/components/CountryFlag";
 import SpeakerAvatar from "@/components/SpeakerAvatar";
@@ -160,6 +166,27 @@ export default function UserHome() {
   const [complaintDetails, setComplaintDetails] = useState("");
   const [complaintSent, setComplaintSent] = useState(false);
   const [complaintSubmitting, setComplaintSubmitting] = useState(false);
+  const [complaintModalOpen, setComplaintModalOpen] = useState(false);
+
+  // Messages & Notifications modal state
+  const [messagesModalOpen, setMessagesModalOpen] = useState(false);
+  const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
+
+  // Devices & Sessions state
+  const [devices, setDevices] = useState<
+    Array<{
+      id: string;
+      deviceName: string;
+      ip: string;
+      current: boolean;
+      createdAt: string;
+      lastActiveAt: string;
+      isBlocked: boolean;
+    }>
+  >([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [deviceActionLoading, setDeviceActionLoading] = useState<string | null>(null);
+  const [deviceMessage, setDeviceMessage] = useState<string | null>(null);
 
   // Real-time online users count
   const [onlineCount, setOnlineCount] = useState<number>(1);
@@ -506,12 +533,26 @@ export default function UserHome() {
       peerConnRef.current = pc;
       iceCandidatesQueueRef.current = [];
 
+      // Ensure explicit audio transceiver for desktop WebRTC
+      try {
+        pc.addTransceiver("audio", { direction: "sendrecv" });
+      } catch {
+        /* fallback */
+      }
+
       // When remote audio track is received from the partner
       pc.ontrack = (event) => {
         const remoteStream = event.streams[0] || new MediaStream([event.track]);
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = remoteStream;
-          remoteAudioRef.current.play().catch(() => {});
+          remoteAudioRef.current.muted = false;
+          remoteAudioRef.current.volume = 1.0;
+          const playPromise = remoteAudioRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.warn("Desktop audio playback waiting for click gesture:", err);
+            });
+          }
         }
       };
 
@@ -903,6 +944,12 @@ export default function UserHome() {
         }),
       });
       setComplaintSent(true);
+      window.setTimeout(() => {
+        setComplaintModalOpen(false);
+        setComplaintSent(false);
+        setSelectedReasons([]);
+        setComplaintDetails("");
+      }, 1500);
     } catch {
       /* ignore */
     } finally {
@@ -914,6 +961,133 @@ export default function UserHome() {
     if (dailyProgress >= 10) return;
     setDailyProgress((p) => p + 1);
     setDiamonds((d) => d + 10);
+  };
+
+  // Auto-unlock desktop WebRTC audio on user interaction
+  useEffect(() => {
+    if (!inMeetingRoom) return;
+    const unlockDesktopAudio = () => {
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.volume = 1.0;
+        if (remoteAudioRef.current.srcObject) {
+          remoteAudioRef.current.play().catch(() => {});
+        }
+      }
+    };
+    unlockDesktopAudio();
+    window.addEventListener("click", unlockDesktopAudio, { passive: true });
+    window.addEventListener("keydown", unlockDesktopAudio, { passive: true });
+    window.addEventListener("touchstart", unlockDesktopAudio, { passive: true });
+    return () => {
+      window.removeEventListener("click", unlockDesktopAudio);
+      window.removeEventListener("keydown", unlockDesktopAudio);
+      window.removeEventListener("touchstart", unlockDesktopAudio);
+    };
+  }, [inMeetingRoom]);
+
+  // Devices & Sessions Handlers
+  const loadDevices = async () => {
+    try {
+      setDevicesLoading(true);
+      const token = localStorage.getItem("ls_token");
+      if (!token) return;
+      const res = await fetch(`${API_BASE}/api/auth/devices`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.sessions)) {
+        setDevices(data.sessions);
+      }
+    } catch (e) {
+      console.warn("Failed to load devices", e);
+    } finally {
+      setDevicesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "devices") {
+      void loadDevices();
+    }
+  }, [activeTab]);
+
+  const handleRevokeDevice = async (sessionId: string) => {
+    try {
+      setDeviceActionLoading(sessionId);
+      const token = localStorage.getItem("ls_token");
+      const res = await fetch(`${API_BASE}/api/auth/devices/${sessionId}/revoke`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setDeviceMessage("Seans muvaffaqiyatli o'chirildi. Qurilma hisobdan chiqariladi.");
+        await loadDevices();
+      } else {
+        setDeviceMessage(data?.error || "Seansni o'chirishda xatolik");
+      }
+    } catch {
+      setDeviceMessage("Xatolik yuz berdi");
+    } finally {
+      setDeviceActionLoading(null);
+    }
+  };
+
+  const handleBlockDevice = async (sessionId: string) => {
+    if (!window.confirm("Rostdan ham ushbu qurilmani bloklamoqchimisiz? Ushbu qurilma hisobdan darhol chiqariladi va unga qayta kirish taqiqlanadi.")) {
+      return;
+    }
+    try {
+      setDeviceActionLoading(sessionId);
+      const token = localStorage.getItem("ls_token");
+      const res = await fetch(`${API_BASE}/api/auth/devices/${sessionId}/block`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setDeviceMessage("Qurilma bloklandi va uning barcha seanslari bekor qilindi.");
+        await loadDevices();
+      } else {
+        setDeviceMessage(data?.error || "Qurilmani bloklashda xatolik");
+      }
+    } catch {
+      setDeviceMessage("Xatolik yuz berdi");
+    } finally {
+      setDeviceActionLoading(null);
+    }
+  };
+
+  const handleUnblockDevice = async (sessionId: string) => {
+    try {
+      setDeviceActionLoading(sessionId);
+      const token = localStorage.getItem("ls_token");
+      const res = await fetch(`${API_BASE}/api/auth/devices/${sessionId}/unblock`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setDeviceMessage("Qurilma blokdan chiqarildi.");
+        await loadDevices();
+      } else {
+        setDeviceMessage(data?.error || "Xatolik yuz berdi");
+      }
+    } catch {
+      setDeviceMessage("Xatolik yuz berdi");
+    } finally {
+      setDeviceActionLoading(null);
+    }
   };
 
   /* ══════════════════════════════════════════════════════════════════
@@ -1026,7 +1200,57 @@ export default function UserHome() {
           {dt.profile.sectionsTitle}
         </p>
 
-        {/* 1. Reyting */}
+        {/* Tilni almashtirish */}
+        <div className="flex items-center justify-between rounded-2xl p-3 bg-white/[0.02] border border-white/[0.06]">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-400">
+              <Globe2 className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Ilova tili</p>
+              <p className="text-[11px] text-zinc-400">Interfeys tilini tanlang</p>
+            </div>
+          </div>
+          <LanguageSwitcher />
+        </div>
+
+        {/* 1. Mening tarixim */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("history")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-500/20 bg-violet-500/10 text-violet-400 group-hover:scale-105 transition-transform">
+              <History className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">{dt.sidebar.history}</p>
+              <p className="text-[11px] text-zinc-400">O'tkazilgan suhbatlar va mashg'ulotlar</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
+        {/* 2. Do'stlar */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("friends")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-400 group-hover:scale-105 transition-transform">
+              <Users className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">{dt.sidebar.friends}</p>
+              <p className="text-[11px] text-zinc-400">Suhbatdosh do'stlaringiz ro'yxati</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
+        {/* 3. Reyting */}
         <button
           type="button"
           onClick={() => setActiveTab("rating")}
@@ -1044,7 +1268,7 @@ export default function UserHome() {
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
         </button>
 
-        {/* 2. Yutuqlar */}
+        {/* 4. Yutuqlar */}
         <button
           type="button"
           onClick={() => setActiveTab("achievements")}
@@ -1062,25 +1286,25 @@ export default function UserHome() {
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
         </button>
 
-        {/* 3. Sozlamalar */}
+        {/* 5. Qurilmalarim */}
         <button
           type="button"
-          onClick={() => setActiveTab("settings")}
+          onClick={() => setActiveTab("devices")}
           className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
         >
           <div className="flex items-center gap-3.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-400 group-hover:scale-105 transition-transform">
-              <Settings className="h-5 w-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-400 group-hover:scale-105 transition-transform">
+              <Laptop className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">{dt.profile.settingsTitle}</p>
-              <p className="text-[11px] text-zinc-400">{dt.profile.settingsDesc}</p>
+              <p className="text-sm font-semibold text-white">{dt.sidebar.devices}</p>
+              <p className="text-[11px] text-zinc-400">Faol seanslar va xavfsizlik nazorati</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
         </button>
 
-        {/* 4. Yordam */}
+        {/* 6. Yordam */}
         <button
           type="button"
           onClick={() => setActiveTab("help")}
@@ -1098,7 +1322,7 @@ export default function UserHome() {
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
         </button>
 
-        {/* 5. Shikoyat / Taklif */}
+        {/* 7. Shikoyat / Taklif */}
         <button
           type="button"
           onClick={() => setActiveTab("feedback")}
@@ -1116,7 +1340,26 @@ export default function UserHome() {
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
         </button>
 
-        {/* 6. Chiqish */}
+        {/* 8. Admin bilan bog'lanish */}
+        <a
+          href="https://t.me"
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 group-hover:scale-105 transition-transform">
+              <Headset className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Admin bilan bog'lanish</p>
+              <p className="text-[11px] text-zinc-400">Telegram orqali tezkor yordam</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </a>
+
+        {/* 9. Chiqish */}
         <div className="pt-2 mt-1 border-t border-white/[0.06]">
           <button
             type="button"
@@ -1139,91 +1382,45 @@ export default function UserHome() {
     </div>
   );
 
-  const renderExercisesView = () => (
-    <div className="mx-auto max-w-4xl flex flex-col gap-6 animate-in fade-in duration-200">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setActiveTab("home")}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-white">{dt.exercises.title}</h1>
-            <p className="text-xs text-zinc-400">{dt.exercises.subtitle}</p>
-          </div>
+  const renderHistoryView = () => (
+    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("home")}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div>
+          <h1 className="text-xl font-bold text-white">{dt.sidebar.history}</h1>
+          <p className="text-xs text-zinc-400">O'tkazilgan suhbatlar va audio mashg'ulotlar tarixi</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[
-          {
-            title: dt.exercises.dailyTopics,
-            desc: dt.exercises.dailyTopicsDesc,
-            icon: MessageSquare,
-            color: "violet",
-            badge: "PRO",
-          },
-          {
-            title: dt.exercises.vocab,
-            desc: dt.exercises.vocabDesc,
-            icon: BookOpen,
-            color: "emerald",
-            badge: "NEW",
-          },
-          {
-            title: dt.exercises.pronounce,
-            desc: dt.exercises.pronounceDesc,
-            icon: Mic,
-            color: "amber",
-            badge: "AI",
-          },
-          {
-            title: dt.exercises.dialogue,
-            desc: dt.exercises.dialogueDesc,
-            icon: Users,
-            color: "sky",
-            badge: "LIVE",
-          },
-        ].map((item, idx) => {
-          const Icon = item.icon;
-          return (
-            <div
-              key={idx}
-              className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/80 p-5 shadow-xl backdrop-blur-2xl flex flex-col justify-between hover:border-violet-500/40 transition-all cursor-pointer"
-              onClick={() => setActiveTab("home")}
-            >
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-violet-300">
-                    <Icon className="h-6 w-6" />
-                  </div>
-                  <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-300">
-                    {item.badge}
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-white">{item.title}</h3>
-                <p className="mt-1 text-xs text-zinc-400 leading-relaxed">{item.desc}</p>
-              </div>
+      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 sm:p-12 shadow-2xl backdrop-blur-2xl text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/25 bg-violet-500/10 text-violet-300 mb-4 shadow-[0_0_25px_rgba(139,92,246,0.2)]">
+          <History className="h-8 w-8" />
+        </div>
+        <h3 className="text-lg font-bold text-white">Hozircha suhbatlar tarixi mavjud emas</h3>
+        <p className="mt-2 max-w-md mx-auto text-xs text-zinc-400 leading-relaxed">
+          Suhbatdoshlar bilan suhbatlashganingizdan so'ng barcha gaplashish tarixingiz shu yerda saqlanadi.
+        </p>
 
-              <button
-                type="button"
-                className="mt-5 w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-white hover:bg-white/[0.08] transition-colors"
-              >
-                <span>{dt.exercises.startBtn}</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          );
-        })}
+        <button
+          type="button"
+          onClick={() => setActiveTab("home")}
+          className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-xs font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+        >
+          <Play className="h-4 w-4 fill-white" />
+          <span>Suhbatni boshlash</span>
+        </button>
       </div>
     </div>
   );
 
   const renderFriendsView = () => (
-    <div className="mx-auto max-w-3xl flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
@@ -1240,12 +1437,12 @@ export default function UserHome() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 shadow-2xl backdrop-blur-2xl text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/25 bg-violet-500/10 text-violet-300 mb-4 shadow-[0_0_25px_rgba(139,92,246,0.2)]">
+      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 sm:p-12 shadow-2xl backdrop-blur-2xl text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-sky-500/25 bg-sky-500/10 text-sky-400 mb-4 shadow-[0_0_25px_rgba(56,189,248,0.2)]">
           <Users className="h-8 w-8" />
         </div>
         <h3 className="text-lg font-bold text-white">{dt.friends.emptyTitle}</h3>
-        <p className="mt-1.5 max-w-sm mx-auto text-xs text-zinc-400 leading-relaxed">
+        <p className="mt-2 max-w-md mx-auto text-xs text-zinc-400 leading-relaxed">
           {dt.friends.emptyDesc}
         </p>
 
@@ -1262,7 +1459,7 @@ export default function UserHome() {
   );
 
   const renderRatingView = () => (
-    <div className="mx-auto max-w-3xl flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -1277,64 +1474,29 @@ export default function UserHome() {
         </div>
       </div>
 
-      {/* Podium Top 3 */}
-      <div className="grid grid-cols-3 gap-3 items-end pt-6">
-        {/* 2-o'rin */}
-        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/80 p-4 text-center backdrop-blur-2xl flex flex-col items-center">
-          <div className="relative mb-2">
-            <SpeakerAvatar size={48} />
-            <span className="absolute -top-2.5 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-slate-300 text-[11px] font-black text-slate-900 shadow-md">
-              2
-            </span>
-          </div>
-          <p className="text-xs font-bold text-white truncate max-w-full">Shaxboz</p>
-          <p className="text-[10px] text-zinc-400">14 {dt.stats.hours}</p>
+      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 sm:p-12 shadow-2xl backdrop-blur-2xl text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-500/25 bg-amber-500/10 text-amber-400 mb-4 shadow-[0_0_25px_rgba(245,158,11,0.2)]">
+          <Trophy className="h-8 w-8" />
         </div>
+        <h3 className="text-lg font-bold text-white">Hozircha reyting ma'lumotlari mavjud emas</h3>
+        <p className="mt-2 max-w-md mx-auto text-xs text-zinc-400 leading-relaxed">
+          Foydalanuvchilar suhbatlashgan sari haftalik va oylik reyting jadvali shu yerda shakllanib boradi.
+        </p>
 
-        {/* 1-o'rin (Oltin) */}
-        <div className="rounded-3xl border border-amber-500/35 bg-gradient-to-b from-amber-500/15 to-[#0b071b]/95 p-5 text-center backdrop-blur-2xl flex flex-col items-center shadow-[0_0_30px_rgba(245,158,11,0.2)] scale-105">
-          <div className="relative mb-2">
-            <Crown className="h-6 w-6 text-amber-400 mx-auto mb-1 animate-bounce" />
-            <SpeakerAvatar size={56} />
-            <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-[11px] font-black text-amber-950 shadow-md">
-              1
-            </span>
-          </div>
-          <p className="text-sm font-black text-amber-300 truncate max-w-full">Jasur_English</p>
-          <p className="text-[11px] text-zinc-300 font-semibold">22 {dt.stats.hours}</p>
-        </div>
-
-        {/* 3-o'rin */}
-        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/80 p-4 text-center backdrop-blur-2xl flex flex-col items-center">
-          <div className="relative mb-2">
-            <SpeakerAvatar size={48} />
-            <span className="absolute -top-2.5 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-amber-700 text-[11px] font-black text-white shadow-md">
-              3
-            </span>
-          </div>
-          <p className="text-xs font-bold text-white truncate max-w-full">Malika</p>
-          <p className="text-[10px] text-zinc-400">11 {dt.stats.hours}</p>
-        </div>
-      </div>
-
-      {/* Sizning o'rningiz */}
-      <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600 text-xs font-bold text-white">
-            #1
-          </span>
-          <div>
-            <p className="text-sm font-bold text-white">{displayName} ({dt.meeting.you})</p>
-            <p className="text-xs text-violet-300">0 {dt.rating.talkedTime}</p>
-          </div>
-        </div>
-        <span className="text-xs font-bold text-amber-300">{diamonds} 💎</span>
+        <button
+          type="button"
+          onClick={() => setActiveTab("home")}
+          className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-xs font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+        >
+          <Play className="h-4 w-4 fill-white" />
+          <span>Suhbatni boshlash</span>
+        </button>
       </div>
     </div>
   );
 
   const renderAchievementsView = () => (
-    <div className="mx-auto max-w-3xl flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -1349,147 +1511,191 @@ export default function UserHome() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[
-          {
-            title: dt.achievements.firstStep,
-            desc: dt.achievements.firstStepDesc,
-            icon: Star,
-            unlocked: true,
-            progress: "100%",
-          },
-          {
-            title: dt.achievements.streak7,
-            desc: dt.achievements.streak7Desc,
-            icon: Flame,
-            unlocked: false,
-            progress: "1/7",
-          },
-          {
-            title: dt.achievements.polyglot,
-            desc: dt.achievements.polyglotDesc,
-            icon: Globe2,
-            unlocked: false,
-            progress: "1/3",
-          },
-          {
-            title: dt.achievements.diamondMaster,
-            desc: dt.achievements.diamondMasterDesc,
-            icon: Gem,
-            unlocked: false,
-            progress: `${diamonds}/500`,
-          },
-        ].map((ach, i) => {
-          const Icon = ach.icon;
-          return (
-            <div
-              key={i}
-              className={cn(
-                "rounded-3xl border p-5 backdrop-blur-2xl flex items-start gap-4 transition-all",
-                ach.unlocked
-                  ? "border-emerald-500/30 bg-emerald-500/10"
-                  : "border-white/[0.08] bg-[#0b071b]/80 opacity-80"
-              )}
-            >
-              <div
-                className={cn(
-                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border",
-                  ach.unlocked
-                    ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-300"
-                    : "border-white/10 bg-white/[0.04] text-zinc-400"
-                )}
-              >
-                <Icon className="h-6 w-6" />
-              </div>
+      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 sm:p-12 shadow-2xl backdrop-blur-2xl text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-500/25 bg-emerald-500/10 text-emerald-400 mb-4 shadow-[0_0_25px_rgba(16,185,129,0.2)]">
+          <Award className="h-8 w-8" />
+        </div>
+        <h3 className="text-lg font-bold text-white">Hozircha yutuqlar ochilmagan</h3>
+        <p className="mt-2 max-w-md mx-auto text-xs text-zinc-400 leading-relaxed">
+          Kunlik ketma-ketlik va suhbatlar orqali yangi nishonlar va sovrinlarni qo'lga kiriting.
+        </p>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-white">{ach.title}</h3>
-                  <span
-                    className={cn(
-                      "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                      ach.unlocked
-                        ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
-                        : "border-white/10 bg-white/[0.04] text-zinc-400"
-                    )}
-                  >
-                    {ach.progress}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-zinc-400 leading-relaxed">{ach.desc}</p>
-              </div>
-            </div>
-          );
-        })}
+        <button
+          type="button"
+          onClick={() => setActiveTab("home")}
+          className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-xs font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+        >
+          <Play className="h-4 w-4 fill-white" />
+          <span>Suhbatni boshlash</span>
+        </button>
       </div>
     </div>
   );
 
-  const renderSettingsView = () => (
+  const renderDevicesView = () => (
     <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-white">{dt.sidebar.devices}</h1>
+            <p className="text-xs text-zinc-400">Akkauntga ulangan qurilmalar, ularning IP manzili va seans nazorati</p>
+          </div>
+        </div>
+
         <button
           type="button"
-          onClick={() => setActiveTab("profile")}
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+          onClick={loadDevices}
+          disabled={devicesLoading}
+          className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <span>{devicesLoading ? "Yuklanmoqda..." : "Yangilash"}</span>
         </button>
-        <div>
-          <h1 className="text-xl font-bold text-white">{dt.settings.title}</h1>
-          <p className="text-xs text-zinc-400">{dt.settings.subtitle}</p>
-        </div>
       </div>
 
-      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 shadow-2xl backdrop-blur-2xl flex flex-col gap-4">
-        {/* Mikrofon */}
-        <div className="flex items-center justify-between py-2 border-b border-white/[0.06]">
-          <div className="flex items-center gap-3">
-            <Mic className="h-5 w-5 text-violet-400" />
-            <div>
-              <p className="text-sm font-semibold text-white">{dt.settings.mic}</p>
-              <p className="text-xs text-zinc-400">{dt.settings.micDesc}</p>
-            </div>
-          </div>
-          <span className="text-xs font-bold text-emerald-400">{dt.settings.micStatus}</span>
+      {deviceMessage && (
+        <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3.5 text-xs font-medium text-violet-300 flex items-center justify-between animate-in fade-in">
+          <span>{deviceMessage}</span>
+          <button
+            type="button"
+            onClick={() => setDeviceMessage(null)}
+            className="text-zinc-400 hover:text-white ml-2 cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
+      )}
 
-        {/* Bildirishnomalar */}
-        <div className="flex items-center justify-between py-2 border-b border-white/[0.06]">
-          <div className="flex items-center gap-3">
-            <Bell className="h-5 w-5 text-sky-400" />
-            <div>
-              <p className="text-sm font-semibold text-white">{dt.settings.notifications}</p>
-              <p className="text-xs text-zinc-400">{dt.settings.notificationsDesc}</p>
-            </div>
-          </div>
-          <span className="text-xs font-bold text-emerald-400">{dt.settings.notificationsStatus}</span>
+      {devicesLoading && devices.length === 0 ? (
+        <div className="py-12 text-center text-xs text-zinc-400">
+          Qurilmalar ro'yxati tekshirilmoqda...
         </div>
+      ) : devices.length === 0 ? (
+        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-8 text-center backdrop-blur-2xl">
+          <Laptop className="h-10 w-10 text-zinc-500 mx-auto mb-3" />
+          <h3 className="text-sm font-bold text-white">Faol seanslar topilmadi</h3>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {devices.map((dev) => {
+            const isMobile =
+              dev.deviceName.toLowerCase().includes("android") ||
+              dev.deviceName.toLowerCase().includes("iphone") ||
+              dev.deviceName.toLowerCase().includes("mobile");
+            const Icon = isMobile ? Smartphone : Laptop;
+            const isLoading = deviceActionLoading === dev.id;
 
-        {/* Til */}
-        <div className="flex items-center justify-between py-2 border-b border-white/[0.06]">
-          <div className="flex items-center gap-3">
-            <Globe2 className="h-5 w-5 text-amber-400" />
-            <div>
-              <p className="text-sm font-semibold text-white">{dt.settings.language}</p>
-              <p className="text-xs text-zinc-400">{dt.settings.languageDesc}</p>
-            </div>
-          </div>
-          <LanguageSwitcher />
-        </div>
+            return (
+              <div
+                key={dev.id}
+                className={cn(
+                  "rounded-2xl border p-4 backdrop-blur-xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4",
+                  dev.isBlocked
+                    ? "border-red-500/30 bg-red-500/5 opacity-80"
+                    : dev.current
+                    ? "border-emerald-500/30 bg-emerald-500/5 shadow-[0_0_20px_rgba(16,185,129,0.06)]"
+                    : "border-white/[0.08] bg-[#0b071b]/80"
+                )}
+              >
+                <div className="flex items-start gap-3.5 min-w-0">
+                  <div
+                    className={cn(
+                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border",
+                      dev.isBlocked
+                        ? "border-red-500/30 bg-red-500/10 text-red-400"
+                        : dev.current
+                        ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-400"
+                        : "border-white/10 bg-white/[0.04] text-zinc-300"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
 
-        {/* Xavfsizlik */}
-        <div className="flex items-center justify-between py-2">
-          <div className="flex items-center gap-3">
-            <Shield className="h-5 w-5 text-emerald-400" />
-            <div>
-              <p className="text-sm font-semibold text-white">{dt.settings.security}</p>
-              <p className="text-xs text-zinc-400">{dt.settings.securityDesc}</p>
-            </div>
-          </div>
-          <span className="text-xs font-bold text-emerald-400">{dt.settings.securityStatus}</span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-bold text-white truncate">{dev.deviceName}</p>
+                      {dev.current && (
+                        <span className="rounded-md border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                          Joriy qurilma
+                        </span>
+                      )}
+                      {dev.isBlocked && (
+                        <span className="rounded-md border border-red-500/30 bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300">
+                          Bloklangan
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+                      <span>IP: <strong className="text-zinc-300">{dev.ip || "Noma'lum"}</strong></span>
+                      <span>•</span>
+                      <span>
+                        Oxirgi faollik:{" "}
+                        <strong className="text-zinc-300">
+                          {dev.lastActiveAt
+                            ? new Date(dev.lastActiveAt).toLocaleString("uz-UZ", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "Hozirgina"}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {!dev.current && (
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    {dev.isBlocked ? (
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() => handleUnblockDevice(dev.id)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] hover:bg-white/[0.1] px-3 py-1.5 text-xs font-semibold text-zinc-200 transition-all cursor-pointer"
+                      >
+                        <span>{isLoading ? "..." : "Blokdan chiqarish"}</span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={isLoading}
+                          onClick={() => handleRevokeDevice(dev.id)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:text-white px-3 py-1.5 text-xs font-semibold text-zinc-300 transition-all cursor-pointer"
+                          title="Seansni o'chirish"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-zinc-400" />
+                          <span>{isLoading ? "..." : "Seansni o'chirish"}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isLoading}
+                          onClick={() => handleBlockDevice(dev.id)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 transition-all cursor-pointer"
+                          title="Seansni bloklash"
+                        >
+                          <Ban className="h-3.5 w-3.5 text-red-400" />
+                          <span>{isLoading ? "..." : "Bloklash"}</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-      </div>
+      )}
     </div>
   );
 
@@ -1597,8 +1803,22 @@ export default function UserHome() {
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-[#06040f] text-foreground font-sans antialiased">
-      {/* ── Hidden audio element for WebRTC voice playback ── */}
-      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+      {/* ── Fixed offscreen audio element for WebRTC voice playback (desktop browser compatible) ── */}
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          top: -9999,
+          left: -9999,
+          width: "1px",
+          height: "1px",
+          opacity: 0.001,
+          pointerEvents: "none",
+        }}
+      />
 
       {/* ── Website Neon Backdrop ── */}
       <div className="neon-backdrop" aria-hidden />
@@ -1645,16 +1865,27 @@ export default function UserHome() {
             <div className="flex items-center gap-2 sm:gap-3">
               <LanguageSwitcher />
 
+              {/* Xabarlar tugmasi (Account avatar o'rniga navbar yonida) */}
               <button
                 type="button"
-                className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04] text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:bg-white/[0.08] hover:text-white transition-all"
+                onClick={() => setMessagesModalOpen(true)}
+                className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04] text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer"
+                title="Xabarlar"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#080514]" />
+              </button>
+
+              {/* Bildirishnomalar */}
+              <button
+                type="button"
+                onClick={() => setNotificationsModalOpen(true)}
+                className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04] text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer"
                 title={dt.topbar.notifications}
               >
                 <Bell className="h-4 w-4" />
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-violet-400 ring-2 ring-[#080514]" />
               </button>
-
-              <AccountMenu />
             </div>
           </header>
         )}
@@ -1744,160 +1975,79 @@ export default function UserHome() {
                   </div>
                 </div>
 
-                {/* ── Main Meeting Area: Chapda Shikoyatlar, O'rtada Tagma-tag Katta Avatarlar va Tugmalar ── */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                  {/* ── CHAP TOMON: Shikoyatlar bo'limi ── */}
-                  <div className="lg:col-span-4 rounded-2xl border border-white/[0.08] bg-[#0b071b]/85 p-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-2xl flex flex-col gap-4">
-                    <div className="flex items-center gap-2 pb-3 border-b border-white/[0.06]">
-                      <Flag className="h-4 w-4 text-amber-400" />
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-white">
-                        Shikoyat bildirish
-                      </h3>
-                    </div>
-
-                    <p className="text-[11.5px] text-zinc-400 leading-relaxed">
-                      Suhbatdosh nojo'ya xatti-harakat qilsa, belgilab jo'nating:
-                    </p>
-
-                    {/* Shikoyat variantlari (Select tugmalari) */}
-                    <div className="flex flex-col gap-2">
-                      {COMPLAINT_OPTIONS.map((reason) => {
-                        const isSelected = selectedReasons.includes(reason);
-                        return (
-                          <button
-                            key={reason}
-                            type="button"
-                            onClick={() => handleToggleReason(reason)}
-                            className={cn(
-                              "flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-all text-xs",
-                              isSelected
-                                ? "border-amber-500/60 bg-amber-500/15 text-amber-200 font-semibold"
-                                : "border-white/[0.08] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05]"
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border text-[10px]",
-                                isSelected
-                                  ? "border-amber-400 bg-amber-500 text-black font-extrabold"
-                                  : "border-white/20 bg-white/5"
-                              )}
-                            >
-                              {isSelected ? "✓" : ""}
-                            </span>
-                            <span className="truncate">{reason}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Batafsil izoh textarea */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold text-zinc-400">
-                        Batafsil izoh:
-                      </label>
-                      <textarea
-                        rows={3}
-                        placeholder="Qo'shimcha tafsilotlar yozing..."
-                        value={complaintDetails}
-                        onChange={(e) => setComplaintDetails(e.target.value)}
-                        className="w-full rounded-xl border border-white/[0.1] bg-white/[0.03] p-2.5 text-xs text-white placeholder:text-zinc-600 focus:border-violet-500 focus:outline-none"
-                      />
-                    </div>
-
-                    {/* Jo'natish tugmasi */}
-                    {complaintSent ? (
-                      <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-2.5 text-center text-xs font-semibold text-emerald-300">
-                        ✓ Shikoyatingiz qabul qilindi
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={
-                          complaintSubmitting ||
-                          (selectedReasons.length === 0 && !complaintDetails.trim())
-                        }
-                        onClick={handleSubmitComplaint}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-600/80 to-amber-700/80 py-2.5 text-xs font-bold text-white shadow-sm hover:brightness-110 disabled:opacity-50 transition-all"
+                {/* ── Main Meeting Area: Tagma-tag Katta Avatarlar + Boshqaruv Tugmalari (Markazda) ── */}
+                <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-6 sm:p-10 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.7),inset_0_1px_0_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
+                  {/* Tagma-tag Katta Avatarlar (Top: My Avatar, Bottom: Speaker Partner Avatar) */}
+                  <div className="flex flex-col items-center gap-8 my-4">
+                    {/* 1. Mening Katta Avatarim (Gapirganda animated light gradient border bilan yonadi) */}
+                    <div className="flex flex-col items-center gap-2">
+                      <div
+                        className={cn(
+                          "relative rounded-full transition-all duration-300",
+                          isMySpeaking
+                            ? "p-[4px] bg-gradient-to-tr from-violet-400 via-fuchsia-400 to-indigo-400 shadow-[0_0_40px_rgba(168,85,247,0.85)] scale-105 animate-pulse"
+                            : "p-[3px] bg-white/10"
+                        )}
                       >
-                        <Flag className="h-3.5 w-3.5" />
-                        <span>{complaintSubmitting ? "Jo'natilmoqda..." : "Shikoyatni jo'natish"}</span>
-                      </button>
-                    )}
+                        <div className="overflow-hidden rounded-full h-28 w-28 sm:h-32 sm:w-32 bg-[#120b2d]">
+                          <SpeakerAvatar size={128} />
+                        </div>
+                        {isMySpeaking && (
+                          <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-violet-500 shadow-glow">
+                            <AudioWaveform className="h-3.5 w-3.5 text-white animate-pulse" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-white">{displayName}</p>
+                        <p className="text-xs font-mono text-violet-300">@{displayUsername}</p>
+                      </div>
+                    </div>
+
+                    {/* O'rtada Jonli Ovozli Aloqa Statusi */}
+                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-xs font-bold text-emerald-300">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span>Jonli ovozli suhbat faol</span>
+                    </div>
+
+                    {/* 2. Speaker Sherigimning Katta Avatari (Gapirganda animated light gradient border bilan yonadi) */}
+                    <div className="flex flex-col items-center gap-2">
+                      <div
+                        className={cn(
+                          "relative rounded-full transition-all duration-300",
+                          isPartnerSpeaking
+                            ? "p-[4px] bg-gradient-to-tr from-cyan-400 via-violet-400 to-fuchsia-400 shadow-[0_0_40px_rgba(56,189,248,0.85)] scale-105 animate-pulse"
+                            : "p-[3px] bg-white/10"
+                        )}
+                      >
+                        <div className="overflow-hidden rounded-full h-28 w-28 sm:h-32 sm:w-32 bg-[#120b2d]">
+                          {matchedPartner.avatarUrl ? (
+                            <img
+                              src={matchedPartner.avatarUrl}
+                              alt={matchedPartner.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <SpeakerAvatar size={128} />
+                          )}
+                        </div>
+                        {isPartnerSpeaking && (
+                          <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 shadow-glow">
+                            <AudioWaveform className="h-3.5 w-3.5 text-white animate-pulse" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-white">{matchedPartner.name}</p>
+                        <p className="text-xs font-mono text-violet-300">@{matchedPartner.username}</p>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* ── O'RTA VA O'NG TOMON: Tagma-tag Katta Avatarlar + Boshqaruv Tugmalari ── */}
-                  <div className="lg:col-span-8 flex flex-col items-center justify-center rounded-2xl border border-white/[0.08] bg-[#0b071b]/85 p-6 sm:p-10 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.7),inset_0_1px_0_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
-                    {/* Tagma-tag Katta Avatarlar (Top: My Avatar, Bottom: Speaker Partner Avatar) */}
-                    <div className="flex flex-col items-center gap-8 my-4">
-                      {/* 1. Mening Katta Avatarim (Gapirganda animated light gradient border bilan yonadi) */}
-                      <div className="flex flex-col items-center gap-2">
-                        <div
-                          className={cn(
-                            "relative rounded-full transition-all duration-300",
-                            isMySpeaking
-                              ? "p-[4px] bg-gradient-to-tr from-violet-400 via-fuchsia-400 to-indigo-400 shadow-[0_0_40px_rgba(168,85,247,0.85)] scale-105 animate-pulse"
-                              : "p-[3px] bg-white/10"
-                          )}
-                        >
-                          <div className="overflow-hidden rounded-full h-28 w-28 sm:h-32 sm:w-32 bg-[#120b2d]">
-                            <SpeakerAvatar size={128} />
-                          </div>
-                          {isMySpeaking && (
-                            <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-violet-500 shadow-glow">
-                              <AudioWaveform className="h-3.5 w-3.5 text-white animate-pulse" />
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-bold text-white">{displayName}</p>
-                          <p className="text-xs font-mono text-violet-300">@{displayUsername}</p>
-                        </div>
-                      </div>
-
-                      {/* O'rtada Jonli Ovozli Aloqa Statusi */}
-                      <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-xs font-bold text-emerald-300">
-                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                        <span>Jonli ovozli suhbat faol</span>
-                      </div>
-
-                      {/* 2. Speaker Sherigimning Katta Avatari (Gapirganda animated light gradient border bilan yonadi) */}
-                      <div className="flex flex-col items-center gap-2">
-                        <div
-                          className={cn(
-                            "relative rounded-full transition-all duration-300",
-                            isPartnerSpeaking
-                              ? "p-[4px] bg-gradient-to-tr from-cyan-400 via-violet-400 to-fuchsia-400 shadow-[0_0_40px_rgba(56,189,248,0.85)] scale-105 animate-pulse"
-                              : "p-[3px] bg-white/10"
-                          )}
-                        >
-                          <div className="overflow-hidden rounded-full h-28 w-28 sm:h-32 sm:w-32 bg-[#120b2d]">
-                            {matchedPartner.avatarUrl ? (
-                              <img
-                                src={matchedPartner.avatarUrl}
-                                alt={matchedPartner.name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <SpeakerAvatar size={128} />
-                            )}
-                          </div>
-                          {isPartnerSpeaking && (
-                            <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 shadow-glow">
-                              <AudioWaveform className="h-3.5 w-3.5 text-white animate-pulse" />
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-bold text-white">{matchedPartner.name}</p>
-                          <p className="text-xs font-mono text-violet-300">@{matchedPartner.username}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* ── Boshqaruv Paneli: Mikrofon, Chat (Dropdown), Suhbatni tugatish (Qizil) ── */}
-                    <div className="mt-8 flex flex-wrap items-center justify-center gap-4 relative">
-                      {/* 1. Mikrofon Tugmasi (Bosganda yonsin, yana bossa o'chsin) */}
+                  {/* ── Boshqaruv Paneli: Mikrofon, Chat (Dropdown), Suhbatni tugatish (Qizil) ── */}
+                  <div className="mt-8 flex flex-col items-center gap-4 w-full">
+                    <div className="flex flex-wrap items-center justify-center gap-4 relative">
+                      {/* 1. Mikrofon Tugmasi */}
                       <button
                         type="button"
                         onClick={handleToggleMic}
@@ -1912,7 +2062,7 @@ export default function UserHome() {
                         {isMicMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
                       </button>
 
-                      {/* 2. Chat Tugmasi (Bosganda dropdown chat ochilsin) */}
+                      {/* 2. Chat Tugmasi */}
                       <div className="relative">
                         <button
                           type="button"
@@ -1959,7 +2109,7 @@ export default function UserHome() {
                               </button>
                             </div>
 
-                            {/* Chat Message List (Vaqtinchalik, keshlanmaydi) */}
+                            {/* Chat Message List */}
                             <div className="flex-1 max-h-[260px] min-h-[180px] overflow-y-auto p-3.5 space-y-2.5 text-xs">
                               {chatMessages.length === 0 ? (
                                 <p className="text-center text-[11px] text-zinc-500 py-6">
@@ -2020,25 +2170,34 @@ export default function UserHome() {
                         <PhoneOff className="h-5 w-5" />
                         <span>{dt.meeting.endCall}</span>
                       </button>
+                    </div>
 
-                      {/* Hidden audio element for receiving and playing partner's live voice */}
-                      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+                    {/* 4. Shikoyat bildirish tugmasi - Suhbatni tugatish tugmasining tagida */}
+                    <div className="w-full flex justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setComplaintModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2 text-xs font-semibold text-amber-300 transition-all cursor-pointer shadow-sm"
+                      >
+                        <Flag className="h-3.5 w-3.5" />
+                        <span>Shikoyat bildirish</span>
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
             ) : activeTab === "profile" ? (
               renderProfileView()
-            ) : activeTab === "exercises" ? (
-              renderExercisesView()
+            ) : activeTab === "history" ? (
+              renderHistoryView()
             ) : activeTab === "friends" ? (
               renderFriendsView()
             ) : activeTab === "rating" ? (
               renderRatingView()
             ) : activeTab === "achievements" ? (
               renderAchievementsView()
-            ) : activeTab === "settings" ? (
-              renderSettingsView()
+            ) : activeTab === "devices" ? (
+              renderDevicesView()
             ) : activeTab === "help" ? (
               renderHelpView()
             ) : activeTab === "feedback" ? (
@@ -2495,24 +2654,24 @@ export default function UserHome() {
             <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.home}</span>
           </button>
 
-          {/* 2. Mening mashqlarim */}
+          {/* 2. Mening tarixim */}
           <button
             type="button"
-            onClick={() => setActiveTab("exercises")}
+            onClick={() => setActiveTab("history")}
             className={cn(
               "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
-              activeTab === "exercises" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
+              activeTab === "history" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
             )}
           >
             <div
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
-                activeTab === "exercises" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+                activeTab === "history" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
               )}
             >
-              <FileText className="h-4 w-4" />
+              <History className="h-4 w-4" />
             </div>
-            <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.exercises}</span>
+            <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.history}</span>
           </button>
 
           {/* 3. Do'stlar */}
@@ -2658,9 +2817,152 @@ export default function UserHome() {
               variant="glow"
               size="sm"
               onClick={() => setPremiumModalOpen(false)}
-              className="mt-5 w-full rounded-xl text-xs bg-gradient-to-r from-amber-500 via-purple-600 to-indigo-600"
+              className="mt-5 w-full rounded-xl text-xs bg-gradient-to-r from-amber-500 via-purple-600 to-indigo-600 cursor-pointer"
             >
               Obunani faollashtirish
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Shikoyat bildirish modali (Tugma bosilganda ochiladi) ── */}
+      {complaintModalOpen && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-3xl border border-amber-500/35 bg-[#0f0923] p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+              <div className="flex items-center gap-2">
+                <Flag className="h-5 w-5 text-amber-400" />
+                <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                  Shikoyat bildirish
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setComplaintModalOpen(false)}
+                className="text-zinc-400 hover:text-white cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-zinc-300">
+              Suhbatdosh nojo'ya xatti-harakat qilsa, belgilab jo'nating:
+            </p>
+
+            <div className="mt-3 flex flex-col gap-2">
+              {COMPLAINT_OPTIONS.map((reason) => {
+                const isSelected = selectedReasons.includes(reason);
+                return (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => handleToggleReason(reason)}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-all text-xs cursor-pointer",
+                      isSelected
+                        ? "border-amber-500/60 bg-amber-500/15 text-amber-200 font-semibold"
+                        : "border-white/[0.08] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05]"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border text-[10px]",
+                        isSelected
+                          ? "border-amber-400 bg-amber-500 text-black font-extrabold"
+                          : "border-white/20 bg-white/5"
+                      )}
+                    >
+                      {isSelected ? "✓" : ""}
+                    </span>
+                    <span className="truncate">{reason}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 space-y-1">
+              <label className="text-[11px] font-semibold text-zinc-400">Batafsil izoh:</label>
+              <textarea
+                rows={3}
+                placeholder="Qo'shimcha tafsilotlar yozing..."
+                value={complaintDetails}
+                onChange={(e) => setComplaintDetails(e.target.value)}
+                className="w-full rounded-xl border border-white/[0.1] bg-white/[0.03] p-2.5 text-xs text-white placeholder:text-zinc-600 focus:border-violet-500 focus:outline-none"
+              />
+            </div>
+
+            {complaintSent ? (
+              <div className="mt-4 rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-2.5 text-center text-xs font-semibold text-emerald-300">
+                ✓ Shikoyatingiz qabul qilindi
+              </div>
+            ) : (
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setComplaintModalOpen(false)}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 cursor-pointer"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    complaintSubmitting ||
+                    (selectedReasons.length === 0 && !complaintDetails.trim())
+                  }
+                  onClick={handleSubmitComplaint}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-600 to-amber-700 py-2.5 text-xs font-bold text-white shadow-sm hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  <Flag className="h-3.5 w-3.5" />
+                  <span>{complaintSubmitting ? "Jo'natilmoqda..." : "Jo'natish"}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Xabarlar modali ── */}
+      {messagesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl border border-white/[0.1] bg-[#0e0922] p-6 shadow-2xl text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-300 mb-3">
+              <MessageSquare className="h-6 w-6" />
+            </div>
+            <h3 className="text-base font-bold text-white">Xabarlar</h3>
+            <p className="mt-2 text-xs text-zinc-400">
+              Hozircha yangi xabarlar mavjud emas. Suhbatlar va bildirishnomalar shu yerda ko'rinadi.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMessagesModalOpen(false)}
+              className="mt-5 w-full rounded-xl text-xs border-white/10 cursor-pointer"
+            >
+              Yopish
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bildirishnomalar modali ── */}
+      {notificationsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl border border-white/[0.1] bg-[#0e0922] p-6 shadow-2xl text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-violet-500/30 bg-violet-500/15 text-violet-300 mb-3">
+              <Bell className="h-6 w-6" />
+            </div>
+            <h3 className="text-base font-bold text-white">Bildirishnomalar</h3>
+            <p className="mt-2 text-xs text-zinc-400">
+              Hozircha yangi bildirishnomalar mavjud emas.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setNotificationsModalOpen(false)}
+              className="mt-5 w-full rounded-xl text-xs border-white/10 cursor-pointer"
+            >
+              Yopish
             </Button>
           </div>
         </div>

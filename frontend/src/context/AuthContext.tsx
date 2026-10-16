@@ -120,7 +120,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          if (
+            err?.code === "SESSION_TERMINATED" ||
+            err?.code === "DEVICE_BLOCKED" ||
+            err?.message?.includes("Seans") ||
+            err?.message?.includes("bloklangan")
+          ) {
+            logout();
+          }
+        });
     }, 1000);
 
     return () => clearInterval(bgSync);

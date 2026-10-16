@@ -1,10 +1,10 @@
 import {
   Home,
-  FileText,
+  History,
   Users,
   Trophy,
   Award,
-  Settings,
+  Laptop,
   HelpCircle,
   MessageSquare,
   Crown,
@@ -18,11 +18,11 @@ import { DASHBOARD_TRANSLATIONS } from "@/i18n/dashboardTranslations";
 
 export type UserNavTab =
   | "home"
-  | "exercises"
+  | "history"
   | "friends"
   | "rating"
   | "achievements"
-  | "settings"
+  | "devices"
   | "help"
   | "feedback"
   | "profile";
@@ -47,11 +47,11 @@ export default function UserSidebar({
 
   const navItems = [
     { id: "home" as const, label: t.sidebar.home, icon: Home },
-    { id: "exercises" as const, label: t.sidebar.exercises, icon: FileText },
+    { id: "history" as const, label: t.sidebar.history, icon: History },
     { id: "friends" as const, label: t.sidebar.friends, icon: Users },
     { id: "rating" as const, label: t.sidebar.rating, icon: Trophy },
     { id: "achievements" as const, label: t.sidebar.achievements, icon: Award },
-    { id: "settings" as const, label: t.sidebar.settings, icon: Settings },
+    { id: "devices" as const, label: t.sidebar.devices, icon: Laptop },
     { id: "help" as const, label: t.sidebar.help, icon: HelpCircle },
     { id: "feedback" as const, label: t.sidebar.feedback, icon: MessageSquare },
   ];
