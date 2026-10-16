@@ -151,10 +151,17 @@ router.post("/register", async (req, res) => {
       console.warn("[supabase] profile insert failed:", saved.error);
     }
 
+    const sessionRes = sessionStore.createSession({
+      userId: user.id,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    const sid = sessionRes.session ? sessionRes.session.id : null;
+
     return res.status(201).json({
       success: true,
       message: "Registration successful",
-      token: signToken(user),
+      token: signToken(user, sid),
       user: publicUser(user),
       onBoardingRequired: true,
       supabase: supabase.supabaseStatus(),
@@ -220,10 +227,17 @@ router.post("/register-phone", async (req, res) => {
       console.warn("[supabase] phone profile insert failed:", saved.error);
     }
 
+    const sessionRes = sessionStore.createSession({
+      userId: user.id,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    const sid = sessionRes.session ? sessionRes.session.id : null;
+
     return res.status(201).json({
       success: true,
       message: "Registration successful",
-      token: signToken(user),
+      token: signToken(user, sid),
       user: publicUser(user),
       onBoardingRequired: true,
       supabase: supabase.supabaseStatus(),
@@ -534,10 +548,18 @@ router.get("/me", authRequired, (req, res) => {
   res.json({ success: true, user: publicUser(req.user), sid: req.sid || null });
 });
 
-/* ─────────────────────────────── devices & sessions ─────────────────── */
 router.get("/devices", authRequired, (req, res) => {
-  const devices = sessionStore.getUserSessions(req.user.id, req.sid);
-  res.json({ success: true, devices });
+  let devices = sessionStore.getUserSessions(req.user.id, req.sid);
+  if (!devices || devices.length === 0) {
+    const sessionRes = sessionStore.createSession({
+      userId: req.user.id,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    const newSid = sessionRes?.session?.id || req.sid;
+    devices = sessionStore.getUserSessions(req.user.id, newSid);
+  }
+  res.json({ success: true, devices, sessions: devices });
 });
 
 router.post("/devices/:id/revoke", authRequired, (req, res) => {
@@ -769,12 +791,11 @@ router.get("/messages", authRequired, async (req, res) => {
 
 router.post("/messages", authRequired, async (req, res) => {
   try {
-    const { text } = req.body || {};
-    if (!text || !String(text).trim()) {
+    const { text, message } = req.body || {};
+    const cleanText = String(text || message || "").trim();
+    if (!cleanText) {
       return res.status(400).json({ success: false, message: "Xabar matni kiritilishi shart" });
     }
-
-    const cleanText = String(text).trim();
     const user = store.findById(req.user.id) || req.user;
     const newMsg = {
       id: "msg_" + Date.now(),

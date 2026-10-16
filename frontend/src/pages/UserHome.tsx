@@ -189,7 +189,7 @@ export default function UserHome() {
   const fetchAdminMessages = async () => {
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/auth/messages`, {
+      const res = await fetch(`${API_BASE}/api/auth/messages`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -204,14 +204,14 @@ export default function UserHome() {
 
   useEffect(() => {
     fetchAdminMessages();
-    const interval = setInterval(fetchAdminMessages, 8000);
+    const interval = setInterval(fetchAdminMessages, 2000);
     return () => clearInterval(interval);
   }, [token]);
 
   const handleOpenMessagesModal = () => {
     setMessagesModalOpen(true);
     if (token) {
-      fetch(`${API_BASE}/auth/messages/read`, {
+      fetch(`${API_BASE}/api/auth/messages/read`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       }).catch(() => {});
@@ -228,7 +228,7 @@ export default function UserHome() {
     const textToSend = adminMessageInput.trim();
     setAdminMessageSending(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/messages`, {
+      const res = await fetch(`${API_BASE}/api/auth/messages`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -277,6 +277,8 @@ export default function UserHome() {
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSuccessMsg, setFeedbackSuccessMsg] = useState<string | null>(null);
 
   const displayName =
     user?.name ||
@@ -1023,6 +1025,18 @@ export default function UserHome() {
         }),
       });
       setComplaintSent(true);
+      if (token) {
+        const pName = matchedPartner?.username ? `@${matchedPartner.username}` : "Suhbatdosh";
+        const msgText = `[Shikoyat: ${pName}] Sabab: ${selectedReasons.join(", ")}. ${complaintDetails ? `Izoh: ${complaintDetails}` : ""}`;
+        fetch(`${API_BASE}/api/auth/messages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ text: msgText }),
+        }).then(() => fetchAdminMessages()).catch(() => {});
+      }
       window.setTimeout(() => {
         setComplaintModalOpen(false);
         setComplaintSent(false);
@@ -1075,8 +1089,9 @@ export default function UserHome() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (data?.success && Array.isArray(data.sessions)) {
-        setDevices(data.sessions);
+      const list = Array.isArray(data?.devices) ? data.devices : (Array.isArray(data?.sessions) ? data.sessions : []);
+      if (data?.success && Array.isArray(list)) {
+        setDevices(list);
       }
     } catch (e) {
       console.warn("Failed to load devices", e);
@@ -1378,23 +1393,6 @@ export default function UserHome() {
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
         </button>
 
-        {/* 5. Qurilmalarim */}
-        <button
-          type="button"
-          onClick={() => setActiveTab("devices")}
-          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
-        >
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-400 group-hover:scale-105 transition-transform">
-              <Laptop className="h-5 w-5" />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-semibold text-white">{dt.sidebar.devices}</p>
-              <p className="text-[11px] text-zinc-400">Faol seanslar va xavfsizlik nazorati</p>
-            </div>
-          </div>
-          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
-        </button>
 
         {/* 6. Yordam */}
         <button
@@ -1755,77 +1753,164 @@ export default function UserHome() {
     </div>
   );
 
-  const renderFeedbackView = () => (
-    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setActiveTab("profile")}
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div>
-          <h1 className="text-xl font-bold text-white">{dt.feedback.title}</h1>
-          <p className="text-xs text-zinc-400">{dt.feedback.subtitle}</p>
-        </div>
-      </div>
+  const handleSendFeedback = async (e: FormEvent) => {
+    e.preventDefault();
+    const textToSend = feedbackText.trim();
+    if (!textToSend || !token || feedbackSubmitting) return;
+    setFeedbackSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text: textToSend }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedbackText("");
+        setFeedbackSuccessMsg("Murojaatingiz ma'muriyatga muvaffaqiyatli yetkazildi!");
+        setTimeout(() => setFeedbackSuccessMsg(null), 4000);
+        await fetchAdminMessages();
+      }
+    } catch (err) {
+      console.warn("Feedback send error", err);
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
 
-      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-6 shadow-2xl backdrop-blur-2xl">
-        {feedbackSent ? (
-          <div className="py-8 text-center animate-in zoom-in-95 duration-200">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-400 mb-3">
-              <Check className="h-7 w-7" />
-            </div>
-            <h3 className="text-base font-bold text-white">{dt.feedback.successTitle}</h3>
-            <p className="mt-1 text-xs text-zinc-400">
-              {dt.feedback.successDesc}
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setFeedbackSent(false);
-                setFeedbackText("");
-              }}
-              className="mt-4 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-xs font-semibold text-zinc-200 hover:bg-white/10"
-            >
-              {dt.feedback.newFeedback}
-            </button>
-          </div>
-        ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (feedbackText.trim()) setFeedbackSent(true);
-            }}
-            className="flex flex-col gap-4"
+  const renderFeedbackView = () => {
+    const sortedFeedMessages = [...adminMessages].sort((a, b) => {
+      const tA = new Date(a.createdAt || 0).getTime();
+      const tB = new Date(b.createdAt || 0).getTime();
+      return tA - tB;
+    });
+
+    return (
+      <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
           >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-white">{dt.feedback.title}</h1>
+            <p className="text-xs text-zinc-400">{dt.feedback.subtitle}</p>
+          </div>
+        </div>
+
+        {/* 1. Murojaat yozish formasi */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-6 shadow-2xl backdrop-blur-2xl">
+          <div className="flex items-center gap-2 mb-3">
+            <MessageSquare className="h-4 w-4 text-violet-400" />
+            <h3 className="text-sm font-bold text-white">Yangi murojaat yoki taklif yuborish</h3>
+          </div>
+
+          {feedbackSuccessMsg && (
+            <div className="mb-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/15 p-3.5 text-xs font-semibold text-emerald-300 flex items-center gap-2 animate-in fade-in">
+              <Check className="h-4 w-4 shrink-0 text-emerald-400" />
+              <span>{feedbackSuccessMsg}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSendFeedback} className="flex flex-col gap-4">
             <div>
               <label className="block text-xs font-semibold text-zinc-300 mb-2">
                 {dt.feedback.label}
               </label>
               <textarea
-                rows={5}
+                rows={4}
                 value={feedbackText}
                 onChange={(e) => setFeedbackText(e.target.value)}
-                placeholder={dt.feedback.placeholder}
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-xs text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                placeholder={dt.feedback.placeholder || "Taklif, fikr yoki shikoyatingizni batafsil bayon qiling..."}
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-xs text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 leading-relaxed"
               />
             </div>
 
             <button
               type="submit"
-              disabled={!feedbackText.trim()}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-violet-500/40 bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-xs font-bold text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] disabled:opacity-50 transition-all cursor-pointer"
+              disabled={!feedbackText.trim() || feedbackSubmitting}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-violet-500/40 bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-xs font-bold text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] disabled:opacity-50 hover:brightness-110 transition-all cursor-pointer"
             >
               <Send className="h-4 w-4" />
-              <span>{dt.feedback.submit}</span>
+              <span>{feedbackSubmitting ? "Yuborilmoqda..." : dt.feedback.submit || "Yuborish"}</span>
             </button>
           </form>
-        )}
+        </div>
+
+        {/* 2. Yuborilgan xabarlar va Admin javoblari tarixi */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-4">
+          <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-300">
+                <MessageSquare className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Yuborilgan xabarlar tarixi</h3>
+                <p className="text-[11px] text-zinc-400">Sizning murojaatlaringiz va Admin javoblari</p>
+              </div>
+            </div>
+            <span className="rounded-full bg-violet-500/15 border border-violet-500/30 px-2.5 py-1 text-[11px] font-mono font-bold text-violet-300">
+              {sortedFeedMessages.length} ta xabar
+            </span>
+          </div>
+
+          {sortedFeedMessages.length === 0 ? (
+            <div className="py-10 text-center text-xs text-zinc-500">
+              Hozircha hech qanday murojaat yuborilmagan. Yuqoridagi shakl orqali o'z fikr yoki shikoyatingizni qoldiring.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 max-h-[440px] overflow-y-auto pr-1">
+              {sortedFeedMessages.map((msg, idx) => {
+                const isAdmin = Boolean(msg.isAdmin || msg.sender === "Admin");
+                const timeStr = new Date(msg.createdAt || Date.now()).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  day: "2-digit",
+                  month: "short",
+                });
+
+                return (
+                  <div
+                    key={msg.id || idx}
+                    className={`flex flex-col ${isAdmin ? "items-end" : "items-start"}`}
+                  >
+                    <div
+                      className={`rounded-2xl p-4 max-w-[88%] text-xs shadow-md transition-all ${
+                        isAdmin
+                          ? "rounded-tr-none border border-amber-400/30 bg-gradient-to-r from-amber-500/15 via-purple-600/20 to-indigo-600/20 text-white shadow-[0_0_15px_rgba(245,158,11,0.08)]"
+                          : "rounded-tl-none border border-white/10 bg-white/[0.04] text-zinc-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        {isAdmin ? (
+                          <span className="flex items-center gap-1 rounded-md bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 uppercase tracking-wider">
+                            👑 Ma'muriyat (Admin javobi)
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 rounded-md bg-violet-500/20 border border-violet-500/30 px-1.5 py-0.5 text-[10px] font-bold text-violet-300 uppercase tracking-wider">
+                            👤 Sizning murojaatingiz
+                          </span>
+                        )}
+                        <span className="text-[10px] text-zinc-400 font-mono">{timeStr}</span>
+                      </div>
+                      <p className="text-xs leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-[#06040f] text-foreground font-sans antialiased">

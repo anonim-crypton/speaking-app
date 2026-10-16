@@ -54,6 +54,7 @@ interface AuthContextValue {
   checkUsername: (username: string) => Promise<{ available: boolean; username: string }>;
   uploadAvatar: (base64Image: string) => Promise<{ success: boolean; avatarUrl: string }>;
   completeOnboarding: (answers: OnboardingAnswers) => Promise<void>;
+  refreshUser: () => Promise<void>;
   logout: () => void;
 }
 
@@ -243,6 +244,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   };
 
+  const refreshUser = async () => {
+    if (!token) return;
+    try {
+      const data = await apiGet<{ success: boolean; user: AuthUser }>("/api/auth/me", token);
+      if (data?.user) {
+        setUser(data.user);
+      }
+    } catch {
+      /* silent */
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    // Silent background polling every 2.5s for real-time user updates (VIP, diamonds, ban, etc.)
+    const timer = setInterval(() => {
+      void refreshUser();
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [token]);
+
   const logout = () => {
     setToken(null);
     setUser(null);
@@ -273,6 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         checkUsername,
         uploadAvatar,
         completeOnboarding,
+        refreshUser,
         logout,
       }}
     >

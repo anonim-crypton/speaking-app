@@ -23,6 +23,9 @@ import {
   Server,
   Phone,
   Crown,
+  MessageSquare,
+  Send,
+  ArrowLeft,
 } from "lucide-react";
 import { adminApiGet, adminApiPost } from "@/lib/api";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
@@ -42,6 +45,8 @@ interface AdminStats {
 interface UserItem {
   id: string;
   name: string | null;
+  username?: string | null;
+  avatarUrl?: string | null;
   email: string | null;
   phone: string | null;
   provider: string;
@@ -50,8 +55,18 @@ interface UserItem {
   bannedAt?: string;
   isVerified?: boolean;
   isPremium?: boolean;
-  diamondHistory?: Array<{ amount: number; type: string; date: string }>;
-  adminMessages?: Array<{ id: string; text: string; date: string; read?: boolean }>;
+  diamondHistory?: Array<{ amount: number; type: string; date: string; createdAt?: string }>;
+  adminMessages?: Array<{
+    id: string;
+    text: string;
+    sender?: string;
+    isAdmin?: boolean;
+    is_admin?: boolean;
+    date?: string;
+    createdAt?: string;
+    sentAt?: string;
+    read?: boolean;
+  }>;
   createdAt?: string;
 }
 
@@ -175,6 +190,11 @@ export default function AdminDashboard() {
   const [showAnnounceModal, setShowAnnounceModal] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: "", body: "", priority: "info" });
 
+  // Interactive Complaints Chat states
+  const [selectedChatUserId, setSelectedChatUserId] = useState<string | null>(null);
+  const [adminChatInput, setAdminChatInput] = useState("");
+  const [adminChatSending, setAdminChatSending] = useState(false);
+
   const notify = (text: string, type: "success" | "error" = "success") => {
     setToast({ text, type });
     setTimeout(() => setToast(null), 3500);
@@ -244,11 +264,42 @@ export default function AdminDashboard() {
     }
   }, [adminToken]);
 
+  // Silent real-time background sync (every 2.5s) without UI loading spinners
+  const silentSyncData = useCallback(async () => {
+    if (!adminToken) return;
+    try {
+      const [statsRes, usersRes, complaintsRes, devicesRes] =
+        await Promise.allSettled([
+          adminApiGet<{ success: boolean; stats: AdminStats }>("/stats/", adminToken),
+          adminApiGet<{ success: boolean; users: UserItem[] }>("/users/", adminToken),
+          adminApiGet<{ success: boolean; complaints: ComplaintItem[] }>("/complaints/", adminToken),
+          adminApiGet<{ success: boolean; devices: DeviceItem[] }>("/devices/", adminToken),
+        ]);
+
+      if (statsRes.status === "fulfilled" && statsRes.value.success) {
+        setStats(statsRes.value.stats);
+      }
+      if (usersRes.status === "fulfilled" && usersRes.value.success) {
+        setUsers(usersRes.value.users);
+      }
+      if (complaintsRes.status === "fulfilled" && complaintsRes.value.success) {
+        setComplaints(complaintsRes.value.complaints);
+      }
+      if (devicesRes.status === "fulfilled" && devicesRes.value.success) {
+        setDevices(devicesRes.value.devices);
+      }
+    } catch {
+      /* silent background sync */
+    }
+  }, [adminToken]);
+
   useEffect(() => {
     if (adminToken) {
       loadData();
+      const interval = setInterval(silentSyncData, 2500);
+      return () => clearInterval(interval);
     }
-  }, [adminToken, loadData]);
+  }, [adminToken, loadData, silentSyncData]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,6 +355,52 @@ export default function AdminDashboard() {
       }
     } catch {
       notify("Amalni bajarishda xatolik", "error");
+    }
+  };
+
+  const handleAdminChatReply = async (userId: string, text: string) => {
+    const cleanText = text.trim();
+    if (!cleanText || adminChatSending || !adminToken) return;
+    setAdminChatSending(true);
+    const nowIso = new Date().toISOString();
+    const tempMsg = {
+      id: "msg_" + Date.now(),
+      text: cleanText,
+      sender: "Admin",
+      isAdmin: true,
+      is_admin: true,
+      createdAt: nowIso,
+      sentAt: nowIso,
+      read: false,
+    };
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id === userId) {
+          const list = [...(u.adminMessages || [])];
+          list.push(tempMsg);
+          return { ...u, adminMessages: list };
+        }
+        return u;
+      })
+    );
+    setAdminChatInput("");
+
+    try {
+      const res = await adminApiPost<{ success: boolean; message: string }>(
+        `/users/${userId}/action/`,
+        { action: "send_message", message: cleanText },
+        adminToken
+      );
+      if (res.success) {
+        notify("Javob foydalanuvchiga muvaffaqiyatli yuborildi!");
+        await silentSyncData();
+      } else {
+        notify(res.message || "Xabar yuborishda xatolik", "error");
+      }
+    } catch {
+      notify("Xabar yuborishda server xatoligi", "error");
+    } finally {
+      setAdminChatSending(false);
     }
   };
 
@@ -962,9 +1059,19 @@ export default function AdminDashboard() {
                           >
                             <td className="py-4 px-5 font-semibold text-white">
                               <div className="flex items-center gap-3">
-                                <div className="h-9 w-9 rounded-2xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-sm uppercase shrink-0">
-                                  {(u.name || u.email || u.phone || "U")[0]}
-                                </div>
+                                {u.avatarUrl ? (
+                                  <img
+                                    src={u.avatarUrl}
+                                    alt=""
+                                    className={`h-9 w-9 rounded-2xl object-cover shrink-0 border ${
+                                      u.isPremium ? "border-amber-400 ring-2 ring-amber-400/30" : "border-white/10"
+                                    }`}
+                                  />
+                                ) : (
+                                  <div className="h-9 w-9 rounded-2xl bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center justify-center font-bold text-sm uppercase shrink-0">
+                                    {(u.name || u.email || u.phone || "U")[0]}
+                                  </div>
+                                )}
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-bold text-white">{u.name || "Nomsiz"}</span>
@@ -980,8 +1087,8 @@ export default function AdminDashboard() {
                                       <VerifiedBadge size={16} />
                                     )}
                                   </div>
-                                  <div className="text-xs text-zinc-500 font-mono truncate max-w-[140px]">
-                                    {u.id}
+                                  <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+                                    <span className="text-cyan-400">@{u.username || u.id.slice(0, 8)}</span>
                                   </div>
                                 </div>
                               </div>
@@ -1298,87 +1405,401 @@ export default function AdminDashboard() {
 
           {/* COMPLAINTS TAB */}
           {currentTab === "complaints" && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2.5">
-                  <AlertTriangle className="h-5 w-5 text-amber-400" />
-                  <span>Kelib tushgan shikoyatlar</span>
-                </h2>
-                <span className="text-sm text-zinc-400 font-mono">Jami: {complaints.length} ta</span>
-              </div>
-
-              {complaints.length === 0 ? (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-16 text-center text-zinc-500 text-sm">
-                  Hozircha hech qanday shikoyat kelib tushmagan.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {complaints.map((c) => (
-                    <div
-                      key={c.id}
-                      className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 space-y-3.5 shadow-sm"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="text-sm font-bold text-white">
-                            Hamkor: <span className="text-rose-400 font-extrabold">{c.partnerUsername}</span>
-                          </div>
-                          <div className="text-xs text-zinc-500 font-mono mt-1">
-                            {new Date(c.createdAt).toLocaleString()}
-                          </div>
-                        </div>
-                        <span
-                          className={`rounded-lg px-2.5 py-1 text-xs font-bold border ${
-                            c.status === "resolved"
-                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                              : c.status === "dismissed"
-                              ? "bg-zinc-800 text-zinc-400 border-zinc-700"
-                              : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                          }`}
-                        >
-                          {c.status === "resolved"
-                            ? "Hal qilindi"
-                            : c.status === "dismissed"
-                            ? "Rad etildi"
-                            : "Kutilmoqda"}
-                        </span>
-                      </div>
-
-                      {c.reasons && c.reasons.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {c.reasons.map((r, i) => (
-                            <span
-                              key={i}
-                              className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 text-xs font-semibold text-rose-300"
-                            >
-                              {r}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {c.details && (
-                        <p className="rounded-xl bg-zinc-950 border border-zinc-800 p-4 text-sm text-zinc-300 leading-relaxed italic">
-                          "{c.details}"
-                        </p>
-                      )}
-
-                      <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-zinc-800">
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {selectedChatUserId ? (
+                /* ── A. TANLANGAN FOYDALANUVCHI BILAN INTERAKTIV CHAT SAHIFA ── */
+                (() => {
+                  const chatUser = users.find((u) => u.id === selectedChatUserId);
+                  if (!chatUser) {
+                    return (
+                      <div className="rounded-3xl border border-white/10 bg-[#0d1527]/80 p-8 text-center">
+                        <p className="text-zinc-400 text-sm">Foydalanuvchi topilmadi.</p>
                         <button
-                          onClick={() => handleComplaintAction(c.id, "dismissed")}
-                          className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white transition-all"
+                          type="button"
+                          onClick={() => setSelectedChatUserId(null)}
+                          className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white"
                         >
-                          Rad etish
-                        </button>
-                        <button
-                          onClick={() => handleComplaintAction(c.id, "resolved")}
-                          className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/20 transition-all"
-                        >
-                          Hal qilindi
+                          Orqaga qaytish
                         </button>
                       </div>
+                    );
+                  }
+
+                  const sortedMessages = [...(chatUser.adminMessages || [])].sort((a, b) => {
+                    const tA = new Date(a.createdAt || a.sentAt || a.date || 0).getTime();
+                    const tB = new Date(b.createdAt || b.sentAt || b.date || 0).getTime();
+                    return tA - tB;
+                  });
+
+                  return (
+                    <div className="rounded-3xl border border-white/10 bg-[#0d1527]/90 shadow-2xl backdrop-blur-2xl flex flex-col overflow-hidden">
+                      {/* Chat Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 border-b border-white/10 bg-white/[0.03]">
+                        <div className="flex items-center gap-3.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedChatUserId(null)}
+                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white transition-all cursor-pointer"
+                            title="Barcha murojaatlarga qaytish"
+                          >
+                            <ArrowLeft className="h-4 w-4" />
+                          </button>
+
+                          <div className="relative">
+                            {chatUser.avatarUrl ? (
+                              <img
+                                src={chatUser.avatarUrl}
+                                alt=""
+                                className={`h-11 w-11 rounded-2xl object-cover border ${
+                                  chatUser.isPremium ? "border-amber-400 ring-2 ring-amber-400/30" : "border-white/10"
+                                }`}
+                              />
+                            ) : (
+                              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-500/20 border border-teal-400/30 text-teal-300 font-bold text-base uppercase">
+                                {(chatUser.name || chatUser.email || chatUser.phone || "U")[0]}
+                              </div>
+                            )}
+                            {chatUser.isPremium && (
+                              <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] text-black font-extrabold shadow-sm">
+                                ★
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-base font-bold text-white">
+                                {chatUser.name || "Nomsiz Foydalanuvchi"}
+                              </span>
+                              {chatUser.isPremium && (
+                                <div className="flex items-center gap-1">
+                                  <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold">
+                                    VIP
+                                  </span>
+                                  <VerifiedBadge size={16} />
+                                </div>
+                              )}
+                              {!chatUser.isPremium && chatUser.isVerified && (
+                                <VerifiedBadge size={16} />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono mt-0.5">
+                              <span className="text-cyan-400">@{chatUser.username || chatUser.id.slice(0, 8)}</span>
+                              <span>•</span>
+                              <span>{chatUser.email || chatUser.phone || "Aloqa yo'q"}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-mono font-bold text-cyan-300">
+                            Olmoslar: {chatUser.diamonds ?? 0}
+                          </span>
+                          <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-mono text-zinc-300">
+                            Jami xabarlar: {sortedMessages.length} ta
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Messages Feed */}
+                      <div className="h-[460px] overflow-y-auto p-5 space-y-3.5 bg-[#070b16]/70">
+                        {sortedMessages.length === 0 ? (
+                          <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                            <MessageSquare className="h-10 w-10 text-zinc-600 mb-2" />
+                            <p className="text-sm font-semibold text-zinc-300">Hozircha yozishmalar yo'q</p>
+                            <p className="text-xs text-zinc-500 mt-1 max-w-sm">
+                              Quyidagi kiritish maydoni orqali foydalanuvchiga birinchi xabarni yuboring.
+                            </p>
+                          </div>
+                        ) : (
+                          sortedMessages.map((msg, idx) => {
+                            const isAdmin = Boolean(msg.isAdmin || msg.is_admin || msg.sender === "Admin");
+                            const msgTime = new Date(msg.createdAt || msg.sentAt || msg.date || Date.now()).toLocaleTimeString(
+                              [],
+                              { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" }
+                            );
+
+                            return (
+                              <div
+                                key={msg.id || idx}
+                                className={`flex flex-col ${isAdmin ? "items-end" : "items-start"}`}
+                              >
+                                <div
+                                  className={`rounded-2xl p-4 max-w-[85%] sm:max-w-[70%] shadow-lg transition-all ${
+                                    isAdmin
+                                      ? "rounded-tr-none bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 text-white shadow-cyan-500/10"
+                                      : "rounded-tl-none border border-white/10 bg-[#121c35] text-zinc-100"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    {isAdmin ? (
+                                      <span className="flex items-center gap-1 rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">
+                                        👑 Ma'muriyat (Siz)
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center gap-1 rounded-md bg-violet-500/20 text-violet-300 border border-violet-400/30 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                        👤 {chatUser.name || "Foydalanuvchi"}
+                                      </span>
+                                    )}
+                                    <span
+                                      className={`text-[10px] font-mono ${
+                                        isAdmin ? "text-cyan-100/80" : "text-zinc-400"
+                                      }`}
+                                    >
+                                      {msgTime}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">
+                                    {msg.text}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Bottom Reply Bar */}
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleAdminChatReply(chatUser.id, adminChatInput);
+                        }}
+                        className="flex items-center gap-3 p-4 border-t border-white/10 bg-white/[0.02]"
+                      >
+                        <input
+                          type="text"
+                          value={adminChatInput}
+                          onChange={(e) => setAdminChatInput(e.target.value)}
+                          placeholder="Foydalanuvchiga javob yozing..."
+                          className="flex-1 rounded-2xl border border-white/10 bg-[#070d1a] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!adminChatInput.trim() || adminChatSending}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/40 bg-gradient-to-r from-teal-500 to-cyan-500 px-5 py-3 text-sm font-bold text-white shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer shrink-0"
+                        >
+                          <Send className="h-4 w-4" />
+                          <span>{adminChatSending ? "..." : "Yuborish"}</span>
+                        </button>
+                      </form>
                     </div>
-                  ))}
+                  );
+                })()
+              ) : (
+                /* ── B. FOYDALANUVCHILARNING MUROJAATLARI RO'YXATI ── */
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-bold text-white flex items-center gap-2.5">
+                        <MessageSquare className="h-5 w-5 text-cyan-400" />
+                        <span>Foydalanuvchilar shikoyat va takliflari</span>
+                      </h2>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Foydalanuvchi profiliga bosing — ikki tomonlama muloqot va chat ochiladi
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-3 py-1 text-xs font-mono font-bold self-start sm:self-auto">
+                      Muloqotlar: {users.filter((u) => u.adminMessages && u.adminMessages.length > 0).length} ta
+                    </span>
+                  </div>
+
+                  {users.filter((u) => u.adminMessages && u.adminMessages.length > 0).length === 0 ? (
+                    <div className="rounded-3xl border border-white/10 bg-[#0d1527]/80 p-12 text-center backdrop-blur-2xl">
+                      <MessageSquare className="h-10 w-10 text-zinc-600 mx-auto mb-3" />
+                      <h3 className="text-sm font-bold text-white">Hozircha hech qanday murojaat kelib tushmagan</h3>
+                      <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
+                        Foydalanuvchilar "Shikoyat / Taklif" bo'limidan xabar yozganda shu yerda ko'rinadi va bevosita javob bera olasiz.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3">
+                      {users
+                        .filter((u) => u.adminMessages && u.adminMessages.length > 0)
+                        .map((u) => {
+                          const msgs = u.adminMessages || [];
+                          const lastMsg = msgs[msgs.length - 1] || msgs[0];
+                          const isLastAdmin = Boolean(lastMsg?.isAdmin || lastMsg?.is_admin || lastMsg?.sender === "Admin");
+                          const snippet = lastMsg?.text
+                            ? lastMsg.text.length > 75
+                              ? lastMsg.text.slice(0, 75) + "..."
+                              : lastMsg.text
+                            : "Xabar matni yo'q";
+                          const timeStr = new Date(
+                            lastMsg?.createdAt || lastMsg?.sentAt || lastMsg?.date || Date.now()
+                          ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" });
+
+                          return (
+                            <div
+                              key={u.id}
+                              onClick={() => setSelectedChatUserId(u.id)}
+                              className="group rounded-2xl border border-white/10 bg-[#0d1527]/80 hover:bg-[#121c35] hover:border-cyan-400/40 p-4 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-4"
+                            >
+                              <div className="flex items-center gap-3.5 min-w-0">
+                                <div className="relative shrink-0">
+                                  {u.avatarUrl ? (
+                                    <img
+                                      src={u.avatarUrl}
+                                      alt=""
+                                      className={`h-11 w-11 rounded-2xl object-cover border ${
+                                        u.isPremium ? "border-amber-400 ring-2 ring-amber-400/30" : "border-white/10"
+                                      }`}
+                                    />
+                                  ) : (
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-500/20 border border-teal-400/30 text-teal-300 font-bold text-base uppercase">
+                                      {(u.name || u.email || u.phone || "U")[0]}
+                                    </div>
+                                  )}
+                                  {u.isPremium && (
+                                    <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] text-black font-extrabold shadow-sm">
+                                      ★
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">
+                                      {u.name || "Nomsiz Foydalanuvchi"}
+                                    </span>
+                                    {u.isPremium && (
+                                      <div className="flex items-center gap-1">
+                                        <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold">
+                                          VIP
+                                        </span>
+                                        <VerifiedBadge size={14} />
+                                      </div>
+                                    )}
+                                    {!u.isPremium && u.isVerified && (
+                                      <VerifiedBadge size={14} />
+                                    )}
+                                    <span className="text-xs text-zinc-400 font-mono">
+                                      @{u.username || u.id.slice(0, 8)}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 mt-1 min-w-0">
+                                    <span
+                                      className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                                        isLastAdmin
+                                          ? "bg-teal-500/20 text-teal-300 border border-teal-400/30"
+                                          : "bg-rose-500/20 text-rose-300 border border-rose-400/30"
+                                      }`}
+                                    >
+                                      {isLastAdmin ? "Siz javob berdingiz" : "Yangi murojaat"}
+                                    </span>
+                                    <p className="text-xs text-zinc-300 truncate italic">
+                                      "{snippet}"
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
+                                <span className="text-xs text-zinc-400 font-mono">{timeStr}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedChatUserId(u.id);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-400/30 bg-cyan-500/10 hover:bg-cyan-500/20 px-3.5 py-1.5 text-xs font-bold text-cyan-300 transition-all cursor-pointer"
+                                >
+                                  <span>Chatni ochish</span>
+                                  <span>→</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+
+                  {/* ── C. SUHBATDOSHLAR USTIDAN SHIKOYATLAR (MATCHMAKING) ── */}
+                  <div className="pt-6 border-t border-white/10 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-400" />
+                        <span>Suhbatdoshlar ustidan shikoyatlar (Audio matchmaking)</span>
+                      </h3>
+                      <span className="text-xs text-zinc-400 font-mono">Jami: {complaints.length} ta</span>
+                    </div>
+
+                    {complaints.length === 0 ? (
+                      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 text-center text-zinc-500 text-xs">
+                        Hozircha suhbat xonalaridan shikoyat tushmagan.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {complaints.map((c) => (
+                          <div
+                            key={c.id}
+                            className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-3 shadow-sm"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <div className="text-sm font-bold text-white">
+                                  Hamkor: <span className="text-rose-400 font-extrabold">{c.partnerUsername}</span>
+                                </div>
+                                <div className="text-xs text-zinc-500 font-mono mt-0.5">
+                                  {new Date(c.createdAt).toLocaleString()}
+                                </div>
+                              </div>
+                              <span
+                                className={`rounded-lg px-2.5 py-1 text-xs font-bold border ${
+                                  c.status === "resolved"
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                    : c.status === "dismissed"
+                                    ? "bg-zinc-800 text-zinc-400 border-zinc-700"
+                                    : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                }`}
+                              >
+                                {c.status === "resolved"
+                                  ? "Hal qilindi"
+                                  : c.status === "dismissed"
+                                  ? "Rad etildi"
+                                  : "Kutilmoqda"}
+                              </span>
+                            </div>
+
+                            {c.reasons && c.reasons.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {c.reasons.map((r, i) => (
+                                  <span
+                                    key={i}
+                                    className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 text-xs font-semibold text-rose-300"
+                                  >
+                                    {r}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {c.details && (
+                              <p className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-xs text-zinc-300 leading-relaxed italic">
+                                "{c.details}"
+                              </p>
+                            )}
+
+                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+                              <button
+                                onClick={() => handleComplaintAction(c.id, "dismissed")}
+                                className="rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-white transition-all cursor-pointer"
+                              >
+                                Rad etish
+                              </button>
+                              <button
+                                onClick={() => handleComplaintAction(c.id, "resolved")}
+                                className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/20 transition-all cursor-pointer"
+                              >
+                                Hal qilindi
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

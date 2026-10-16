@@ -406,11 +406,15 @@ class AdminUserActionView(APIView):
             if not msg_text:
                 return Response({"success": False, "message": "Xabar matni bo'sh bo'lishi mumkin emas"}, status=status.HTTP_400_BAD_REQUEST)
             msgs = target.setdefault("adminMessages", [])
+            now_iso = datetime.utcnow().isoformat()
             new_msg = {
                 "id": "msg_" + uuid.uuid4().hex[:8],
                 "text": msg_text,
-                "sentAt": datetime.utcnow().isoformat(),
+                "sentAt": now_iso,
+                "createdAt": now_iso,
                 "sender": "Admin",
+                "isAdmin": True,
+                "is_admin": True,
                 "read": False
             }
             msgs.insert(0, new_msg)
