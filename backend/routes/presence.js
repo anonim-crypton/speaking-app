@@ -52,10 +52,10 @@ function broadcastCount() {
   }
 }
 
-// Periodic cleanup every 10 seconds
+// Periodic broadcast and cleanup every 1 second
 setInterval(() => {
   broadcastCount();
-}, 10_000).unref();
+}, 1_000).unref();
 
 /**
  * GET /api/presence

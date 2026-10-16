@@ -138,6 +138,40 @@ function updateUser(id, patch) {
   return users[index];
 }
 
+function deleteUser(id) {
+  const users = readUsers();
+  const next = users.filter((u) => u.id !== id);
+  if (next.length !== users.length) {
+    writeUsers(next);
+    return true;
+  }
+  return false;
+}
+
+function deleteByPhone(phone) {
+  const target = digits(phone);
+  if (!target) return false;
+  const users = readUsers();
+  const next = users.filter((u) => !u.phone || digits(u.phone) !== target);
+  if (next.length !== users.length) {
+    writeUsers(next);
+    return true;
+  }
+  return false;
+}
+
+function deleteByEmail(email) {
+  const target = norm(email);
+  if (!target) return false;
+  const users = readUsers();
+  const next = users.filter((u) => !u.email || norm(u.email) !== target);
+  if (next.length !== users.length) {
+    writeUsers(next);
+    return true;
+  }
+  return false;
+}
+
 module.exports = {
   readUsers,
   findByEmail,
@@ -146,5 +180,8 @@ module.exports = {
   findById,
   createUser,
   updateUser,
+  deleteUser,
+  deleteByPhone,
+  deleteByEmail,
   normUsername,
 };

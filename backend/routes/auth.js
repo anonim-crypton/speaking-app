@@ -97,11 +97,14 @@ router.post("/register", async (req, res) => {
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
-    if (store.findByEmail(cleanEmail)) {
-      return res.status(409).json({ success: false, message: "This email is already registered" });
-    }
+    const isSupabaseEnabled = supabase.supabaseStatus().enabled;
     const existingRemote = await supabase.findRow("profiles", "email", cleanEmail);
     if (existingRemote) {
+      return res.status(409).json({ success: false, message: "This email is already registered" });
+    }
+    if (isSupabaseEnabled) {
+      store.deleteByEmail(cleanEmail);
+    } else if (store.findByEmail(cleanEmail)) {
       return res.status(409).json({ success: false, message: "This email is already registered" });
     }
 
@@ -163,13 +166,16 @@ router.post("/register-phone", async (req, res) => {
         .json({ success: false, message: "Enter a valid phone number" });
     }
 
-    if (store.findByPhone(cleaned)) {
+    const isSupabaseEnabled = supabase.supabaseStatus().enabled;
+    const existingRemote = await supabase.findRow("profiles", "phone", cleaned);
+    if (existingRemote) {
       return res
         .status(409)
         .json({ success: false, message: "This phone number is already registered" });
     }
-    const existingRemote = await supabase.findRow("profiles", "phone", cleaned);
-    if (existingRemote) {
+    if (isSupabaseEnabled) {
+      store.deleteByPhone(cleaned);
+    } else if (store.findByPhone(cleaned)) {
       return res
         .status(409)
         .json({ success: false, message: "This phone number is already registered" });
@@ -322,12 +328,17 @@ router.post("/login", async (req, res) => {
         return res.status(400).json({ success: false, message: "Enter a valid phone number" });
       }
 
-      let user = store.findByPhone(cleaned);
-      if (!user) {
+      const isSupabaseEnabled = supabase.supabaseStatus().enabled;
+      let user = null;
+      if (isSupabaseEnabled) {
         const profile = await supabase.findRow("profiles", "phone", cleaned);
         if (profile) {
           user = hydrateUserFromProfile(profile);
+        } else {
+          store.deleteByPhone(cleaned);
         }
+      } else {
+        user = store.findByPhone(cleaned);
       }
 
       if (!user) {
@@ -369,13 +380,17 @@ router.post("/login", async (req, res) => {
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
-    let user = store.findByEmail(cleanEmail);
-
-    if (!user) {
+    const isSupabaseEnabled = supabase.supabaseStatus().enabled;
+    let user = null;
+    if (isSupabaseEnabled) {
       const profile = await supabase.findRow("profiles", "email", cleanEmail);
       if (profile) {
         user = hydrateUserFromProfile(profile);
+      } else {
+        store.deleteByEmail(cleanEmail);
       }
+    } else {
+      user = store.findByEmail(cleanEmail);
     }
 
     if (!user) {

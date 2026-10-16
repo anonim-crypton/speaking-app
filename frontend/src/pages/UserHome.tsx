@@ -267,10 +267,30 @@ export default function UserHome() {
     };
 
     sendHeartbeat();
-    const hbInterval = window.setInterval(sendHeartbeat, 12_000);
+    const hbInterval = window.setInterval(sendHeartbeat, 1000);
+
+    // Silent background data reload every second without disturbing user
+    const bgSyncInterval = window.setInterval(async () => {
+      try {
+        const token = localStorage.getItem("ls_token");
+        if (!token) return;
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data?.user) {
+          if (typeof data.user.diamonds === "number") {
+            setDiamonds(data.user.diamonds);
+          }
+        }
+      } catch {
+        /* silent */
+      }
+    }, 1000);
 
     return () => {
       window.clearInterval(hbInterval);
+      window.clearInterval(bgSyncInterval);
       es?.close();
     };
   }, [user?.id]);

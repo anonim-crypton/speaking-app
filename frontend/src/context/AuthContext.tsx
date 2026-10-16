@@ -99,6 +99,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [token]);
 
+  // Silent background reload every 1 second without disrupting user UI
+  useEffect(() => {
+    if (!token) return;
+    const bgSync = setInterval(() => {
+      apiGet<{ success: boolean; user: AuthUser }>("/api/auth/me", token)
+        .then((data) => {
+          if (data?.user) {
+            setUser((prev) => {
+              if (!prev) return data.user;
+              if (
+                prev.diamonds !== data.user.diamonds ||
+                prev.name !== data.user.name ||
+                prev.username !== data.user.username ||
+                prev.onboardingCompleted !== data.user.onboardingCompleted
+              ) {
+                return data.user;
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(() => {});
+    }, 1000);
+
+    return () => clearInterval(bgSync);
+  }, [token]);
+
   function persist(nextToken: string, nextUser: AuthUser) {
     setToken(nextToken);
     setUser(nextUser);
