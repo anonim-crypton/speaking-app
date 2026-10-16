@@ -1,4 +1,7 @@
-const BASE = ""; // same-origin; Vite proxies /api to the Express backend
+export const API_BASE = import.meta.env.VITE_API_URL
+  ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, "")
+  : "";
+const BASE = API_BASE;
 
 export type AuthProviderKind = "password" | "phone" | "google";
 

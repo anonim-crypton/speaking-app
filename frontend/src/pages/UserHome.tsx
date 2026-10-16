@@ -39,6 +39,7 @@ import SpeakerAvatar from "@/components/SpeakerAvatar";
 import AiLoader from "@/components/ui/ai-loader";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { API_BASE } from "@/lib/api";
 
 const MAX_SEARCH_SECONDS = 120; // 2 daqiqa kutish limiti
 
@@ -190,7 +191,7 @@ export default function UserHome() {
 
   const leaveMatchmakingServer = async () => {
     try {
-      await fetch("/api/matchmaking/leave", {
+      await fetch(`${API_BASE}/api/matchmaking/leave`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -213,7 +214,7 @@ export default function UserHome() {
         const blob = new Blob([JSON.stringify({ clientId: cid, userId: uid })], {
           type: "application/json",
         });
-        navigator.sendBeacon?.("/api/matchmaking/leave", blob);
+        navigator.sendBeacon?.(`${API_BASE}/api/matchmaking/leave`, blob);
       } catch {
         /* ignore */
       }
@@ -235,7 +236,7 @@ export default function UserHome() {
 
     let es: EventSource | null = null;
     try {
-      es = new EventSource(`/api/presence/stream?${query}`);
+      es = new EventSource(`${API_BASE}/api/presence/stream?${query}`);
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -251,7 +252,7 @@ export default function UserHome() {
     }
 
     const sendHeartbeat = () => {
-      fetch("/api/presence/heartbeat", {
+      fetch(`${API_BASE}/api/presence/heartbeat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientId, userId }),
@@ -300,7 +301,7 @@ export default function UserHome() {
 
     const pollInterval = window.setInterval(async () => {
       try {
-        const res = await fetch("/api/matchmaking/status", {
+        const res = await fetch(`${API_BASE}/api/matchmaking/status`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -342,7 +343,7 @@ export default function UserHome() {
 
     let roomEs: EventSource | null = null;
     try {
-      roomEs = new EventSource(`/api/matchmaking/room-stream?${sseQuery}`);
+      roomEs = new EventSource(`${API_BASE}/api/matchmaking/room-stream?${sseQuery}`);
       roomEs.onmessage = (e) => {
         try {
           const payload = JSON.parse(e.data);
@@ -372,7 +373,7 @@ export default function UserHome() {
 
     const roomPoll = window.setInterval(async () => {
       try {
-        const res = await fetch("/api/matchmaking/status", {
+        const res = await fetch(`${API_BASE}/api/matchmaking/status`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -452,7 +453,7 @@ export default function UserHome() {
 
         if (speakingNow !== lastReported && activeRoomId) {
           lastReported = speakingNow;
-          fetch("/api/matchmaking/speaking", {
+          fetch(`${API_BASE}/api/matchmaking/speaking`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -582,7 +583,7 @@ export default function UserHome() {
       setMatchedPartner(null);
 
       // Join the isolated language server pool for `speakerOption.id`
-      const res = await fetch("/api/matchmaking/join", {
+      const res = await fetch(`${API_BASE}/api/matchmaking/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -619,7 +620,7 @@ export default function UserHome() {
       });
     }
     if (activeRoomId) {
-      fetch("/api/matchmaking/speaking", {
+      fetch(`${API_BASE}/api/matchmaking/speaking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -640,7 +641,7 @@ export default function UserHome() {
 
     setChatInput("");
     try {
-      const res = await fetch("/api/matchmaking/message", {
+      const res = await fetch(`${API_BASE}/api/matchmaking/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -672,7 +673,7 @@ export default function UserHome() {
     if (selectedReasons.length === 0 && !complaintDetails.trim()) return;
     setComplaintSubmitting(true);
     try {
-      await fetch("/api/matchmaking/complaint", {
+      await fetch(`${API_BASE}/api/matchmaking/complaint`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
