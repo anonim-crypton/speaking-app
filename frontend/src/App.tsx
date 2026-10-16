@@ -12,6 +12,7 @@ import Dashboard from "@/pages/Dashboard";
 import UserHome from "@/pages/UserHome";
 import { useAuth } from "@/context/AuthContext";
 import { loaderDuration, measureRtt, routeLoadDuration } from "@/lib/network";
+import { cn } from "@/lib/utils";
 
 /** Requires a session, and a completed questionnaire. */
 function Protected({ children }: { children: ReactNode }) {
@@ -111,7 +112,7 @@ export default function App() {
       {/* Full-screen pages have no landing navbar */}
       {!isOnboardingRoute && !isUserDashboard ? <Navbar /> : null}
 
-      <main className="flex-1">
+      <main className={cn("flex-1", !isUserDashboard && !isOnboardingRoute && "pb-20 lg:pb-0")}>
         <Routes>
           <Route path="/" element={<HomeGate />} />
           <Route path="/login" element={<Login />} />

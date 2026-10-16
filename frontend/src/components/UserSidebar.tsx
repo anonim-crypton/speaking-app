@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/context/LanguageContext";
+import { DASHBOARD_TRANSLATIONS } from "@/i18n/dashboardTranslations";
 
 export type UserNavTab =
   | "home"
@@ -40,15 +42,18 @@ export default function UserSidebar({
   isCollapsed = false,
   onOpenPremium,
 }: UserSidebarProps) {
+  const { lang } = useLanguage();
+  const t = DASHBOARD_TRANSLATIONS[lang] ?? DASHBOARD_TRANSLATIONS.uz;
+
   const navItems = [
-    { id: "home" as const, label: "Bosh sahifa", icon: Home },
-    { id: "exercises" as const, label: "Mening mashqlarim", icon: FileText },
-    { id: "friends" as const, label: "Do'stlar", icon: Users },
-    { id: "rating" as const, label: "Reyting", icon: Trophy },
-    { id: "achievements" as const, label: "Yutuqlar", icon: Award },
-    { id: "settings" as const, label: "Sozlamalar", icon: Settings },
-    { id: "help" as const, label: "Yordam", icon: HelpCircle },
-    { id: "feedback" as const, label: "Shikoyat / Taklif", icon: MessageSquare },
+    { id: "home" as const, label: t.sidebar.home, icon: Home },
+    { id: "exercises" as const, label: t.sidebar.exercises, icon: FileText },
+    { id: "friends" as const, label: t.sidebar.friends, icon: Users },
+    { id: "rating" as const, label: t.sidebar.rating, icon: Trophy },
+    { id: "achievements" as const, label: t.sidebar.achievements, icon: Award },
+    { id: "settings" as const, label: t.sidebar.settings, icon: Settings },
+    { id: "help" as const, label: t.sidebar.help, icon: HelpCircle },
+    { id: "feedback" as const, label: t.sidebar.feedback, icon: MessageSquare },
   ];
 
   return (
@@ -159,7 +164,7 @@ export default function UserSidebar({
                   </span>
                 </div>
                 <p className="mt-1 truncate text-[11px] text-zinc-400">
-                  Barcha imkoniyatlar ochiq
+                  {t.sidebar.premiumDesc}
                 </p>
               </div>
             </div>

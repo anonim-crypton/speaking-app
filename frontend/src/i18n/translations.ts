@@ -943,32 +943,13 @@ export interface LangOption {
   translated: boolean;
 }
 
-/** 24 languages, each rendered with its own inline SVG flag. */
+/** 5 ta asosiy til: O'zbekcha, Ruscha, Inglizcha, Turkcha, Koreyscha */
 export const LANGS: LangOption[] = [
   { code: "uz", label: "O'zbekcha", short: "UZ", country: "UZ", translated: true },
-  { code: "en", label: "English", short: "EN", country: "GB", translated: true },
   { code: "ru", label: "Русский", short: "RU", country: "RU", translated: true },
+  { code: "en", label: "English", short: "EN", country: "GB", translated: true },
   { code: "tr", label: "Türkçe", short: "TR", country: "TR", translated: true },
-  { code: "de", label: "Deutsch", short: "DE", country: "DE", translated: true },
-  { code: "fr", label: "Français", short: "FR", country: "FR", translated: true },
-  { code: "es", label: "Español", short: "ES", country: "ES", translated: true },
-  { code: "it", label: "Italiano", short: "IT", country: "IT", translated: true },
-  { code: "pt", label: "Português", short: "PT", country: "PT", translated: true },
-  { code: "ar", label: "العربية", short: "AR", country: "SA", translated: true },
-  { code: "fa", label: "فارسی", short: "FA", country: "IR", translated: true },
-  { code: "zh", label: "中文", short: "ZH", country: "CN", translated: true },
-  { code: "ja", label: "日本語", short: "JA", country: "JP", translated: true },
   { code: "ko", label: "한국어", short: "KO", country: "KR", translated: true },
-  { code: "hi", label: "हिन्दी", short: "HI", country: "IN", translated: true },
-  { code: "kk", label: "Қазақша", short: "KK", country: "KZ", translated: true },
-  { code: "ky", label: "Кыргызча", short: "KY", country: "KG", translated: true },
-  { code: "tg", label: "Тоҷикӣ", short: "TG", country: "TJ", translated: true },
-  { code: "tk", label: "Türkmençe", short: "TK", country: "TM", translated: true },
-  { code: "az", label: "Azərbaycan", short: "AZ", country: "AZ", translated: true },
-  { code: "nl", label: "Nederlands", short: "NL", country: "NL", translated: true },
-  { code: "pl", label: "Polski", short: "PL", country: "PL", translated: true },
-  { code: "uk", label: "Українська", short: "UK", country: "UA", translated: true },
-  { code: "id", label: "Bahasa Indonesia", short: "ID", country: "ID", translated: true },
 ];
 
 export const BRAND = "Lingo Speek";

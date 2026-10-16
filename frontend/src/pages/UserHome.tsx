@@ -46,8 +46,11 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
+import { DASHBOARD_TRANSLATIONS } from "@/i18n/dashboardTranslations";
 import UserSidebar, { type UserNavTab } from "@/components/UserSidebar";
 import AccountMenu from "@/components/AccountMenu";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import CountryFlag from "@/components/CountryFlag";
 import SpeakerAvatar from "@/components/SpeakerAvatar";
 import AiLoader from "@/components/ui/ai-loader";
@@ -114,6 +117,8 @@ function getOrCreateClientId(): string {
 export default function UserHome() {
   const { slug } = useParams<{ slug: string }>();
   const { user, logout } = useAuth();
+  const { lang } = useLanguage();
+  const dt = DASHBOARD_TRANSLATIONS[lang] ?? DASHBOARD_TRANSLATIONS.uz;
 
   const [activeTab, setActiveTab] = useState<UserNavTab>("home");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -973,15 +978,15 @@ export default function UserHome() {
               <span>{diamonds}</span>
               <Gem className="h-3.5 w-3.5 text-violet-400" />
             </div>
-            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">Olmoslar</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">{dt.profile.diamonds}</p>
           </div>
 
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center">
             <div className="flex items-center justify-center gap-1 text-sm font-bold text-amber-300">
-              <span>0 kun</span>
+              <span>0 {dt.stats.days}</span>
               <Flame className="h-3.5 w-3.5 text-amber-400" />
             </div>
-            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">Streak</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">{dt.profile.streak}</p>
           </div>
 
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center">
@@ -989,7 +994,7 @@ export default function UserHome() {
               <span>#1</span>
               <Trophy className="h-3.5 w-3.5 text-emerald-400" />
             </div>
-            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">O'rningiz</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">{dt.profile.rank}</p>
           </div>
         </div>
 
@@ -1001,7 +1006,7 @@ export default function UserHome() {
             className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] hover:bg-white/[0.08] hover:border-violet-400/40 py-2.5 px-3 text-xs font-semibold text-white transition-all cursor-pointer"
           >
             <Plus className="h-4 w-4 text-violet-400" />
-            <span>Hisobni to'ldirish</span>
+            <span>{dt.reward.topUp}</span>
           </button>
 
           <button
@@ -1010,7 +1015,7 @@ export default function UserHome() {
             className="flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-gradient-to-r from-amber-500/90 via-purple-600/90 to-indigo-600/90 hover:brightness-110 py-2.5 px-3 text-xs font-semibold text-white shadow-[0_0_20px_rgba(168,85,247,0.3)] transition-all cursor-pointer"
           >
             <Crown className="h-4 w-4 text-amber-200" />
-            <span>Premium xarid qilish</span>
+            <span>{dt.reward.buyPremium}</span>
           </button>
         </div>
       </div>
@@ -1018,7 +1023,7 @@ export default function UserHome() {
       {/* ── Barcha Menyu Tugmalari (Chap menyudan ko'chirilgan) ── */}
       <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-3.5 sm:p-4 shadow-xl backdrop-blur-2xl flex flex-col gap-1.5">
         <p className="px-3 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-          Ilova bo'limlari va sozlamalar
+          {dt.profile.sectionsTitle}
         </p>
 
         {/* 1. Reyting */}
@@ -1032,8 +1037,8 @@ export default function UserHome() {
               <Trophy className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">Reyting jadvali</p>
-              <p className="text-[11px] text-zinc-400">Eng faol foydalanuvchilar bilan bellashing</p>
+              <p className="text-sm font-semibold text-white">{dt.profile.ratingTitle}</p>
+              <p className="text-[11px] text-zinc-400">{dt.profile.ratingDesc}</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
@@ -1050,8 +1055,8 @@ export default function UserHome() {
               <Award className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">Yutuqlar va medallar</p>
-              <p className="text-[11px] text-zinc-400">Erishilgan marralar va nishonlar</p>
+              <p className="text-sm font-semibold text-white">{dt.profile.achievementsTitle}</p>
+              <p className="text-[11px] text-zinc-400">{dt.profile.achievementsDesc}</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
@@ -1068,8 +1073,8 @@ export default function UserHome() {
               <Settings className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">Sozlamalar</p>
-              <p className="text-[11px] text-zinc-400">Mikrofon, bildirishnomalar va xavfsizlik</p>
+              <p className="text-sm font-semibold text-white">{dt.profile.settingsTitle}</p>
+              <p className="text-[11px] text-zinc-400">{dt.profile.settingsDesc}</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
@@ -1086,8 +1091,8 @@ export default function UserHome() {
               <HelpCircle className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">Yordam markazi (FAQ)</p>
-              <p className="text-[11px] text-zinc-400">Savollar, ko'rsatmalar va qo'llab-quvvatlash</p>
+              <p className="text-sm font-semibold text-white">{dt.profile.helpTitle}</p>
+              <p className="text-[11px] text-zinc-400">{dt.profile.helpDesc}</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
@@ -1104,8 +1109,8 @@ export default function UserHome() {
               <MessageSquare className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">Shikoyat va Taklif</p>
-              <p className="text-[11px] text-zinc-400">Takliflaringiz yoki muammolarni yuboring</p>
+              <p className="text-sm font-semibold text-white">{dt.profile.feedbackTitle}</p>
+              <p className="text-[11px] text-zinc-400">{dt.profile.feedbackDesc}</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
@@ -1123,8 +1128,8 @@ export default function UserHome() {
                 <LogOut className="h-5 w-5" />
               </div>
               <div className="text-left">
-                <p className="text-sm font-semibold text-red-400">Hisobdan chiqish</p>
-                <p className="text-[11px] text-red-400/60">Tizimdan xavfsiz chiqish</p>
+                <p className="text-sm font-semibold text-red-400">{dt.profile.logoutTitle}</p>
+                <p className="text-[11px] text-red-400/60">{dt.profile.logoutDesc}</p>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-red-400/60 group-hover:text-red-300 group-hover:translate-x-0.5 transition-all" />
@@ -1146,8 +1151,8 @@ export default function UserHome() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-white">Mening mashqlarim</h1>
-            <p className="text-xs text-zinc-400">So'zlashuv va nutq ko'nikmalarini oshirish mashqlari</p>
+            <h1 className="text-xl font-bold text-white">{dt.exercises.title}</h1>
+            <p className="text-xs text-zinc-400">{dt.exercises.subtitle}</p>
           </div>
         </div>
       </div>
@@ -1155,32 +1160,32 @@ export default function UserHome() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
           {
-            title: "Kundalik mavzular",
-            desc: "Sayohat, IT, Ish, Do'stlik va Madaniyat mavzularida so'zlashuvlar",
+            title: dt.exercises.dailyTopics,
+            desc: dt.exercises.dailyTopicsDesc,
             icon: MessageSquare,
             color: "violet",
-            badge: "Tavsiya",
+            badge: "PRO",
           },
           {
-            title: "Lug'at boyligi",
-            desc: "Eng ko'p qo'llaniladigan 500 ta ibora va so'zlar to'plami",
+            title: dt.exercises.vocab,
+            desc: dt.exercises.vocabDesc,
             icon: BookOpen,
             color: "emerald",
-            badge: "Yangi",
+            badge: "NEW",
           },
           {
-            title: "Talaffuz testi",
-            desc: "Mikrofon orqali talaffuz aniqligini tekshirish va baholash",
+            title: dt.exercises.pronounce,
+            desc: dt.exercises.pronounceDesc,
             icon: Mic,
             color: "amber",
-            badge: "Mashhur",
+            badge: "AI",
           },
           {
-            title: "Jonli dialog mashqi",
-            desc: "Sherik bilan birgalikda rolli o'yinlar va amaliy muloqot",
+            title: dt.exercises.dialogue,
+            desc: dt.exercises.dialogueDesc,
             icon: Users,
             color: "sky",
-            badge: "Faol",
+            badge: "LIVE",
           },
         ].map((item, idx) => {
           const Icon = item.icon;
@@ -1207,7 +1212,7 @@ export default function UserHome() {
                 type="button"
                 className="mt-5 w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-white hover:bg-white/[0.08] transition-colors"
               >
-                <span>Mashqni boshlash</span>
+                <span>{dt.exercises.startBtn}</span>
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -1229,8 +1234,8 @@ export default function UserHome() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-white">Do'stlar va Sheriklar</h1>
-            <p className="text-xs text-zinc-400">Siz bilan muloqot qilgan va birga til o'rganayotgan do'stlaringiz</p>
+            <h1 className="text-xl font-bold text-white">{dt.friends.title}</h1>
+            <p className="text-xs text-zinc-400">{dt.friends.subtitle}</p>
           </div>
         </div>
       </div>
@@ -1239,9 +1244,9 @@ export default function UserHome() {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/25 bg-violet-500/10 text-violet-300 mb-4 shadow-[0_0_25px_rgba(139,92,246,0.2)]">
           <Users className="h-8 w-8" />
         </div>
-        <h3 className="text-lg font-bold text-white">Hozircha do'stlaringiz ro'yxati bo'sh</h3>
+        <h3 className="text-lg font-bold text-white">{dt.friends.emptyTitle}</h3>
         <p className="mt-1.5 max-w-sm mx-auto text-xs text-zinc-400 leading-relaxed">
-          Jonli suhbatlar o'tkazing va muloqot davomida suhbatdoshlarni do'stlar safiga qo'shing.
+          {dt.friends.emptyDesc}
         </p>
 
         <button
@@ -1250,7 +1255,7 @@ export default function UserHome() {
           className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-xs font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
         >
           <Play className="h-4 w-4 fill-white" />
-          <span>Yangi suhbat boshlash</span>
+          <span>{dt.friends.startMeeting}</span>
         </button>
       </div>
     </div>
@@ -1267,8 +1272,8 @@ export default function UserHome() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-white">Haftalik Reyting</h1>
-          <p className="text-xs text-zinc-400">Eng ko'p vaqt suhbatlashgan faol foydalanuvchilar</p>
+          <h1 className="text-xl font-bold text-white">{dt.rating.title}</h1>
+          <p className="text-xs text-zinc-400">{dt.rating.subtitle}</p>
         </div>
       </div>
 
@@ -1283,7 +1288,7 @@ export default function UserHome() {
             </span>
           </div>
           <p className="text-xs font-bold text-white truncate max-w-full">Shaxboz</p>
-          <p className="text-[10px] text-zinc-400">14 soat</p>
+          <p className="text-[10px] text-zinc-400">14 {dt.stats.hours}</p>
         </div>
 
         {/* 1-o'rin (Oltin) */}
@@ -1296,7 +1301,7 @@ export default function UserHome() {
             </span>
           </div>
           <p className="text-sm font-black text-amber-300 truncate max-w-full">Jasur_English</p>
-          <p className="text-[11px] text-zinc-300 font-semibold">22 soat</p>
+          <p className="text-[11px] text-zinc-300 font-semibold">22 {dt.stats.hours}</p>
         </div>
 
         {/* 3-o'rin */}
@@ -1308,7 +1313,7 @@ export default function UserHome() {
             </span>
           </div>
           <p className="text-xs font-bold text-white truncate max-w-full">Malika</p>
-          <p className="text-[10px] text-zinc-400">11 soat</p>
+          <p className="text-[10px] text-zinc-400">11 {dt.stats.hours}</p>
         </div>
       </div>
 
@@ -1319,8 +1324,8 @@ export default function UserHome() {
             #1
           </span>
           <div>
-            <p className="text-sm font-bold text-white">{displayName} (Siz)</p>
-            <p className="text-xs text-violet-300">0 daqiqa gaplashildi</p>
+            <p className="text-sm font-bold text-white">{displayName} ({dt.meeting.you})</p>
+            <p className="text-xs text-violet-300">0 {dt.rating.talkedTime}</p>
           </div>
         </div>
         <span className="text-xs font-bold text-amber-300">{diamonds} 💎</span>
@@ -1339,37 +1344,37 @@ export default function UserHome() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-white">Yutuqlar va Medallar</h1>
-          <p className="text-xs text-zinc-400">Muloqotlar davomida erishgan barcha natijalaringiz</p>
+          <h1 className="text-xl font-bold text-white">{dt.achievements.title}</h1>
+          <p className="text-xs text-zinc-400">{dt.achievements.subtitle}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
           {
-            title: "Ilk Qadam",
-            desc: "Dasturda birinchi suhbatni to'liq yakunlang",
+            title: dt.achievements.firstStep,
+            desc: dt.achievements.firstStepDesc,
             icon: Star,
             unlocked: true,
             progress: "100%",
           },
           {
-            title: "7 Kunlik Olov",
-            desc: "Ketma-ket 7 kun davomida speaking mashg'ulotida bo'ling",
+            title: dt.achievements.streak7,
+            desc: dt.achievements.streak7Desc,
             icon: Flame,
             unlocked: false,
-            progress: "1/7 kun",
+            progress: "1/7",
           },
           {
-            title: "Poliglot",
-            desc: "Kamida 3 xil tildagi suhbat xonalarida ishtirok eting",
+            title: dt.achievements.polyglot,
+            desc: dt.achievements.polyglotDesc,
             icon: Globe2,
             unlocked: false,
-            progress: "1/3 til",
+            progress: "1/3",
           },
           {
-            title: "Olmos Ustasi",
-            desc: "Balansda 500 ta olmos to'plang",
+            title: dt.achievements.diamondMaster,
+            desc: dt.achievements.diamondMasterDesc,
             icon: Gem,
             unlocked: false,
             progress: `${diamonds}/500`,
@@ -1431,8 +1436,8 @@ export default function UserHome() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-white">Sozlamalar</h1>
-          <p className="text-xs text-zinc-400">Ovoz, bildirishnomalar va shaxsiy parametrlarni sozlang</p>
+          <h1 className="text-xl font-bold text-white">{dt.settings.title}</h1>
+          <p className="text-xs text-zinc-400">{dt.settings.subtitle}</p>
         </div>
       </div>
 
@@ -1442,11 +1447,11 @@ export default function UserHome() {
           <div className="flex items-center gap-3">
             <Mic className="h-5 w-5 text-violet-400" />
             <div>
-              <p className="text-sm font-semibold text-white">Mikrofon sezgirligi</p>
-              <p className="text-xs text-zinc-400">Nutqni aniq qabul qilish rejimi</p>
+              <p className="text-sm font-semibold text-white">{dt.settings.mic}</p>
+              <p className="text-xs text-zinc-400">{dt.settings.micDesc}</p>
             </div>
           </div>
-          <span className="text-xs font-bold text-emerald-400">Avtomatik</span>
+          <span className="text-xs font-bold text-emerald-400">{dt.settings.micStatus}</span>
         </div>
 
         {/* Bildirishnomalar */}
@@ -1454,11 +1459,11 @@ export default function UserHome() {
           <div className="flex items-center gap-3">
             <Bell className="h-5 w-5 text-sky-400" />
             <div>
-              <p className="text-sm font-semibold text-white">Bildirishnomalar</p>
-              <p className="text-xs text-zinc-400">Yangi suhbatlar va xabarnomalar</p>
+              <p className="text-sm font-semibold text-white">{dt.settings.notifications}</p>
+              <p className="text-xs text-zinc-400">{dt.settings.notificationsDesc}</p>
             </div>
           </div>
-          <span className="text-xs font-bold text-emerald-400">Yoqilgan</span>
+          <span className="text-xs font-bold text-emerald-400">{dt.settings.notificationsStatus}</span>
         </div>
 
         {/* Til */}
@@ -1466,11 +1471,11 @@ export default function UserHome() {
           <div className="flex items-center gap-3">
             <Globe2 className="h-5 w-5 text-amber-400" />
             <div>
-              <p className="text-sm font-semibold text-white">Ilova tili</p>
-              <p className="text-xs text-zinc-400">Interfeys tili</p>
+              <p className="text-sm font-semibold text-white">{dt.settings.language}</p>
+              <p className="text-xs text-zinc-400">{dt.settings.languageDesc}</p>
             </div>
           </div>
-          <span className="text-xs font-bold text-white">O'zbekcha</span>
+          <LanguageSwitcher />
         </div>
 
         {/* Xavfsizlik */}
@@ -1478,11 +1483,11 @@ export default function UserHome() {
           <div className="flex items-center gap-3">
             <Shield className="h-5 w-5 text-emerald-400" />
             <div>
-              <p className="text-sm font-semibold text-white">Xavfsizlik va maxfiylik</p>
-              <p className="text-xs text-zinc-400">WebRTC orqali shifrlangan ovozli aloqa</p>
+              <p className="text-sm font-semibold text-white">{dt.settings.security}</p>
+              <p className="text-xs text-zinc-400">{dt.settings.securityDesc}</p>
             </div>
           </div>
-          <span className="text-xs font-bold text-emerald-400">Himoyalangan</span>
+          <span className="text-xs font-bold text-emerald-400">{dt.settings.securityStatus}</span>
         </div>
       </div>
     </div>
@@ -1499,30 +1504,13 @@ export default function UserHome() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-white">Yordam Markazi (FAQ)</h1>
-          <p className="text-xs text-zinc-400">Tez-tez beriladigan savollar va yechimlar</p>
+          <h1 className="text-xl font-bold text-white">{dt.help.title}</h1>
+          <p className="text-xs text-zinc-400">{dt.help.subtitle}</p>
         </div>
       </div>
 
       <div className="flex flex-col gap-3">
-        {[
-          {
-            q: "Suhbatdosh qanday tanlanadi?",
-            a: "Kerakli tilni tanlab 'START' tugmasini bosganingizda, tizim shu tilda suhbatlashmoqchi bo'lgan foydalanuvchini avtomatik bog'laydi.",
-          },
-          {
-            q: "Ovoz eshitilmasa nima qilish kerak?",
-            a: "Brauzerda mikrofonga ruxsat berilganiga ishonch hosil qiling va ekrandagi mikrofon tugmasi yoqilganini tekshiring.",
-          },
-          {
-            q: "Olmoslar nima uchun kerak?",
-            a: "Olmoslar orqali kunlik suhbatlar chegarasini oshirish, sovg'alar yuborish va premium imkoniyatlardan foydalanish mumkin.",
-          },
-          {
-            q: "Qoidabuzarlik holatida nima qilish kerak?",
-            a: "Suhbat xonasida 'Shikoyat bildirish' bo'limi mavjud. Sababni tanlab darhol moderatorlarga xabar yuborishingiz mumkin.",
-          },
-        ].map((item, idx) => (
+        {dt.help.faqs.map((item, idx) => (
           <div
             key={idx}
             className="rounded-2xl border border-white/[0.08] bg-[#0b071b]/80 p-4 backdrop-blur-xl"
@@ -1546,8 +1534,8 @@ export default function UserHome() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-white">Shikoyat va Takliflar</h1>
-          <p className="text-xs text-zinc-400">Ilovani yaxshilash bo'yicha fikringiz biz uchun muhim</p>
+          <h1 className="text-xl font-bold text-white">{dt.feedback.title}</h1>
+          <p className="text-xs text-zinc-400">{dt.feedback.subtitle}</p>
         </div>
       </div>
 
@@ -1557,9 +1545,9 @@ export default function UserHome() {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-400 mb-3">
               <Check className="h-7 w-7" />
             </div>
-            <h3 className="text-base font-bold text-white">Taklifingiz qabul qilindi!</h3>
+            <h3 className="text-base font-bold text-white">{dt.feedback.successTitle}</h3>
             <p className="mt-1 text-xs text-zinc-400">
-              Fikringiz uchun tashakkur. Biz har bir taklifni ko'rib chiqamiz.
+              {dt.feedback.successDesc}
             </p>
             <button
               type="button"
@@ -1569,7 +1557,7 @@ export default function UserHome() {
               }}
               className="mt-4 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-xs font-semibold text-zinc-200 hover:bg-white/10"
             >
-              Yangi taklif yozish
+              {dt.feedback.newFeedback}
             </button>
           </div>
         ) : (
@@ -1582,13 +1570,13 @@ export default function UserHome() {
           >
             <div>
               <label className="block text-xs font-semibold text-zinc-300 mb-2">
-                Fikr yoki shikoyatingizni yozing:
+                {dt.feedback.label}
               </label>
               <textarea
                 rows={5}
                 value={feedbackText}
                 onChange={(e) => setFeedbackText(e.target.value)}
-                placeholder="Ilovani yaxshilash bo'yicha fikr yoki duch kelgan xatolikni batafsil yozing..."
+                placeholder={dt.feedback.placeholder}
                 className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-xs text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
               />
             </div>
@@ -1599,7 +1587,7 @@ export default function UserHome() {
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-violet-500/40 bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-xs font-bold text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] disabled:opacity-50 transition-all cursor-pointer"
             >
               <Send className="h-4 w-4" />
-              <span>Yuborish</span>
+              <span>{dt.feedback.submit}</span>
             </button>
           </form>
         )}
@@ -1648,17 +1636,19 @@ export default function UserHome() {
                 </span>
                 <div className="flex items-center gap-1 sm:gap-1.5 text-xs">
                   <span className="font-bold text-white tabular-nums">{onlineCount}</span>
-                  <span className="hidden sm:inline font-medium text-zinc-300">ta foydalanuvchi onlayn</span>
-                  <span className="sm:hidden font-medium text-zinc-300">onlayn</span>
+                  <span className="hidden sm:inline font-medium text-zinc-300">{dt.topbar.usersOnline}</span>
+                  <span className="sm:hidden font-medium text-zinc-300">{dt.topbar.online}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <LanguageSwitcher />
+
               <button
                 type="button"
                 className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04] text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:bg-white/[0.08] hover:text-white transition-all"
-                title="Bildirishnomalar"
+                title={dt.topbar.notifications}
               >
                 <Bell className="h-4 w-4" />
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-violet-400 ring-2 ring-[#080514]" />
@@ -2028,7 +2018,7 @@ export default function UserHome() {
                         className="flex h-14 items-center gap-2 rounded-2xl border border-red-500/40 bg-gradient-to-r from-red-600 to-rose-700 px-5 text-sm font-bold text-white shadow-[0_0_25px_rgba(239,68,68,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                       >
                         <PhoneOff className="h-5 w-5" />
-                        <span>Suhbatni tugatish</span>
+                        <span>{dt.meeting.endCall}</span>
                       </button>
 
                       {/* Hidden audio element for receiving and playing partner's live voice */}
@@ -2071,28 +2061,28 @@ export default function UserHome() {
                       <div className="max-w-xl">
                         <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold text-violet-300 mb-3">
                           <Sparkles className="h-3.5 w-3.5 text-violet-300" />
-                          <span>Assalomu alaykum, {displayName}</span>
+                          <span>{dt.welcome.greeting}, {displayName}</span>
                         </div>
 
                         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                          Qaysi tilda gaplashishni xohlaysiz?
+                          {dt.welcome.question}
                         </h1>
                         <p className="mt-1.5 text-[13px] text-zinc-400 leading-relaxed">
-                          O'zingizga mos tildagi suhbatdoshni tanlang va darhol jonli muloqotni boshlang.
+                          {dt.welcome.description}
                         </p>
 
                         <div className="mt-5 flex flex-wrap items-center gap-2 select-none pointer-events-none">
-                          {LANGUAGES.map((lang) => (
+                          {LANGUAGES.map((l) => (
                             <div
-                              key={lang.id}
+                              key={l.id}
                               className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-xs font-semibold text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]"
                             >
                               <CountryFlag
-                                code={lang.flagCode}
+                                code={l.flagCode}
                                 width={40}
                                 className="h-4 w-5.5 rounded-[3px]"
                               />
-                              <span>{lang.name}</span>
+                              <span>{l.name}</span>
                             </div>
                           ))}
                         </div>
@@ -2101,8 +2091,8 @@ export default function UserHome() {
                       <div className="hidden sm:flex items-center gap-4 self-end xl:self-center shrink-0">
                         <div className="text-right">
                           <p className="font-script text-base text-violet-200 leading-tight">
-                            Yangi odamlar bilan tanishing, <br />
-                            <span className="text-violet-400">yangi tillar o'rganing!</span>
+                            {dt.welcome.quoteA} <br />
+                            <span className="text-violet-400">{dt.welcome.quoteB}</span>
                           </p>
                           <svg
                             className="ml-auto mt-1 h-5 w-11 text-violet-400/70"
@@ -2131,14 +2121,14 @@ export default function UserHome() {
                         <Flame className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium text-zinc-400">Ketma-ket kunlar</p>
+                        <p className="truncate text-xs font-medium text-zinc-400">{dt.stats.streak}</p>
                         <div className="mt-1 flex items-center gap-2">
                           <span className="text-lg font-bold tracking-tight text-white tabular-nums">
-                            0 kun
+                            0 {dt.stats.days}
                           </span>
                           <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
                             <Flame className="h-3 w-3 text-amber-400" />
-                            kun
+                            {dt.stats.days}
                           </span>
                         </div>
                       </div>
@@ -2149,9 +2139,9 @@ export default function UserHome() {
                         <Clock className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium text-zinc-400">Umumiy mashq vaqti</p>
+                        <p className="truncate text-xs font-medium text-zinc-400">{dt.stats.talkTime}</p>
                         <p className="mt-1 text-lg font-bold tracking-tight text-white tabular-nums">
-                          0 min
+                          0 {dt.stats.hours}
                         </p>
                       </div>
                     </div>
@@ -2161,7 +2151,7 @@ export default function UserHome() {
                         <Gem className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium text-zinc-400">Yig'ilgan olmoslar</p>
+                        <p className="truncate text-xs font-medium text-zinc-400">{dt.profile.diamonds}</p>
                         <p className="mt-1 text-lg font-bold tracking-tight text-white tabular-nums">
                           {diamonds}
                         </p>
@@ -2176,11 +2166,11 @@ export default function UserHome() {
                         <div className="flex items-center gap-2">
                           <Globe2 className="h-4.5 w-4.5 text-violet-400" />
                           <h2 className="text-base font-semibold tracking-tight text-white">
-                            Jonli muloqot xonasi
+                            {dt.start.chooseLanguage}
                           </h2>
                         </div>
                         <p className="mt-0.5 text-xs text-zinc-400">
-                          Speaker (sherik) tilini tanlang va START tugmasini bosing
+                          {dt.start.ruleWarning}
                         </p>
                       </div>
 
@@ -2188,7 +2178,7 @@ export default function UserHome() {
                       <div className="relative w-full sm:w-[230px] shrink-0">
                         <label className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                           <Users className="h-3 w-3 text-violet-400" />
-                          <span>Speaker (Sherik) tili</span>
+                          <span>{dt.start.selected}</span>
                         </label>
                         <button
                           type="button"
@@ -2305,14 +2295,14 @@ export default function UserHome() {
                                 <div className="flex flex-col items-center justify-center px-2 text-center">
                                   <Mic className="h-6 w-6 text-white animate-bounce" />
                                   <span className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-violet-100">
-                                    Ruxsat...
+                                    Mic...
                                   </span>
                                 </div>
                               ) : isSearching ? (
                                 <div className="flex flex-col items-center justify-center">
                                   <Radio className="h-6 w-6 text-white animate-pulse" />
                                   <span className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-violet-100">
-                                    Qidirilmoqda
+                                    {dt.start.searching}
                                   </span>
                                   <span className="mt-0.5 text-xs font-mono font-bold text-white tabular-nums">
                                     {formatSeconds(searchSeconds)} / 02:00
@@ -2322,7 +2312,7 @@ export default function UserHome() {
                                 <div className="flex flex-col items-center justify-center">
                                   <Play className="h-7 w-7 fill-white text-white translate-x-0.5 group-hover:scale-110 transition-transform duration-150" />
                                   <span className="mt-1.5 text-sm sm:text-base font-extrabold tracking-widest uppercase">
-                                    START
+                                    {dt.start.startBtn}
                                   </span>
                                 </div>
                               )}
@@ -2336,7 +2326,7 @@ export default function UserHome() {
                               className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-red-500/35 bg-red-500/10 px-3.5 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/20 transition-colors"
                             >
                               <X className="h-3.5 w-3.5" />
-                              <span>Bekor qilish</span>
+                              <span>{dt.start.cancelBtn}</span>
                             </button>
                           )}
                         </div>
@@ -2345,7 +2335,7 @@ export default function UserHome() {
                         <div className="w-full max-w-[270px] rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                           <div className="mb-3 flex items-center justify-between border-b border-white/[0.06] pb-2">
                             <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                              Speaker (Sherik) hisobi
+                              {dt.meeting.partner}
                             </span>
                             <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-zinc-300">
                               <CountryFlag
@@ -2371,10 +2361,10 @@ export default function UserHome() {
 
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-xs font-semibold text-zinc-300">
-                                {isSearching ? "Sherik qidirilmoqda..." : "Sherik kutilmoqda"}
+                                {isSearching ? dt.start.searching : dt.start.waitingQueue}
                               </p>
                               <p className="mt-0.5 truncate text-[11px] text-zinc-500">
-                                {isSearching ? `${speakerOption.name} serverida...` : "@username"}
+                                {isSearching ? `${speakerOption.name}...` : "@username"}
                               </p>
                             </div>
                           </div>
@@ -2384,17 +2374,17 @@ export default function UserHome() {
                       <div className="mt-6 flex flex-wrap items-center justify-center gap-4 border-t border-white/[0.05] pt-4 text-xs text-zinc-400">
                         <span className="inline-flex items-center gap-1.5">
                           <Mic className="h-3.5 w-3.5 text-violet-400" />
-                          Mikrofon ruxsati talab etiladi
+                          WebRTC Audio
                         </span>
                         <span className="h-1 w-1 rounded-full bg-zinc-700" />
                         <span className="inline-flex items-center gap-1.5">
                           <Headphones className="h-3.5 w-3.5 text-violet-400" />
-                          HD Audio
+                          HD Voice
                         </span>
                         <span className="h-1 w-1 rounded-full bg-zinc-700" />
                         <span className="inline-flex items-center gap-1.5">
                           <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                          Maksimal kutish: 2 daqiqa
+                          SSL Secure
                         </span>
                       </div>
                     </div>
@@ -2409,7 +2399,7 @@ export default function UserHome() {
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-amber-400">
                           <Gem className="h-4 w-4" />
                         </div>
-                        <span className="text-[13px] font-semibold text-white">Kunlik olmoscha</span>
+                        <span className="text-[13px] font-semibold text-white">{dt.reward.dailyTitle}</span>
                         <Info className="h-3.5 w-3.5 text-zinc-500" />
                       </div>
                       <span className="text-xs font-bold text-zinc-300 tabular-nums">
@@ -2430,7 +2420,7 @@ export default function UserHome() {
                       className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] hover:border-amber-500/30 py-2 text-xs font-semibold text-amber-300 transition-all"
                     >
                       <Gem className="h-3.5 w-3.5 text-amber-400" />
-                      <span>Kunlik olmoslarni olish</span>
+                      <span>{dt.reward.claimBtn}</span>
                     </button>
                   </div>
 
@@ -2441,14 +2431,14 @@ export default function UserHome() {
                           <Gem className="h-5 w-5" />
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-zinc-400">Jami hisobdagi olmoslar</p>
+                          <p className="text-xs font-medium text-zinc-400">{dt.reward.balance}</p>
                           <p className="mt-0.5 text-2xl font-bold tracking-tight text-white tabular-nums">
                             {diamonds}
                           </p>
                         </div>
                       </div>
                       <span className="rounded-md border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-300">
-                        Balans
+                        {dt.reward.balance}
                       </span>
                     </div>
 
@@ -2459,7 +2449,7 @@ export default function UserHome() {
                         className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] hover:bg-white/[0.08] hover:border-violet-400/40 py-2.5 px-4 text-xs font-semibold text-white transition-all"
                       >
                         <Plus className="h-4 w-4 text-violet-400" />
-                        <span>Hisobni to'ldirish</span>
+                        <span>{dt.reward.topUp}</span>
                       </button>
 
                       <button
@@ -2468,7 +2458,7 @@ export default function UserHome() {
                         className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-gradient-to-r from-amber-500/90 via-purple-600/90 to-indigo-600/90 hover:brightness-110 py-2.5 px-4 text-xs font-semibold text-white shadow-[0_0_25px_rgba(168,85,247,0.3)] transition-all"
                       >
                         <Crown className="h-4 w-4 text-amber-200" />
-                        <span>Premium xarid qilish</span>
+                        <span>{dt.reward.buyPremium}</span>
                       </button>
                     </div>
                   </div>
@@ -2502,7 +2492,7 @@ export default function UserHome() {
             >
               <Home className="h-4 w-4" />
             </div>
-            <span className="text-[10px] font-medium tracking-tight">Bosh sahifa</span>
+            <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.home}</span>
           </button>
 
           {/* 2. Mening mashqlarim */}
@@ -2522,7 +2512,7 @@ export default function UserHome() {
             >
               <FileText className="h-4 w-4" />
             </div>
-            <span className="text-[10px] font-medium tracking-tight">Mashqlarim</span>
+            <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.exercises}</span>
           </button>
 
           {/* 3. Do'stlar */}
@@ -2542,7 +2532,7 @@ export default function UserHome() {
             >
               <Users className="h-4 w-4" />
             </div>
-            <span className="text-[10px] font-medium tracking-tight">Do'stlar</span>
+            <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.friends}</span>
           </button>
 
           {/* 4. Profil (faqat avatar) */}
@@ -2550,7 +2540,7 @@ export default function UserHome() {
             type="button"
             onClick={() => setActiveTab("profile")}
             className="flex flex-1 flex-col items-center justify-center py-1 transition-all cursor-pointer"
-            title="Mening profilim"
+            title={dt.sidebar.profile}
           >
             <div
               className={cn(
@@ -2562,6 +2552,7 @@ export default function UserHome() {
             >
               <SpeakerAvatar size={32} />
             </div>
+            <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.profile}</span>
           </button>
         </nav>
       )}
@@ -2582,10 +2573,10 @@ export default function UserHome() {
             </div>
 
             <h3 className="text-base sm:text-lg font-bold text-white leading-snug">
-              Rostdan ham suhbatni tugatmoqchimisiz?
+              {dt.meeting.confirmEndTitle}
             </h3>
             <p className="mt-2 text-xs text-zinc-400 leading-relaxed">
-              Suhbat tugatilsa, joriy xona yopiladi va barcha vaqtinchalik yozishmalar tozalanadi.
+              {dt.meeting.confirmEndDesc}
             </p>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
@@ -2594,7 +2585,7 @@ export default function UserHome() {
                 onClick={() => setEndMeetingModalOpen(false)}
                 className="flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-xs font-bold text-zinc-200 hover:bg-white/10 transition-colors"
               >
-                Yo'q
+                {dt.meeting.no}
               </button>
 
               <button
@@ -2602,7 +2593,7 @@ export default function UserHome() {
                 onClick={handleConfirmEndMeeting}
                 className="flex items-center justify-center rounded-xl border border-red-500/40 bg-gradient-to-r from-red-600 to-rose-700 py-2.5 text-xs font-bold text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] hover:brightness-110 transition-all"
               >
-                Ha
+                {dt.meeting.yes}
               </button>
             </div>
           </div>

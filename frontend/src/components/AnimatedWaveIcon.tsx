@@ -21,15 +21,21 @@ const BARS = [
 interface AnimatedWaveIconProps {
   className?: string;
   strokeWidth?: number;
+  width?: number | string;
+  height?: number | string;
 }
 
 export default function AnimatedWaveIcon({
   className,
   strokeWidth = 2,
+  width = 20,
+  height = 20,
 }: AnimatedWaveIconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
+      width={width}
+      height={height}
       fill="none"
       stroke="currentColor"
       strokeWidth={strokeWidth}
