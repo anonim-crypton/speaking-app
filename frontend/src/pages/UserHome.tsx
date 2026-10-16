@@ -168,6 +168,9 @@ export default function UserHome() {
   const animFrameRef = useRef<number | null>(null);
   const peerConnRef = useRef<RTCPeerConnection | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const myRoleRef = useRef<"caller" | "callee">("callee");
+  const iceCandidatesQueueRef = useRef<RTCIceCandidateInit[]>([]);
+  const processedSignalIdsRef = useRef<Set<string>>(new Set());
 
   const stopMicStream = () => {
     if (animFrameRef.current) {
@@ -186,6 +189,16 @@ export default function UserHome() {
       peerConnRef.current.close();
       peerConnRef.current = null;
     }
+    if (remoteAudioRef.current) {
+      try {
+        remoteAudioRef.current.pause();
+        remoteAudioRef.current.srcObject = null;
+      } catch {
+        /* ignore */
+      }
+    }
+    iceCandidatesQueueRef.current = [];
+    processedSignalIdsRef.current.clear();
     setIsMySpeaking(false);
   };
 
@@ -295,6 +308,107 @@ export default function UserHome() {
     };
   }, [user?.id]);
 
+  const sendSignal = async (type: "offer" | "answer" | "ice-candidate", payload: any) => {
+    if (!activeRoomId) return;
+    try {
+      await fetch(`${API_BASE}/api/matchmaking/signal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomId: activeRoomId,
+          clientId: clientIdRef.current,
+          userId: user?.id || null,
+          type,
+          payload,
+        }),
+      });
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleIncomingSignal = async (signal: { id?: string; type: string; payload: any }) => {
+    const pc = peerConnRef.current;
+    if (!pc || !signal || !signal.type) return;
+
+    try {
+      if (signal.type === "offer") {
+        await pc.setRemoteDescription(new RTCSessionDescription(signal.payload));
+        while (iceCandidatesQueueRef.current.length > 0) {
+          const cand = iceCandidatesQueueRef.current.shift();
+          if (cand) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(cand));
+            } catch {
+              /* ignore candidate error */
+            }
+          }
+        }
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await sendSignal("answer", answer);
+      } else if (signal.type === "answer") {
+        if (pc.signalingState !== "stable") {
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.payload));
+          while (iceCandidatesQueueRef.current.length > 0) {
+            const cand = iceCandidatesQueueRef.current.shift();
+            if (cand) {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              } catch {
+                /* ignore candidate error */
+              }
+            }
+          }
+        }
+      } else if (signal.type === "ice-candidate") {
+        if (pc.remoteDescription && pc.remoteDescription.type) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.payload));
+          } catch {
+            /* ignore candidate error */
+          }
+        } else {
+          iceCandidatesQueueRef.current.push(signal.payload);
+        }
+      }
+    } catch (err) {
+      console.warn("Signal handle error:", err);
+    }
+  };
+
+  const triggerEnterMeeting = (
+    partner: MatchedPartner,
+    roomId: string | null,
+    role: "caller" | "callee" = "callee"
+  ) => {
+    myRoleRef.current = role;
+    setMatchedPartner(partner);
+    setActiveRoomId(roomId);
+    setIsSearching(false);
+    setTransitionLoading(true);
+    window.setTimeout(() => {
+      setTransitionLoading(false);
+      setInMeetingRoom(true);
+      setIsMicMuted(false);
+    }, 1300);
+  };
+
+  const handlePartnerExited = () => {
+    stopMicStream();
+    setTransitionLoading(true);
+    window.setTimeout(() => {
+      setTransitionLoading(false);
+      setInMeetingRoom(false);
+      setMatchedPartner(null);
+      setActiveRoomId(null);
+      setChatMessages([]);
+      setChatOpen(false);
+      setUnreadChatCount(0);
+      setTimeoutNotice("Sherigingiz suhbatni tark etdi.");
+    }, 1200);
+  };
+
   // Search timer with strict 2-minute (120s) limit + polling
   useEffect(() => {
     if (!isSearching) {
@@ -332,7 +446,7 @@ export default function UserHome() {
         });
         const data = await res.json();
         if (data?.status === "matched" && data.partner) {
-          triggerEnterMeeting(data.partner, data.roomId || null);
+          triggerEnterMeeting(data.partner, data.roomId || null, data.role || "callee");
           setIsSearching(false);
         } else if (data?.status === "timeout") {
           stopMicStream();
@@ -352,11 +466,61 @@ export default function UserHome() {
     };
   }, [isSearching, speakerOption.id, user?.id]);
 
-  // Real-time Room Heartbeat & Chat Polling / Partner events
+  // Real-time Room Heartbeat, Chat, WebRTC Audio & Partner events
   useEffect(() => {
     if (!inMeetingRoom || !activeRoomId) return;
 
-    // Connect to room SSE stream for 0ms chat & speaking delivery
+    // 1. Establish WebRTC PeerConnection for two-way live microphone audio
+    let pc: RTCPeerConnection | null = null;
+    try {
+      pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "stun:stun2.l.google.com:19302" },
+          { urls: "stun:stun3.l.google.com:19302" },
+          { urls: "stun:stun4.l.google.com:19302" },
+        ],
+      });
+      peerConnRef.current = pc;
+      iceCandidatesQueueRef.current = [];
+
+      // When remote audio track is received from the partner
+      pc.ontrack = (event) => {
+        const remoteStream = event.streams[0] || new MediaStream([event.track]);
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remoteStream;
+          remoteAudioRef.current.play().catch(() => {});
+        }
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          void sendSignal("ice-candidate", event.candidate.toJSON());
+        }
+      };
+
+      // Add our microphone audio tracks to the peer connection
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getAudioTracks().forEach((track) => {
+          pc?.addTrack(track, mediaStreamRef.current!);
+        });
+      }
+
+      // If this peer is the caller, initiate the audio offer
+      if (myRoleRef.current === "caller") {
+        pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false })
+          .then((offer) => pc?.setLocalDescription(offer).then(() => offer))
+          .then((offer) => {
+            if (offer) void sendSignal("offer", offer);
+          })
+          .catch((err) => console.warn("WebRTC createOffer failed:", err));
+      }
+    } catch (pcErr) {
+      console.warn("WebRTC setup error:", pcErr);
+    }
+
+    // 2. Connect to room SSE stream for 0ms chat, audio signaling & speaking delivery
     const sseQuery = `roomId=${encodeURIComponent(activeRoomId)}&clientId=${encodeURIComponent(
       clientIdRef.current
     )}&userId=${encodeURIComponent(user?.id || "")}`;
@@ -375,11 +539,19 @@ export default function UserHome() {
                 (user?.username || displayName.toLowerCase());
               return [...prev, { ...payload.message, isMe: isMine }];
             });
-            if (!chatOpen) {
+            const isMine =
+              payload.message.senderUsername ===
+              (user?.username || displayName.toLowerCase());
+            if (!isMine && !chatOpen) {
               setUnreadChatCount((c) => c + 1);
             }
           } else if (payload.type === "partner_speaking") {
             setIsPartnerSpeaking(Boolean(payload.speaking) && !payload.muted);
+          } else if (payload.type === "webrtc_signal" && payload.signal) {
+            if (!processedSignalIdsRef.current.has(payload.signal.id)) {
+              processedSignalIdsRef.current.add(payload.signal.id);
+              void handleIncomingSignal(payload.signal);
+            }
           } else if (payload.type === "room_closed") {
             handlePartnerExited();
           }
@@ -391,6 +563,7 @@ export default function UserHome() {
       /* fallback */
     }
 
+    let nextSigIdx = 0;
     const roomPoll = window.setInterval(async () => {
       try {
         const res = await fetch(`${API_BASE}/api/matchmaking/status`, {
@@ -400,14 +573,26 @@ export default function UserHome() {
             clientId: clientIdRef.current,
             userId: user?.id || null,
             language: speakerOption.id,
+            sinceSignalIndex: nextSigIdx,
           }),
         });
         const data = await res.json();
         if (data?.status === "idle") {
           handlePartnerExited();
         } else if (data?.status === "matched") {
+          if (typeof data.nextSignalIndex === "number") {
+            nextSigIdx = data.nextSignalIndex;
+          }
           if (typeof data.partner?.speaking === "boolean") {
             setIsPartnerSpeaking(Boolean(data.partner.speaking) && !data.partner.muted);
+          }
+          if (Array.isArray(data.signals) && data.signals.length > 0) {
+            for (const sig of data.signals) {
+              if (!processedSignalIdsRef.current.has(sig.id)) {
+                processedSignalIdsRef.current.add(sig.id);
+                void handleIncomingSignal(sig);
+              }
+            }
           }
           if (Array.isArray(data.messages) && data.messages.length > 0) {
             setChatMessages((prev) => {
@@ -420,7 +605,10 @@ export default function UserHome() {
                   isMe: (m.senderUsername || "").toLowerCase() === myUsername,
                 }));
               if (newItems.length > 0) {
-                if (!chatOpen) setUnreadChatCount((c) => c + newItems.length);
+                const partnerCount = newItems.filter((m: any) => !m.isMe).length;
+                if (!chatOpen && partnerCount > 0) {
+                  setUnreadChatCount((c) => c + partnerCount);
+                }
                 return [...prev, ...newItems];
               }
               return prev;
@@ -435,6 +623,20 @@ export default function UserHome() {
     return () => {
       window.clearInterval(roomPoll);
       roomEs?.close();
+      if (peerConnRef.current) {
+        peerConnRef.current.close();
+        peerConnRef.current = null;
+      }
+      if (remoteAudioRef.current) {
+        try {
+          remoteAudioRef.current.pause();
+          remoteAudioRef.current.srcObject = null;
+        } catch {
+          /* ignore */
+        }
+      }
+      processedSignalIdsRef.current.clear();
+      iceCandidatesQueueRef.current = [];
     };
   }, [inMeetingRoom, activeRoomId, chatOpen, user?.username, displayName, speakerOption.id]);
 
@@ -517,32 +719,6 @@ export default function UserHome() {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  const triggerEnterMeeting = (partner: MatchedPartner, roomId: string | null) => {
-    setMatchedPartner(partner);
-    setActiveRoomId(roomId);
-    setIsSearching(false);
-    setTransitionLoading(true);
-    window.setTimeout(() => {
-      setTransitionLoading(false);
-      setInMeetingRoom(true);
-      setIsMicMuted(false);
-    }, 1300);
-  };
-
-  const handlePartnerExited = () => {
-    stopMicStream();
-    setTransitionLoading(true);
-    window.setTimeout(() => {
-      setTransitionLoading(false);
-      setInMeetingRoom(false);
-      setMatchedPartner(null);
-      setActiveRoomId(null);
-      setChatMessages([]);
-      setChatOpen(false);
-      setUnreadChatCount(0);
-      setTimeoutNotice("Sherigingiz suhbatni tark etdi.");
-    }, 1200);
-  };
 
   const handleConfirmEndMeeting = async () => {
     setEndMeetingModalOpen(false);
@@ -617,7 +793,7 @@ export default function UserHome() {
       const data = await res.json();
 
       if (data?.status === "matched" && data.partner) {
-        triggerEnterMeeting(data.partner, data.roomId || null);
+        triggerEnterMeeting(data.partner, data.roomId || null, data.role || "caller");
       } else {
         setIsSearching(true);
       }
@@ -1037,8 +1213,11 @@ export default function UserHome() {
                         <button
                           type="button"
                           onClick={() => {
-                            setChatOpen((o) => !o);
-                            setUnreadChatCount(0);
+                            setChatOpen((o) => {
+                              const next = !o;
+                              if (next) setUnreadChatCount(0);
+                              return next;
+                            });
                           }}
                           className={cn(
                             "relative flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-200 cursor-pointer shadow-lg",
@@ -1050,8 +1229,8 @@ export default function UserHome() {
                         >
                           <MessageSquare className="h-6 w-6" />
                           {unreadChatCount > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-violet-500 text-[10px] font-extrabold text-white ring-2 ring-[#0b071b] animate-bounce">
-                              {unreadChatCount}
+                            <span className="absolute -top-2 -right-2 flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-[11px] font-black text-white shadow-lg shadow-red-500/60 ring-2 ring-[#0b071b] animate-bounce">
+                              {unreadChatCount > 99 ? "99+" : unreadChatCount}
                             </span>
                           )}
                         </button>
@@ -1137,6 +1316,9 @@ export default function UserHome() {
                         <PhoneOff className="h-5 w-5" />
                         <span>Suhbatni tugatish</span>
                       </button>
+
+                      {/* Hidden audio element for receiving and playing partner's live voice */}
+                      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
                     </div>
                   </div>
                 </div>

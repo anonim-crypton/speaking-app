@@ -565,11 +565,15 @@ router.post("/signal", (req, res) => {
   const participant = room.participants.get(key);
   participant.lastSeen = Date.now();
 
+  const sigType = String(req.body?.type || req.body?.signal?.type || "");
+  const sigPayload =
+    req.body?.payload !== undefined ? req.body.payload : req.body?.signal?.payload;
+
   const signalObj = {
     id: crypto.randomUUID(),
     fromKey: key,
-    type: String(type || ""),
-    payload,
+    type: sigType,
+    payload: sigPayload,
     createdAt: Date.now(),
   };
 
