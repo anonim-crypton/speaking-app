@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
   Users,
   Shield,
@@ -36,6 +36,7 @@ import { adminApiGet, adminApiPost, API_BASE } from "@/lib/api";
 import { resolveAvatarUrl } from "@/components/SpeakerAvatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { ChartAreaInteractive } from "@/components/ChartAreaInteractive";
+import { DonutChartAuthProviders } from "@/components/DonutChartAuthProviders";
 
 interface AdminBookItem {
   id: string;
@@ -56,7 +57,17 @@ interface AdminStats {
   blockedDevices: number;
   totalComplaints: number;
   pendingComplaints: number;
-  providers: Record<string, number>;
+  providers: {
+    google?: number;
+    password?: number;
+    phone?: number;
+    [key: string]: number | undefined;
+  };
+  deviceChart?: Array<{
+    date: string;
+    desktop: number;
+    mobile: number;
+  }>;
   maintenanceMode?: boolean;
 }
 
@@ -307,9 +318,12 @@ export default function AdminDashboard() {
     }
   }, [adminToken]);
 
-  // Silent real-time background sync (every 2.5s) without UI loading spinners
+  const isSyncingRef = useRef(false);
+
+  // Silent real-time background sync (every 1s) without UI loading spinners
   const silentSyncData = useCallback(async () => {
-    if (!adminToken) return;
+    if (!adminToken || isSyncingRef.current) return;
+    isSyncingRef.current = true;
     try {
       const [statsRes, usersRes, complaintsRes, devicesRes] =
         await Promise.allSettled([
@@ -333,13 +347,15 @@ export default function AdminDashboard() {
       }
     } catch {
       /* silent background sync */
+    } finally {
+      isSyncingRef.current = false;
     }
   }, [adminToken]);
 
   useEffect(() => {
     if (adminToken) {
       loadData();
-      const interval = setInterval(silentSyncData, 2500);
+      const interval = setInterval(silentSyncData, 1000);
       return () => clearInterval(interval);
     }
   }, [adminToken, loadData, silentSyncData]);
@@ -696,13 +712,13 @@ export default function AdminDashboard() {
   }
 
   // Calculations for providers card
-  const phoneCount = stats?.providers?.phone ?? 6;
-  const pwdCount = stats?.providers?.password ?? 2;
-  const googleCount = stats?.providers?.google ?? 2;
-  const totalProviders = stats?.totalUsers || 10;
-  const phonePct = Math.round((phoneCount / totalProviders) * 100);
-  const pwdPct = Math.round((pwdCount / totalProviders) * 100);
-  const googlePct = Math.round((googleCount / totalProviders) * 100);
+  const phoneCount = stats?.providers?.phone ?? 0;
+  const pwdCount = stats?.providers?.password ?? 0;
+  const googleCount = stats?.providers?.google ?? 0;
+  const totalProviders = Math.max(1, stats?.totalUsers || 0);
+  const phonePct = stats?.totalUsers ? Math.round((phoneCount / totalProviders) * 100) : 0;
+  const pwdPct = stats?.totalUsers ? Math.round((pwdCount / totalProviders) * 100) : 0;
+  const googlePct = stats?.totalUsers ? Math.round((googleCount / totalProviders) * 100) : 0;
 
   // ── 2. MAIN CYBER NEON DASHBOARD ──────────────────────────────────────────
   return (
@@ -766,7 +782,7 @@ export default function AdminDashboard() {
                     <span>Foydalanuvchilar</span>
                   </div>
                   <span className="rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-2.5 py-0.5 text-xs font-mono font-bold">
-                    {users.length || 10}
+                    {users.length}
                   </span>
                 </button>
 
@@ -921,7 +937,8 @@ export default function AdminDashboard() {
           {/* ── 1. OVERVIEW (Umumiy Ko'rsatkichlar Diagrammasi) ──────────── */}
           {currentTab === "overview" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <ChartAreaInteractive />
+              <ChartAreaInteractive data={stats?.deviceChart} />
+              <DonutChartAuthProviders providers={stats?.providers} />
             </div>
           )}
 

@@ -61,6 +61,11 @@ function parseDeviceName(userAgent = "") {
   return `${os} (${browser})`;
 }
 
+function isMobileDevice(userAgent = "") {
+  const ua = String(userAgent || "");
+  return /android|iphone|ipad|ipod|mobile|phone|tablet/i.test(ua);
+}
+
 function getFingerprint(userAgent = "", ip = "") {
   return crypto
     .createHash("sha256")
@@ -97,6 +102,7 @@ function createSession({ userId, ip, userAgent }) {
     id: sid,
     userId,
     deviceName: parseDeviceName(userAgent),
+    deviceType: isMobileDevice(userAgent) ? "mobile" : "desktop",
     ip: cIp,
     userAgent: String(userAgent || "").slice(0, 255),
     deviceFingerprint: fp,
@@ -191,4 +197,5 @@ module.exports = {
   unblockSession,
   cleanIp,
   getFingerprint,
+  isMobileDevice,
 };

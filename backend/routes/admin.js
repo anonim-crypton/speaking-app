@@ -250,10 +250,54 @@ router.get(["/stats", "/stats/"], async (req, res) => {
   const totalComplaints = complaints.length;
   const pendingComplaints = complaints.filter((c) => (c?.status || "pending") === "pending").length;
 
-  const providers = {};
+  const providers = {
+    google: 0,
+    password: 0,
+    phone: 0,
+  };
   for (const u of users) {
-    const p = u?.provider || "other";
-    providers[p] = (providers[p] || 0) + 1;
+    const p = String(u?.provider || "").toLowerCase();
+    if (p === "google" || u?.googleEmail) {
+      providers.google += 1;
+    } else if (p === "phone" || (u?.phone && !u?.email && !u?.passwordHash)) {
+      providers.phone += 1;
+    } else {
+      providers.password += 1;
+    }
+  }
+
+  // Generate 90-day device chart starting from 2026-10-18 (no dates prior to 2026-10-18)
+  const START_DATE = new Date("2026-10-18T00:00:00Z");
+  const chartDays = 90;
+  const dateCounts = {};
+
+  for (const s of sessions) {
+    if (!s) continue;
+    const isMobile =
+      s.deviceType === "mobile" ||
+      /android|iphone|ipad|ipod|mobile|phone|tablet/i.test(s.userAgent || "");
+    const sDateStr = String(s.createdAt || "").slice(0, 10);
+    const targetDate = sDateStr < "2026-10-18" ? "2026-10-18" : sDateStr;
+    if (!dateCounts[targetDate]) {
+      dateCounts[targetDate] = { desktop: 0, mobile: 0 };
+    }
+    if (isMobile) {
+      dateCounts[targetDate].mobile += 1;
+    } else {
+      dateCounts[targetDate].desktop += 1;
+    }
+  }
+
+  const deviceChart = [];
+  for (let i = 0; i < chartDays; i++) {
+    const d = new Date(START_DATE.getTime() + i * 24 * 60 * 60 * 1000);
+    const dateKey = d.toISOString().slice(0, 10);
+    const counts = dateCounts[dateKey] || { desktop: 0, mobile: 0 };
+    deviceChart.push({
+      date: dateKey,
+      desktop: counts.desktop,
+      mobile: counts.mobile,
+    });
   }
 
   return res.json({
@@ -267,6 +311,7 @@ router.get(["/stats", "/stats/"], async (req, res) => {
       totalComplaints,
       pendingComplaints,
       providers,
+      deviceChart,
       maintenanceMode: Boolean(settingsData.maintenanceMode),
     },
   });
