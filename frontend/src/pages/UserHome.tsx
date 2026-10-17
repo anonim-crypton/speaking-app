@@ -1784,9 +1784,9 @@ export default function UserHome() {
      ══════════════════════════════════════════════════════════════════ */
 
   const renderProfileView = () => (
-    <div className="mx-auto max-w-2xl flex flex-col gap-5 animate-in fade-in duration-200">
+    <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200 pb-10">
       {/* ── Profile Header Card ── */}
-      <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-br from-[#120c2d]/90 via-[#0a071c]/95 to-[#0e0924]/90 p-6 shadow-2xl backdrop-blur-2xl">
+      <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-br from-[#120c2d]/90 via-[#0a071c]/95 to-[#0e0924]/90 p-6 sm:p-7 shadow-2xl backdrop-blur-2xl">
         <div
           aria-hidden
           className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-violet-600/20 blur-3xl"
@@ -1834,7 +1834,7 @@ export default function UserHome() {
               {user?.email && (
                 <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1">
                   <Mail className="h-3.5 w-3.5 text-zinc-400" />
-                  <span className="truncate max-w-[200px]">{user.email}</span>
+                  <span className="truncate max-w-[240px]">{user.email}</span>
                 </span>
               )}
               {user?.phone && (
@@ -1917,7 +1917,7 @@ export default function UserHome() {
       </div>
 
       {/* ── Barcha Menyu Tugmalari (Chap menyudan ko'chirilgan) ── */}
-      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-3.5 sm:p-4 shadow-xl backdrop-blur-2xl flex flex-col gap-1.5">
+      <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-3.5 sm:p-5 shadow-xl backdrop-blur-2xl flex flex-col gap-1.5">
         <p className="px-3 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
           {dt.profile.sectionsTitle}
         </p>
@@ -2148,26 +2148,26 @@ export default function UserHome() {
   );
 
   const renderHistoryView = () => (
-    <div className="mx-auto max-w-4xl flex flex-col gap-6 animate-in fade-in duration-200 pb-10">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl">
+    <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200 pb-10">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3.5">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/15 text-violet-300 shadow-[0_0_20px_rgba(139,92,246,0.25)]">
             <History className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-lg sm:text-xl font-bold text-white">{dt.sidebar.history}</h1>
-            <p className="text-xs text-zinc-400">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">{dt.sidebar.history}</h1>
+            <p className="text-xs sm:text-sm text-zinc-400">
               Oxirgi marta speaking va chat qilib gaplashgan speakerlar tarixi
             </p>
           </div>
         </div>
-        <span className="self-start sm:self-center rounded-full border border-violet-500/30 bg-violet-500/15 px-3.5 py-1 text-xs font-bold text-violet-300">
+        <span className="self-start sm:self-center rounded-full border border-violet-500/30 bg-violet-500/15 px-4 py-1.5 text-xs font-bold text-violet-300">
           {talkHistory.length} ta speaker
         </span>
       </div>
 
       {talkHistory.length === 0 ? (
-        <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[46vh] text-center px-4">
+        <div className="w-full rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-10 flex flex-col items-center justify-center min-h-[46vh] text-center">
           <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-violet-500/10 text-violet-300 mb-5 shadow-[0_0_35px_rgba(139,92,246,0.25)]">
             <History className="h-10 w-10" />
           </div>
@@ -2255,16 +2255,16 @@ export default function UserHome() {
   );
 
   const renderFriendsView = () => (
-    <div className="mx-auto max-w-6xl flex flex-col gap-6 animate-in fade-in duration-200 pb-10">
+    <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200 pb-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3.5">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-sky-500/30 bg-sky-500/15 text-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.25)]">
             <Users className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-lg sm:text-xl font-bold text-white">{dt.sidebar.friends}</h1>
-            <p className="text-xs text-zinc-400">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">{dt.sidebar.friends}</h1>
+            <p className="text-xs sm:text-sm text-zinc-400">
               Ism yoki @username orqali foydalanuvchilarni toping, do'stlashing va suhbatlashing
             </p>
           </div>
@@ -2580,9 +2580,9 @@ export default function UserHome() {
     });
 
     return (
-      <div className="mx-auto max-w-5xl flex flex-col gap-6 animate-in fade-in duration-200 pb-10">
+      <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200 pb-10">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-white/[0.08]">
           <div className="flex items-center gap-3.5">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/15 text-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.25)]">
               <Trophy className="h-6 w-6" />
@@ -2628,7 +2628,7 @@ export default function UserHome() {
 
         {/* Leaderboard List */}
         {sortedList.length === 0 ? (
-          <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[42vh] text-center px-4">
+          <div className="w-full flex flex-col items-center justify-center min-h-[42vh] text-center px-4">
             <Trophy className="h-12 w-12 text-amber-400 mb-3" />
             <h3 className="text-lg font-bold text-white">Reyting yuklanmoqda...</h3>
           </div>
@@ -2768,94 +2768,92 @@ export default function UserHome() {
     ).length;
 
     return (
-      <div className="mx-auto max-w-5xl flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
-        {/* Top Header Card */}
-        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-500/35 bg-cyan-500/15 text-cyan-300 shadow-[0_0_25px_rgba(34,211,238,0.2)]">
-                <ClipboardCheck className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg sm:text-xl font-bold text-white">
-                    Kunlik topshiriqlar
-                  </h1>
-                  <span className="rounded-full border border-emerald-500/35 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-300">
-                    Har bir topshiriq = +1 💎 Olmos + XP
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  5 ta tildan xohlaganingizni tanlang — topshiriqlar har kuni avtomatik yangilanadi va osondan qiyinga (A1 → C1) sekin-asta o'sib boradi.
-                </p>
-              </div>
+      <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
+        {/* Top Header Row (No outer box border — fits full page like Bosh sahifa) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-500/35 bg-cyan-500/15 text-cyan-300 shadow-[0_0_25px_rgba(34,211,238,0.2)]">
+              <ClipboardCheck className="h-6 w-6" />
             </div>
-
-            {/* Right Stats Pill */}
-            <div className="flex items-center gap-2.5 self-start sm:self-center">
-              <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2 text-center">
-                <p className="text-[10px] text-cyan-200/80 uppercase font-bold">Sizning darajangiz</p>
-                <p className="text-xs sm:text-sm font-black text-white flex items-center justify-center gap-1 mt-0.5">
-                  <Zap className="h-3.5 w-3.5 text-cyan-400 fill-cyan-400" />
-                  <span>{userLevel}-Daraja • {userXp} XP</span>
-                </p>
-              </div>
-              <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 px-3.5 py-2 text-center">
-                <p className="text-[10px] text-violet-200/80 uppercase font-bold">Bugun bajarildi</p>
-                <p className="text-xs sm:text-sm font-black text-white mt-0.5">
-                  {completedForLangCount} / {dailyTasks.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* 5 Language Selector Pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-white/[0.06]">
-            {LANGUAGES.map((l) => {
-              const isSelected = taskLang === l.id;
-              return (
-                <button
-                  key={l.id}
-                  type="button"
-                  onClick={() => setTaskLang(l.id)}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-2xl border p-3 text-left transition-all cursor-pointer",
-                    isSelected
-                      ? "border-cyan-400/50 bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-white shadow-[0_0_20px_rgba(34,211,238,0.18)]"
-                      : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07] hover:text-white"
-                  )}
-                >
-                  <CountryFlag code={l.flagCode} width={20} className="h-4 w-6 rounded-[3px] shrink-0" />
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-extrabold text-white">{l.name}</p>
-                    <p className="truncate text-[10px] text-zinc-400">
-                      {LANGUAGE_META[l.id].subtitle}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Gradual Progression Banner */}
-          <div className="rounded-2xl border border-violet-500/25 bg-gradient-to-r from-violet-500/10 via-indigo-500/10 to-cyan-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className={cn("rounded-lg border px-2.5 py-0.5 text-[11px] font-extrabold", TIER_META[activeTier].badgeClass)}>
-                  {TIER_META[activeTier].label}
+                <h1 className="text-lg sm:text-xl font-bold text-white">
+                  Kunlik topshiriqlar
+                </h1>
+                <span className="rounded-full border border-emerald-500/35 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-300">
+                  Har bir topshiriq = +1 💎 Olmos + XP
                 </span>
-                <span className="text-xs font-bold text-white">{progressionTitle}</span>
               </div>
-              <p className="text-xs text-zinc-300 mt-1 leading-relaxed">
-                {progressionDescription}
+              <p className="text-xs text-zinc-400 mt-0.5">
+                5 ta tildan xohlaganingizni tanlang — topshiriqlar har kuni avtomatik yangilanadi va osondan qiyinga (A1 → C1) sekin-asta o'sib boradi.
               </p>
             </div>
-            <div className="shrink-0 text-right">
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-300">
-                <Clock className="h-3.5 w-3.5 text-cyan-400" />
-                <span>Sana: <strong className="text-white">{todayStr}</strong></span>
-              </span>
+          </div>
+
+          {/* Right Stats Pill */}
+          <div className="flex items-center gap-2.5 self-start sm:self-center">
+            <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2 text-center">
+              <p className="text-[10px] text-cyan-200/80 uppercase font-bold">Sizning darajangiz</p>
+              <p className="text-xs sm:text-sm font-black text-white flex items-center justify-center gap-1 mt-0.5">
+                <Zap className="h-3.5 w-3.5 text-cyan-400 fill-cyan-400" />
+                <span>{userLevel}-Daraja • {userXp} XP</span>
+              </p>
             </div>
+            <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 px-3.5 py-2 text-center">
+              <p className="text-[10px] text-violet-200/80 uppercase font-bold">Bugun bajarildi</p>
+              <p className="text-xs sm:text-sm font-black text-white mt-0.5">
+                {completedForLangCount} / {dailyTasks.length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 5 Language Selector Pills */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {LANGUAGES.map((l) => {
+            const isSelected = taskLang === l.id;
+            return (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => setTaskLang(l.id)}
+                className={cn(
+                  "flex items-center gap-3 rounded-2xl border p-3.5 text-left transition-all cursor-pointer",
+                  isSelected
+                    ? "border-cyan-400/50 bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-white shadow-[0_0_20px_rgba(34,211,238,0.18)]"
+                    : "border-white/10 bg-[#0b071b]/80 text-zinc-300 hover:bg-white/[0.07] hover:text-white"
+                )}
+              >
+                <CountryFlag code={l.flagCode} width={20} className="h-4 w-6 rounded-[3px] shrink-0" />
+                <div className="min-w-0">
+                  <p className="truncate text-xs sm:text-sm font-extrabold text-white">{l.name}</p>
+                  <p className="truncate text-[10px] text-zinc-400">
+                    {LANGUAGE_META[l.id].subtitle}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Gradual Progression Banner */}
+        <div className="rounded-2xl border border-violet-500/25 bg-gradient-to-r from-violet-500/10 via-indigo-500/10 to-cyan-500/10 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={cn("rounded-lg border px-2.5 py-0.5 text-[11px] font-extrabold", TIER_META[activeTier].badgeClass)}>
+                {TIER_META[activeTier].label}
+              </span>
+              <span className="text-xs sm:text-sm font-bold text-white">{progressionTitle}</span>
+            </div>
+            <p className="text-xs text-zinc-300 mt-1 leading-relaxed">
+              {progressionDescription}
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-300">
+              <Clock className="h-3.5 w-3.5 text-cyan-400" />
+              <span>Sana: <strong className="text-white">{todayStr}</strong></span>
+            </span>
           </div>
         </div>
 
@@ -3057,54 +3055,52 @@ export default function UserHome() {
     };
 
     return (
-      <div className="mx-auto max-w-4xl flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
-        {/* Header */}
-        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-fuchsia-500/35 bg-fuchsia-500/15 text-fuchsia-300 shadow-[0_0_25px_rgba(217,70,239,0.25)]">
-                <Gamepad2 className="h-6 w-6" />
-              </div>
-              <div>
-                <h1 className="text-lg sm:text-xl font-bold text-white">Topshiriqli o'yin</h1>
-                <p className="text-xs text-zinc-400">
-                  Osondan qiyinga qarab ketma-ket savollarni yeching, XP darajangizni oshiring va bonus olmos yutib oling!
-                </p>
-              </div>
+      <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
+        {/* Header Row (No outer box border — fits full page) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-fuchsia-500/35 bg-fuchsia-500/15 text-fuchsia-300 shadow-[0_0_25px_rgba(217,70,239,0.25)]">
+              <Gamepad2 className="h-6 w-6" />
             </div>
-
-            <button
-              type="button"
-              onClick={() => startNewTaskGame(gameLang)}
-              className="self-start sm:self-center inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-2 text-xs font-bold text-zinc-200 transition-all cursor-pointer"
-            >
-              <RotateCcw className="h-3.5 w-3.5 text-fuchsia-400" />
-              <span>Qayta boshlash</span>
-            </button>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold text-white">Topshiriqli o'yin</h1>
+              <p className="text-xs text-zinc-400">
+                Osondan qiyinga qarab ketma-ket savollarni yeching, XP darajangizni oshiring va bonus olmos yutib oling!
+              </p>
+            </div>
           </div>
 
-          {/* 5 Language Selector */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-white/[0.06]">
-            {LANGUAGES.map((l) => {
-              const active = gameLang === l.id;
-              return (
-                <button
-                  key={l.id}
-                  type="button"
-                  onClick={() => setGameLang(l.id)}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-2xl border p-3 text-left transition-all cursor-pointer",
-                    active
-                      ? "border-fuchsia-400/50 bg-gradient-to-r from-fuchsia-500/20 to-violet-500/20 text-white shadow-[0_0_20px_rgba(217,70,239,0.2)]"
-                      : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07]"
-                  )}
-                >
-                  <CountryFlag code={l.flagCode} width={20} className="h-4 w-5 rounded-[2px] shrink-0" />
-                  <span className="truncate text-xs font-bold">{l.name}</span>
-                </button>
-              );
-            })}
-          </div>
+          <button
+            type="button"
+            onClick={() => startNewTaskGame(gameLang)}
+            className="self-start sm:self-center inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-2 text-xs font-bold text-zinc-200 transition-all cursor-pointer"
+          >
+            <RotateCcw className="h-3.5 w-3.5 text-fuchsia-400" />
+            <span>Qayta boshlash</span>
+          </button>
+        </div>
+
+        {/* 5 Language Selector */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {LANGUAGES.map((l) => {
+            const active = gameLang === l.id;
+            return (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => setGameLang(l.id)}
+                className={cn(
+                  "flex items-center gap-3 rounded-2xl border p-3.5 text-left transition-all cursor-pointer",
+                  active
+                    ? "border-fuchsia-400/50 bg-gradient-to-r from-fuchsia-500/20 to-violet-500/20 text-white shadow-[0_0_20px_rgba(217,70,239,0.2)]"
+                    : "border-white/10 bg-[#0b071b]/80 text-zinc-300 hover:bg-white/[0.07]"
+                )}
+              >
+                <CountryFlag code={l.flagCode} width={20} className="h-4 w-6 rounded-[2px] shrink-0" />
+                <span className="truncate text-xs sm:text-sm font-bold">{l.name}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Game Arena */}
@@ -3268,9 +3264,9 @@ export default function UserHome() {
     };
 
     return (
-      <div className="mx-auto max-w-6xl flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
-        {/* Header Card */}
-        <div className="rounded-3xl border border-amber-500/25 bg-gradient-to-r from-[#140d2a]/95 via-[#0b071b]/95 to-[#171026]/95 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
+        {/* Header Row (No outer box border — fits full page) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-white/[0.08]">
           <div className="flex items-center gap-3.5">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-500/15 text-amber-300 shadow-[0_0_25px_rgba(245,158,11,0.25)]">
               <BookOpen className="h-6 w-6" />
@@ -3328,7 +3324,7 @@ export default function UserHome() {
 
         {/* Books Grid */}
         {booksList.length === 0 ? (
-          <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[42vh] text-center px-4">
+          <div className="w-full flex flex-col items-center justify-center min-h-[42vh] text-center px-4">
             <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-500/10 text-amber-300 mb-4 border border-amber-500/25">
               <BookOpen className="h-10 w-10" />
             </div>
@@ -3338,7 +3334,7 @@ export default function UserHome() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {booksList.map((book) => {
               const coverSrc = resolveMediaUrl(book.coverUrl);
               const fileHref = resolveMediaUrl(book.fileUrl);
@@ -3414,7 +3410,7 @@ export default function UserHome() {
   };
 
   const renderAchievementsView = () => (
-    <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[58vh] text-center px-4 animate-in fade-in duration-200">
+    <div className="w-full flex flex-col items-center justify-center min-h-[58vh] text-center px-4 animate-in fade-in duration-200">
       <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-500/10 text-emerald-400 mb-5 shadow-[0_0_35px_rgba(16,185,129,0.25)]">
         <Award className="h-10 w-10" />
       </div>
@@ -3435,7 +3431,7 @@ export default function UserHome() {
   );
 
   const renderDevicesView = () => (
-    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
@@ -3602,7 +3598,7 @@ export default function UserHome() {
   );
 
   const renderHelpView = () => (
-    <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -3617,11 +3613,11 @@ export default function UserHome() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         {dt.help.faqs.map((item, idx) => (
           <div
             key={idx}
-            className="rounded-2xl border border-white/[0.08] bg-[#0b071b]/80 p-4 backdrop-blur-xl"
+            className="rounded-2xl border border-white/[0.08] bg-[#0b071b]/80 p-5 backdrop-blur-xl"
           >
             <h3 className="text-sm font-bold text-white mb-1.5">{item.q}</h3>
             <p className="text-xs text-zinc-400 leading-relaxed">{item.a}</p>
@@ -3667,7 +3663,7 @@ export default function UserHome() {
     });
 
     return (
-      <div className="mx-auto max-w-2xl flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
+      <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
         {/* Header */}
         <div className="flex items-center gap-3">
           <button
@@ -3895,7 +3891,7 @@ export default function UserHome() {
 
         {/* ── 3. Content Body (Switches between Dashboard, Tab Views and Meeting Chat Room) ── */}
         <main className="flex-1 p-3.5 sm:p-6 lg:p-8 bg-transparent max-w-full overflow-x-hidden">
-          <div className="mx-auto max-w-[1440px]">
+          <div className="w-full">
             {/* ════════════════════════════════════════════════════════════════
                 A. MEETING CHAT ROOM (To'liq Meeting Chat Saxifasi)
                ════════════════════════════════════════════════════════════════ */}
