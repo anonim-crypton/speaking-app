@@ -35,6 +35,35 @@ import {
 import { adminApiGet, adminApiPost, API_BASE } from "@/lib/api";
 import { resolveAvatarUrl } from "@/components/SpeakerAvatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+
+const chartData = [
+  { month: "January", desktop: 186, mobile: 80 },
+  { month: "February", desktop: 305, mobile: 200 },
+  { month: "March", desktop: 237, mobile: 120 },
+  { month: "April", desktop: 73, mobile: 190 },
+  { month: "May", desktop: 209, mobile: 130 },
+  { month: "June", desktop: 214, mobile: 140 },
+];
+
+const chartConfig = {
+  desktop: {
+    label: "Desktop",
+    color: "#2563eb",
+  },
+  mobile: {
+    label: "Mobile",
+    color: "#60a5fa",
+  },
+} satisfies ChartConfig;
 
 interface AdminBookItem {
   id: string;
@@ -917,235 +946,63 @@ export default function AdminDashboard() {
         {/* Main Tabs Container */}
         <main className="p-4 space-y-6">
 
-          {/* ── 1. OVERVIEW (Rasm bilan 100% bir xil dizayn) ──────────── */}
+          {/* ── 1. OVERVIEW (Umumiy Ko'rsatkichlar Diagrammasi) ──────────── */}
           {currentTab === "overview" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-
-              {/* 6 TA RANG-BARANG GLOW KARTALAR (Huddi rasmdagidek) */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
-
-                {/* KARTA 1: Jami Userlar (Teal/Emerald Glow) */}
-                <div className="rounded-3xl border border-teal-500/40 bg-gradient-to-br from-[#0c2e28]/70 via-[#0a1f24]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(20,184,166,0.18)] backdrop-blur-xl flex flex-col justify-between">
+              <div className="rounded-3xl border border-white/10 bg-[#0d1527]/80 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-white/10 gap-4">
                   <div>
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <div className="h-9 w-9 rounded-2xl bg-teal-500/20 border border-teal-400/40 text-teal-300 flex items-center justify-center shrink-0">
-                        <Users className="w-5 h-5" />
-                      </div>
-                      <span className="text-sm font-semibold text-zinc-200">Jami Userlar</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <div className="text-3xl font-extrabold text-white">{stats ? stats.totalUsers : 10}</div>
-                      <span className="text-xs font-semibold text-emerald-400 flex items-center">↑ 12%</span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-zinc-400 mt-2 font-medium">Ro'yxatdan o'tganlar</div>
-                </div>
-
-                {/* KARTA 2: Bloklangan (Rose/Pink Glow) */}
-                <div className="rounded-3xl border border-rose-500/40 bg-gradient-to-br from-[#3b0d24]/70 via-[#25091a]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(244,63,94,0.18)] backdrop-blur-xl flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <div className="h-9 w-9 rounded-2xl bg-rose-500/20 border border-rose-400/40 text-rose-300 flex items-center justify-center shrink-0">
-                        <Lock className="w-5 h-5" />
-                      </div>
-                      <span className="text-sm font-semibold text-zinc-200">Bloklangan</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <div className="text-3xl font-extrabold text-white">{stats ? stats.bannedUsers : 0}</div>
-                      <span className="text-xs font-semibold text-zinc-400">— 0%</span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-zinc-400 mt-2 font-medium">Taqiqlangan hisoblar</div>
-                </div>
-
-                {/* KARTA 3: Jami Olmoslar (Cyan/Blue Glow) */}
-                <div className="rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#072d42]/70 via-[#071d33]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(6,182,212,0.18)] backdrop-blur-xl flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <div className="h-9 w-9 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0">
-                        <Gem className="w-5 h-5" />
-                      </div>
-                      <span className="text-sm font-semibold text-zinc-200 truncate">Jami Olmoslar</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <div className="text-3xl font-extrabold text-white">{stats ? (stats.totalDiamonds || 1) : 1}</div>
-                      <span className="text-xs font-semibold text-emerald-400">↑ 100%</span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-zinc-400 mt-2 font-medium">Muomalada bo'lgan</div>
-                </div>
-
-                {/* KARTA 4: Qurilmalar (Indigo/Purple Glow) */}
-                <div className="rounded-3xl border border-indigo-500/40 bg-gradient-to-br from-[#1e1347]/70 via-[#150f36]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(99,102,241,0.18)] backdrop-blur-xl flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <div className="h-9 w-9 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 flex items-center justify-center shrink-0">
-                        <Smartphone className="w-5 h-5" />
-                      </div>
-                      <span className="text-sm font-semibold text-zinc-200">Qurilmalar</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <div className="text-3xl font-extrabold text-white">{stats ? stats.totalSessions : 1}</div>
-                      <span className="text-xs font-semibold text-emerald-400">↑ 100%</span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-zinc-400 mt-2 font-medium">Tizimga ulangan</div>
-                </div>
-
-                {/* KARTA 5: Blok Qurilmalar (Amber/Gold Glow) */}
-                <div className="rounded-3xl border border-amber-500/40 bg-gradient-to-br from-[#38260b]/70 via-[#241708]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(245,158,11,0.18)] backdrop-blur-xl flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <div className="h-9 w-9 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0">
-                        <Shield className="w-5 h-5" />
-                      </div>
-                      <span className="text-sm font-semibold text-zinc-200">Blok Qurilmalar</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <div className="text-3xl font-extrabold text-white">{stats ? stats.blockedDevices : 0}</div>
-                      <span className="text-xs font-semibold text-zinc-400">— 0%</span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-zinc-400 mt-2 font-medium">Kirish to'silgan</div>
-                </div>
-
-                {/* KARTA 6: Shikoyatlar (Yellow Glow) */}
-                <div className="rounded-3xl border border-yellow-500/40 bg-gradient-to-br from-[#3b2d07]/70 via-[#261c06]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(234,179,8,0.18)] backdrop-blur-xl flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <div className="h-9 w-9 rounded-2xl bg-yellow-500/20 border border-yellow-400/40 text-yellow-300 flex items-center justify-center shrink-0">
-                        <AlertTriangle className="w-5 h-5" />
-                      </div>
-                      <span className="text-sm font-semibold text-zinc-200">Shikoyatlar</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <div className="text-3xl font-extrabold text-white">
-                        {stats ? stats.pendingComplaints : 0} <span className="text-lg text-zinc-400 font-normal">/ {stats ? stats.totalComplaints : 0}</span>
-                      </div>
-                      <span className="text-xs font-semibold text-zinc-400">— 0%</span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-zinc-400 mt-2 font-medium">Ko'rib chiqilmagan</div>
-                </div>
-
-              </div>
-
-              {/* 2 TA KATTA ASOSIY KARTA (Huddi rasmdagidek) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-                {/* KARTA CHAP: RO'YXATDAN O'TISH PROVAYDERLARI */}
-                <div className="rounded-3xl border border-white/10 bg-[#0d1527]/80 backdrop-blur-2xl p-6 shadow-2xl">
-                  <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-2xl bg-teal-500/20 text-teal-300 border border-teal-400/40 flex items-center justify-center shrink-0">
-                        <Users className="w-5 h-5" />
+                      <div className="h-10 w-10 rounded-2xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 flex items-center justify-center shrink-0">
+                        <LayoutDashboard className="w-5 h-5" />
                       </div>
-                      <h3 className="text-sm font-bold text-white tracking-wider uppercase">
-                        RO'YXATDAN O'TISH PROVAYDERLARI
-                      </h3>
-                    </div>
-                    <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-zinc-300 font-mono">
-                      Jami {phoneCount} ta ({phonePct}%)
-                    </span>
-                  </div>
-
-                  <div className="space-y-5">
-                    {/* 1. Phone */}
-                    <div>
-                      <div className="flex items-center justify-between text-sm font-medium mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-400/30 flex items-center justify-center">
-                            <Phone className="w-4 h-4" />
-                          </div>
-                          <span className="text-zinc-200 font-semibold">Phone</span>
-                        </div>
-                        <span className="text-zinc-300 font-mono text-sm">{phoneCount} ta ({phonePct}%)</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-teal-400 to-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.6)] rounded-full transition-all duration-500"
-                          style={{ width: `${phonePct}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* 2. Password */}
-                    <div>
-                      <div className="flex items-center justify-between text-sm font-medium mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-400/30 flex items-center justify-center">
-                            <Lock className="w-4 h-4" />
-                          </div>
-                          <span className="text-zinc-200 font-semibold">Password</span>
-                        </div>
-                        <span className="text-zinc-300 font-mono text-sm">{pwdCount} ta ({pwdPct}%)</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-teal-400 to-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.6)] rounded-full transition-all duration-500"
-                          style={{ width: `${pwdPct}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* 3. Google */}
-                    <div>
-                      <div className="flex items-center justify-between text-sm font-medium mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
-                            <GoogleIcon className="w-4 h-4" />
-                          </div>
-                          <span className="text-zinc-200 font-semibold">Google</span>
-                        </div>
-                        <span className="text-zinc-300 font-mono text-sm">{googleCount} ta ({googlePct}%)</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-teal-400 to-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.6)] rounded-full transition-all duration-500"
-                          style={{ width: `${googlePct}%` }}
-                        />
+                      <div>
+                        <h2 className="text-base sm:text-lg font-bold text-white tracking-wide">
+                          Umumiy Ko'rsatkichlar Diagrammasi
+                        </h2>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          January - June • Desktop va Mobile foydalanuvchilar statistikasi
+                        </p>
                       </div>
                     </div>
                   </div>
-                </div>
-
-                {/* KARTA O'NG: TIZIM XAVFSIZLIK HOLATI */}
-                <div className="rounded-3xl border border-white/10 bg-[#0d1527]/80 backdrop-blur-2xl p-6 shadow-2xl flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-2xl bg-cyan-500/20 text-cyan-400 border border-cyan-400/40 flex items-center justify-center shrink-0">
-                          <Shield className="w-5 h-5" />
-                        </div>
-                        <h3 className="text-sm font-bold text-white tracking-wider uppercase">
-                          TIZIM XAVFSIZLIK HOLATI
-                        </h3>
-                      </div>
-                      <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-semibold text-emerald-400">
-                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        Protected
-                      </span>
-                    </div>
-
-                    <p className="text-sm text-zinc-300 leading-relaxed mt-2">
-                      Admin panel Django REST Framework orqali ishlamoqda. CSRF va HMAC imzoli xavfsiz URL manzillar
-                      yordamida sessiya doimiy himoyalangan.
-                    </p>
-                  </div>
-
-                  <div className="mt-8 pt-4 border-t border-white/10 flex items-center justify-between text-sm font-mono text-zinc-400">
-                    <div className="flex items-center gap-2">
-                      <Server className="w-4 h-4 text-cyan-400" />
-                      <span>Backend: Django 5.2</span>
-                    </div>
-                    <span className="rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-bold">
-                      Protected (200 OK)
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-semibold text-emerald-400">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      O'sish: +5.2% bu oy
                     </span>
                   </div>
                 </div>
 
+                <div className="w-full">
+                  <ChartContainer config={chartConfig} className="h-[380px] w-full">
+                    <BarChart accessibilityLayer data={chartData}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis
+                        dataKey="month"
+                        tickLine={false}
+                        tickMargin={10}
+                        axisLine={false}
+                        tickFormatter={(value) => value.slice(0, 3)}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
+                      <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-zinc-400">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                    <span>Recharts v3 & Shadcn Chart komponenti asosida integratsiya qilingan</span>
+                  </div>
+                  <div className="font-mono text-zinc-500">
+                    Showing total visitors for the last 6 months
+                  </div>
+                </div>
               </div>
-
             </div>
           )}
 
