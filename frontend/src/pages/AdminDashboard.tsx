@@ -33,6 +33,7 @@ import {
   Download,
 } from "lucide-react";
 import { adminApiGet, adminApiPost, API_BASE } from "@/lib/api";
+import { resolveAvatarUrl } from "@/components/SpeakerAvatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 
 interface AdminBookItem {
@@ -1214,9 +1215,9 @@ export default function AdminDashboard() {
                           >
                             <td className="py-4 px-5 font-semibold text-white">
                               <div className="flex items-center gap-3">
-                                {u.avatarUrl ? (
+                                {resolveAvatarUrl(u.avatarUrl) ? (
                                   <img
-                                    src={u.avatarUrl}
+                                    src={resolveAvatarUrl(u.avatarUrl) || ""}
                                     alt=""
                                     className={`h-9 w-9 rounded-2xl object-cover shrink-0 border ${
                                       u.isPremium ? "border-amber-400 ring-2 ring-amber-400/30" : "border-white/10"
@@ -1858,9 +1859,9 @@ export default function AdminDashboard() {
                           </button>
 
                           <div className="relative">
-                            {chatUser.avatarUrl ? (
+                            {resolveAvatarUrl(chatUser.avatarUrl) ? (
                               <img
-                                src={chatUser.avatarUrl}
+                                src={resolveAvatarUrl(chatUser.avatarUrl) || ""}
                                 alt=""
                                 className={`h-11 w-11 rounded-2xl object-cover border ${
                                   chatUser.isPremium ? "border-amber-400 ring-2 ring-amber-400/30" : "border-white/10"
@@ -2049,9 +2050,9 @@ export default function AdminDashboard() {
                             >
                               <div className="flex items-center gap-3.5 min-w-0">
                                 <div className="relative shrink-0">
-                                  {u.avatarUrl ? (
+                                  {resolveAvatarUrl(u.avatarUrl) ? (
                                     <img
-                                      src={u.avatarUrl}
+                                      src={resolveAvatarUrl(u.avatarUrl) || ""}
                                       alt=""
                                       className={`h-11 w-11 rounded-2xl object-cover border ${
                                         u.isPremium ? "border-amber-400 ring-2 ring-amber-400/30" : "border-white/10"

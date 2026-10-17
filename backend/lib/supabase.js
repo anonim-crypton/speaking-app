@@ -205,25 +205,25 @@ async function saveProfile({
       return { ok: true, data };
     }
 
-    // Attempt 2: If `username` column hasn't been added via SQL Editor yet,
-    // store `@username` in `region` so all profile fields + username still save in `profiles`.
+    // Attempt 2: Handle missing optional columns in Supabase (`username` or `avatar_url`)
+    const fallbackPayload = { ...payloadWithUsername };
+    if (/avatar_url/i.test(error.message || "")) {
+      delete fallbackPayload.avatar_url;
+    }
     if (cleanUsername && /username/i.test(error.message || "")) {
-      const fallbackPayload = {
-        ...basePayload,
-        region: `@${cleanUsername}`,
-      };
-      const retry = await client
-        .from("profiles")
-        .upsert(fallbackPayload, { onConflict: "id" })
-        .select()
-        .maybeSingle();
-      if (!retry.error) {
-        return { ok: true, data: retry.data };
-      }
-      return { ok: false, error: retry.error.message };
+      delete fallbackPayload.username;
+      fallbackPayload.region = `@${cleanUsername}`;
     }
 
-    return { ok: false, error: error.message };
+    const retry = await client
+      .from("profiles")
+      .upsert(fallbackPayload, { onConflict: "id" })
+      .select()
+      .maybeSingle();
+    if (!retry.error) {
+      return { ok: true, data: retry.data };
+    }
+    return { ok: false, error: retry.error.message };
   } catch (err) {
     return { ok: false, error: err.message };
   }

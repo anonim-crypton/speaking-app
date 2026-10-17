@@ -68,6 +68,41 @@ function readStoredToken(): string | null {
   }
 }
 
+function withCachedAvatar(u: AuthUser | null, token?: string | null): AuthUser | null {
+  if (!u) return null;
+  try {
+    const userKey = `ls_user_avatar_${u.id}`;
+    const cachedForUser = localStorage.getItem(userKey);
+    const cachedLast = localStorage.getItem("ls_user_avatar");
+
+    if (u.avatarUrl && u.avatarUrl.startsWith("data:image/")) {
+      localStorage.setItem(userKey, u.avatarUrl);
+      localStorage.setItem("ls_user_avatar", u.avatarUrl);
+      return u;
+    }
+
+    const bestCached =
+      (cachedForUser && cachedForUser.startsWith("data:image/") ? cachedForUser : null) ||
+      (cachedLast && cachedLast.startsWith("data:image/") ? cachedLast : null);
+
+    // If server returned null or a broken relative /media/ path, restore the cached data URL and sync to backend
+    if (bestCached && (!u.avatarUrl || u.avatarUrl.startsWith("/media/"))) {
+      if (token) {
+        void apiPost("/api/auth/upload-avatar", { image: bestCached }, token).catch(() => {});
+      }
+      return { ...u, avatarUrl: bestCached };
+    }
+
+    if (u.avatarUrl) {
+      localStorage.setItem(userKey, u.avatarUrl);
+      localStorage.setItem("ls_user_avatar", u.avatarUrl);
+    }
+  } catch {
+    /* ignore storage errors */
+  }
+  return u;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(readStoredToken);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -83,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     apiGet<{ success: boolean; user: AuthUser }>("/api/auth/me", token)
       .then((data) => {
-        if (!cancelled) setUser(data.user);
+        if (!cancelled) setUser(withCachedAvatar(data.user, token));
       })
       .catch(() => {
         if (cancelled) return;
@@ -110,15 +145,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       apiGet<{ success: boolean; user: AuthUser }>("/api/auth/me", token)
         .then((data) => {
           if (data?.user) {
+            const hydrated = withCachedAvatar(data.user, token);
+            if (!hydrated) return;
             setUser((prev) => {
-              if (!prev) return data.user;
+              if (!prev) return hydrated;
               if (
-                prev.diamonds !== data.user.diamonds ||
-                prev.name !== data.user.name ||
-                prev.username !== data.user.username ||
-                prev.onboardingCompleted !== data.user.onboardingCompleted
+                prev.diamonds !== hydrated.diamonds ||
+                prev.name !== hydrated.name ||
+                prev.username !== hydrated.username ||
+                prev.avatarUrl !== hydrated.avatarUrl ||
+                prev.xp !== hydrated.xp ||
+                prev.isPremium !== hydrated.isPremium ||
+                prev.onboardingCompleted !== hydrated.onboardingCompleted
               ) {
-                return data.user;
+                return hydrated;
               }
               return prev;
             });
@@ -141,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function persist(nextToken: string, nextUser: AuthUser) {
     setToken(nextToken);
-    setUser(nextUser);
+    setUser(withCachedAvatar(nextUser, nextToken));
     try {
       localStorage.setItem("ls_token", nextToken);
     } catch {
@@ -223,25 +263,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const uploadAvatar = async (base64Image: string) => {
     if (!token) throw new Error("Not signed in");
+    try {
+      if (base64Image && base64Image.startsWith("data:image/")) {
+        localStorage.setItem("ls_user_avatar", base64Image);
+        if (user?.id) {
+          localStorage.setItem(`ls_user_avatar_${user.id}`, base64Image);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     const data = await apiPost<{ success: boolean; avatarUrl: string; message: string }>(
       "/api/auth/upload-avatar",
       { image: base64Image },
       token
     );
-    if (data.avatarUrl) {
-      setUser((prev) => (prev ? { ...prev, avatarUrl: data.avatarUrl } : prev));
+    const finalAvatar =
+      data.avatarUrl && data.avatarUrl.startsWith("data:image/")
+        ? data.avatarUrl
+        : base64Image || data.avatarUrl;
+    if (finalAvatar) {
+      setUser((prev) => (prev ? withCachedAvatar({ ...prev, avatarUrl: finalAvatar }, token) : prev));
     }
-    return data;
+    return { ...data, avatarUrl: finalAvatar };
   };
 
   const completeOnboarding = async (answers: OnboardingAnswers) => {
     if (!token) throw new Error("Not signed in");
+    try {
+      if (answers.avatarUrl) {
+        localStorage.setItem("ls_user_avatar", answers.avatarUrl);
+        if (user?.id) {
+          localStorage.setItem(`ls_user_avatar_${user.id}`, answers.avatarUrl);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     const data = await apiPost<{ success: boolean; user: AuthUser }>(
       "/api/onboarding",
       answers,
       token
     );
-    setUser(data.user);
+    setUser(withCachedAvatar({ ...data.user, avatarUrl: data.user.avatarUrl || answers.avatarUrl }, token));
   };
 
   const refreshUser = async () => {
@@ -249,7 +313,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const data = await apiGet<{ success: boolean; user: AuthUser }>("/api/auth/me", token);
       if (data?.user) {
-        setUser(data.user);
+        setUser(withCachedAvatar(data.user, token));
       }
     } catch {
       /* silent */
@@ -270,6 +334,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     try {
       localStorage.removeItem("ls_token");
+      localStorage.removeItem("ls_user_avatar");
     } catch {
       /* ignore */
     }

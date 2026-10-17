@@ -127,9 +127,59 @@ function touchTalkHistoryBetween(userAId, userBId) {
   store.updateUser(userB.id, { talkHistory: filteredB.slice(0, 100) });
 }
 
-/* ───────────────────────── 1. TALK HISTORY ───────────────────────── */
-router.get("/history", authRequired, (req, res) => {
+let lastRemoteProfileSync = 0;
+async function syncRemoteProfilesIfNeeded() {
+  if (!supabase.isSupabaseEnabled()) return;
+  const now = Date.now();
+  if (now - lastRemoteProfileSync < 4000) return;
+  lastRemoteProfileSync = now;
   try {
+    const client = supabase.getSupabase();
+    const { data } = await client.from("profiles").select("*");
+    if (Array.isArray(data)) {
+      const localUsers = store.readUsers();
+      const localMap = new Map(localUsers.map((u) => [String(u.id), u]));
+      for (const p of data) {
+        if (!p || !p.id) continue;
+        const extractedUsername = supabase.extractProfileUsername(p);
+        const existing = localMap.get(String(p.id));
+        if (existing) {
+          if (
+            (p.avatar_url && p.avatar_url !== existing.avatarUrl) ||
+            (p.name && p.name !== existing.name) ||
+            (extractedUsername && extractedUsername !== existing.username)
+          ) {
+            store.updateUser(p.id, {
+              name: p.name || existing.name,
+              username: extractedUsername || existing.username,
+              avatarUrl: p.avatar_url || existing.avatarUrl || null,
+            });
+          }
+        } else {
+          store.createUser({
+            id: p.id,
+            name: p.name || null,
+            username: extractedUsername || null,
+            avatarUrl: p.avatar_url || null,
+            email: p.email || null,
+            phone: p.phone || null,
+            provider: p.provider || "password",
+            countryCode: p.country_code || "UZ",
+            diamonds: Number(p.diamonds) || 0,
+            onboardingCompleted: Boolean(p.onboarding_completed),
+          });
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/* ───────────────────────── 1. TALK HISTORY ───────────────────────── */
+router.get("/history", authRequired, async (req, res) => {
+  try {
+    await syncRemoteProfilesIfNeeded();
     const me = store.findById(req.user.id) || req.user;
     const rawHistory = Array.isArray(me.talkHistory) ? me.talkHistory : [];
     const allUsers = store.readUsers();
@@ -150,7 +200,7 @@ router.get("/history", authRequired, (req, res) => {
           partnerId: livePartner.id,
           name: prof.name,
           username: prof.username,
-          avatarUrl: prof.avatarUrl,
+          avatarUrl: prof.avatarUrl || item.avatarUrl || null,
           isPremium: prof.isPremium,
           isVerified: prof.isVerified,
           language: item.language || "uz",
@@ -180,8 +230,9 @@ router.get("/history", authRequired, (req, res) => {
 });
 
 /* ───────────────────────── 2. FRIENDS & SEARCH ───────────────────────── */
-router.get("/search", authRequired, (req, res) => {
+router.get("/search", authRequired, async (req, res) => {
   try {
+    await syncRemoteProfilesIfNeeded();
     const q = String(req.query.q || "")
       .trim()
       .replace(/^@+/, "")
@@ -224,8 +275,9 @@ router.get("/search", authRequired, (req, res) => {
   }
 });
 
-router.get("/friends", authRequired, (req, res) => {
+router.get("/friends", authRequired, async (req, res) => {
   try {
+    await syncRemoteProfilesIfNeeded();
     const me = store.findById(req.user.id) || req.user;
     const allUsers = store.readUsers();
 
@@ -528,8 +580,9 @@ router.post("/dm/:partnerId", authRequired, (req, res) => {
 });
 
 /* ───────────────────────── 4. LEADERBOARD / REYTING ───────────────────────── */
-router.get("/leaderboard", (req, res) => {
+router.get("/leaderboard", async (req, res) => {
   try {
+    await syncRemoteProfilesIfNeeded();
     const allUsers = store
       .readUsers()
       .filter((u) => u && !u.isBanned && (u.name || u.username));

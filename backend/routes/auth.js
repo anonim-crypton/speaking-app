@@ -453,6 +453,7 @@ router.post("/login", async (req, res) => {
           id: user.id,
           name: user.name,
           username: user.username || null,
+          avatarUrl: user.avatarUrl || user.onboarding?.avatarUrl || null,
           phone: user.phone,
           provider: user.provider || "phone",
           countryCode: user.countryCode || user.onboarding?.countryCode || "UZ",
@@ -545,6 +546,7 @@ router.post("/login", async (req, res) => {
       id: user.id,
       name: user.name,
       username: user.username || null,
+      avatarUrl: user.avatarUrl || user.onboarding?.avatarUrl || null,
       email: user.email,
       passwordHash: user.passwordHash,
       provider: user.provider || "password",
@@ -583,9 +585,22 @@ router.post("/login", async (req, res) => {
 });
 
 /* ─────────────────────────────── current user ───────────────────────── */
-router.get("/me", authRequired, (req, res) => {
-  const updatedUser = touchUserDailyActivity(req.user);
-  res.json({ success: true, user: publicUser(updatedUser), sid: req.sid || null });
+router.get("/me", authRequired, async (req, res) => {
+  let currentUser = touchUserDailyActivity(req.user);
+  if (!currentUser.avatarUrl && currentUser.onboarding?.avatarUrl) {
+    currentUser = store.updateUser(currentUser.id, { avatarUrl: currentUser.onboarding.avatarUrl }) || currentUser;
+  }
+  if (!currentUser.avatarUrl && supabase.isSupabaseEnabled()) {
+    try {
+      const remoteProf = await supabase.findRow("profiles", "id", currentUser.id);
+      if (remoteProf && remoteProf.avatar_url) {
+        currentUser = store.updateUser(currentUser.id, { avatarUrl: remoteProf.avatar_url }) || currentUser;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  res.json({ success: true, user: publicUser(currentUser), sid: req.sid || null });
 });
 
 /* ─────────────────────────────── Onboarding +10 Diamonds Bonus ──────── */
@@ -974,7 +989,7 @@ router.post("/messages/read", authRequired, async (req, res) => {
 
 /**
  * POST /api/auth/upload-avatar
- * Accepts base64 image, writes to backend/media/avatars/, saves URL to user and Supabase.
+ * Accepts base64 image, stores portable Data URL in user profile and Supabase so it works across Vercel + Render.
  */
 router.post("/upload-avatar", authRequired, async (req, res) => {
   try {
@@ -984,34 +999,47 @@ router.post("/upload-avatar", authRequired, async (req, res) => {
     }
 
     const matches = image.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+    let mimeSubtype = "jpeg";
     let ext = "jpg";
+    let base64Payload = image;
     let buffer;
     if (matches) {
-      ext = matches[1].toLowerCase();
-      if (ext === "jpeg") ext = "jpg";
-      if (ext === "svg+xml") ext = "svg";
-      buffer = Buffer.from(matches[2], "base64");
+      mimeSubtype = matches[1].toLowerCase();
+      ext = mimeSubtype === "jpeg" ? "jpg" : mimeSubtype === "svg+xml" ? "svg" : mimeSubtype;
+      base64Payload = matches[2];
+      buffer = Buffer.from(base64Payload, "base64");
     } else {
       buffer = Buffer.from(image, "base64");
+      base64Payload = buffer.toString("base64");
     }
 
     if (!buffer || buffer.length === 0) {
       return res.status(400).json({ success: false, message: "Yaroqsiz rasm formati" });
     }
 
-    const uploadDir = path.join(__dirname, "../media/avatars");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    // Also save to local media directory for local static access if needed
+    try {
+      const uploadDir = path.join(__dirname, "../media/avatars");
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      const filename = `avatar_${req.user.id}_${Date.now()}.${ext}`;
+      const filePath = path.join(uploadDir, filename);
+      fs.writeFileSync(filePath, buffer);
+    } catch {
+      /* ignore ephemeral disk error */
     }
 
-    const filename = `avatar_${req.user.id}_${Date.now()}.${ext}`;
-    const filePath = path.join(uploadDir, filename);
-    fs.writeFileSync(filePath, buffer);
-
-    const avatarUrl = `/media/avatars/${filename}`;
+    // Portable data URL works seamlessly across Vercel, Render, and Supabase
+    const avatarUrl = `data:image/${mimeSubtype};base64,${base64Payload}`;
 
     // Update local store
-    store.updateUser(req.user.id, { avatarUrl });
+    const currentOnboarding = req.user.onboarding ? { ...req.user.onboarding, avatarUrl } : undefined;
+    const updated =
+      store.updateUser(req.user.id, {
+        avatarUrl,
+        ...(currentOnboarding ? { onboarding: currentOnboarding } : {}),
+      }) || req.user;
 
     // Update Supabase
     void supabase.updateRow("profiles", "id", req.user.id, { avatar_url: avatarUrl });
@@ -1019,6 +1047,7 @@ router.post("/upload-avatar", authRequired, async (req, res) => {
     return res.json({
       success: true,
       avatarUrl,
+      user: publicUser(updated),
       message: "Profil rasmi muvaffaqiyatli saqlandi",
     });
   } catch (err) {

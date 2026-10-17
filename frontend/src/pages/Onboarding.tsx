@@ -150,14 +150,62 @@ export default function Onboarding() {
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
-        const base64 = e.target?.result as string;
+        const rawDataUrl = e.target?.result as string;
+        // Optimize image to a compact square/aspect-preserved JPEG Data URL so it loads instantly everywhere
+        const compressImage = (src: string): Promise<string> =>
+          new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              try {
+                const maxDim = 360;
+                let w = img.width || maxDim;
+                let h = img.height || maxDim;
+                if (w > maxDim || h > maxDim) {
+                  if (w > h) {
+                    h = Math.round((h * maxDim) / w);
+                    w = maxDim;
+                  } else {
+                    w = Math.round((w * maxDim) / h);
+                    h = maxDim;
+                  }
+                }
+                const canvas = document.createElement("canvas");
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+                if (ctx) {
+                  ctx.drawImage(img, 0, 0, w, h);
+                  resolve(canvas.toDataURL("image/jpeg", 0.86));
+                  return;
+                }
+              } catch {
+                /* fallback to rawDataUrl */
+              }
+              resolve(src);
+            };
+            img.onerror = () => resolve(src);
+            img.src = src;
+          });
+
+        const base64 = await compressImage(rawDataUrl);
+        // Set immediately so preview and onboarding submission always have the portable Data URL
+        setAvatarUrl(base64);
+        try {
+          localStorage.setItem("ls_user_avatar", base64);
+          if (user?.id) {
+            localStorage.setItem(`ls_user_avatar_${user.id}`, base64);
+          }
+        } catch {
+          /* ignore */
+        }
+
         try {
           const res = await uploadAvatar(base64);
-          if (res.avatarUrl) {
+          if (res.avatarUrl && res.avatarUrl.startsWith("data:image/")) {
             setAvatarUrl(res.avatarUrl);
           }
-        } catch (err) {
-          setError(errorText(err));
+        } catch {
+          // Keep local base64 Data URL so onboarding still succeeds with the photo
         } finally {
           setUploadingAvatar(false);
         }

@@ -213,7 +213,7 @@ export default function UserHome() {
   const { slug, clubRoomId: routeClubRoomId } = useParams<{ slug?: string; clubRoomId?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, token, logout, refreshUser } = useAuth();
+  const { user, token, logout, refreshUser, uploadAvatar } = useAuth();
   const { lang } = useLanguage();
   const dt = DASHBOARD_TRANSLATIONS[lang] ?? DASHBOARD_TRANSLATIONS.uz;
 
@@ -1906,6 +1906,7 @@ export default function UserHome() {
           language: speakerOption.id,
           name: displayName,
           username: displayUsername,
+          avatarUrl: user?.avatarUrl || null,
           skipPartnerId: prevPartnerId,
         }),
       });
@@ -2221,6 +2222,7 @@ export default function UserHome() {
           language: speakerOption.id,
           name: displayName,
           username: displayUsername,
+          avatarUrl: user?.avatarUrl || null,
         }),
       });
       const data = await res.json();
@@ -2579,24 +2581,75 @@ export default function UserHome() {
 
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
           {/* Avatar with Glow Ring */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0 group">
             {user?.isPremium && (
               <span className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 rounded-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black text-[9px] px-2.5 py-0.5 tracking-widest shadow-[0_2px_8px_rgba(245,158,11,0.5)] border border-yellow-200 uppercase whitespace-nowrap">
                 PREMIUM
               </span>
             )}
-            <div
+            <label
+              title="Profil rasmini yangilash"
               className={cn(
-                "flex h-20 w-20 items-center justify-center rounded-full p-0.5 transition-all duration-300",
+                "flex h-20 w-20 items-center justify-center rounded-full p-0.5 transition-all duration-300 cursor-pointer",
                 user?.isPremium
                   ? "bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_35px_rgba(245,158,11,0.7)] ring-2 ring-amber-400/80"
                   : "bg-gradient-to-tr from-violet-600 via-indigo-600 to-fuchsia-500 shadow-[0_0_25px_rgba(139,92,246,0.5)]"
               )}
             >
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = async (ev) => {
+                    const rawDataUrl = ev.target?.result as string;
+                    if (!rawDataUrl) return;
+                    const img = new Image();
+                    img.onload = async () => {
+                      let finalDataUrl = rawDataUrl;
+                      try {
+                        const maxDim = 360;
+                        let w = img.width || maxDim;
+                        let h = img.height || maxDim;
+                        if (w > maxDim || h > maxDim) {
+                          if (w > h) {
+                            h = Math.round((h * maxDim) / w);
+                            w = maxDim;
+                          } else {
+                            w = Math.round((w * maxDim) / h);
+                            h = maxDim;
+                          }
+                        }
+                        const canvas = document.createElement("canvas");
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext("2d");
+                        if (ctx) {
+                          ctx.drawImage(img, 0, 0, w, h);
+                          finalDataUrl = canvas.toDataURL("image/jpeg", 0.86);
+                        }
+                      } catch {
+                        /* fallback */
+                      }
+                      try {
+                        await uploadAvatar(finalDataUrl);
+                        await refreshUser();
+                      } catch {
+                        /* ignore */
+                      }
+                    };
+                    img.src = rawDataUrl;
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
               <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0d0822] overflow-hidden">
-                <SpeakerAvatar size={76} src={user?.avatarUrl} />
+                <SpeakerAvatar size={76} src={user?.avatarUrl} name={displayName} />
               </div>
-            </div>
+            </label>
             <span className="absolute bottom-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#0d0822]" />
           </div>
 
@@ -6478,7 +6531,7 @@ export default function UserHome() {
                   : "ring-1 ring-white/25 hover:ring-white/50 opacity-80 hover:opacity-100"
               )}
             >
-              <SpeakerAvatar size={32} />
+              <SpeakerAvatar size={32} src={user?.avatarUrl} name={displayName} />
             </div>
             <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.profile}</span>
           </button>
