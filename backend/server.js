@@ -29,7 +29,37 @@ app.use(
   })
 );
 app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+const fs = require("fs");
+const store = require("./utils/store");
+
+// Re-create avatar from database/cache if missing on Render's ephemeral disk
+app.get("/media/avatars/:filename", (req, res, next) => {
+  const filePath = path.join(__dirname, "media", "avatars", req.params.filename);
+  if (fs.existsSync(filePath)) {
+    return res.sendFile(filePath);
+  }
+  try {
+    const match = req.params.filename.match(/^avatar_([^_]+)_/);
+    const userId = match ? match[1] : null;
+    if (userId) {
+      const user = store.findById(userId);
+      const dataUrl = user?.avatarDataUrl || (user?.avatarUrl?.startsWith("data:image/") ? user.avatarUrl : null);
+      if (dataUrl) {
+        const matches = dataUrl.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+        if (matches) {
+          const buffer = Buffer.from(matches[2], "base64");
+          fs.mkdirSync(path.join(__dirname, "media", "avatars"), { recursive: true });
+          fs.writeFileSync(filePath, buffer);
+          return res.sendFile(filePath);
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  next();
+});
+
 app.use("/media", express.static(path.join(__dirname, "media")));
 app.use(require("./utils/errorCodes").errorCodes);
 

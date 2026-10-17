@@ -4,6 +4,7 @@ const store = require("../utils/store");
 const supabase = require("../lib/supabase");
 const { authRequired } = require("../middleware/auth");
 const { userSlug } = require("../utils/slug");
+const { saveAvatarFile } = require("../utils/avatarStorage");
 
 const router = express.Router();
 
@@ -117,13 +118,22 @@ router.post("/", authRequired, async (req, res) => {
     }
 
     // 3. Validate Mandatory Avatar
-    const finalAvatarUrl = (avatarUrl && String(avatarUrl).trim()) || req.user.avatarUrl;
+    let finalAvatarUrl = (avatarUrl && String(avatarUrl).trim()) || req.user.avatarUrl;
+    let finalAvatarDataUrl = null;
     if (!finalAvatarUrl) {
       return res.status(400).json({
         success: false,
         message: "Profil rasmi majburiy",
         code: "AVATAR_REQUIRED",
       });
+    }
+
+    if (finalAvatarUrl.startsWith("data:image/") || finalAvatarUrl.length > 100) {
+      const saved = saveAvatarFile(req.user.id, finalAvatarUrl);
+      if (saved) {
+        finalAvatarDataUrl = saved.dataUrl;
+        finalAvatarUrl = saved.relativeUrl;
+      }
     }
 
     const takenLocal = store.findByUsername(cleanUsername, req.user.id);

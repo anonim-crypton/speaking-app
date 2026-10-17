@@ -64,6 +64,9 @@ import {
   RotateCcw,
   SkipForward,
   UserX,
+  Edit3,
+  Camera,
+  Upload,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -73,7 +76,7 @@ import UserSidebar, { type UserNavTab } from "@/components/UserSidebar";
 import AccountMenu from "@/components/AccountMenu";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import CountryFlag from "@/components/CountryFlag";
-import SpeakerAvatar from "@/components/SpeakerAvatar";
+import SpeakerAvatar, { resolveAvatarUrl } from "@/components/SpeakerAvatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import VipUserCard from "@/components/VipUserCard";
 import AiLoader from "@/components/ui/ai-loader";
@@ -213,7 +216,7 @@ export default function UserHome() {
   const { slug, clubRoomId: routeClubRoomId } = useParams<{ slug?: string; clubRoomId?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, token, logout, refreshUser, uploadAvatar } = useAuth();
+  const { user, token, logout, refreshUser, uploadAvatar, updateProfile } = useAuth();
   const { lang } = useLanguage();
   const dt = DASHBOARD_TRANSLATIONS[lang] ?? DASHBOARD_TRANSLATIONS.uz;
 
@@ -623,6 +626,135 @@ export default function UserHome() {
     user?.username ||
     (user?.email ? user.email.split("@")[0].toLowerCase() : null) ||
     "speaker";
+
+  // Edit Profile Modal State & Handlers
+  const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editUsername, setEditUsername] = useState("");
+  const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
+  const [editDeleteAvatar, setEditDeleteAvatar] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccessMsg, setEditSuccessMsg] = useState<string | null>(null);
+
+  const handleOpenEditProfile = () => {
+    setEditName(user?.name || (displayName !== "Anonim" ? displayName : ""));
+    const cleanU = (user?.username || displayUsername).replace(/^@+/, "");
+    setEditUsername(cleanU);
+    setEditAvatarPreview(user?.avatarUrl || null);
+    setEditDeleteAvatar(false);
+    setEditError(null);
+    setEditSuccessMsg(null);
+    setEditProfileModalOpen(true);
+  };
+
+  const handleSelectNewAvatar = (file: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setEditError("Faqat rasm fayllari (JPG, PNG, WEBP, GIF) qabul qilinadi");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const rawDataUrl = ev.target?.result as string;
+      if (!rawDataUrl) return;
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxDim = 360;
+          let w = img.width || maxDim;
+          let h = img.height || maxDim;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h);
+            const compressed = canvas.toDataURL("image/jpeg", 0.88);
+            setEditAvatarPreview(compressed);
+            setEditDeleteAvatar(false);
+            setEditError(null);
+            return;
+          }
+        } catch {
+          /* fallback */
+        }
+        setEditAvatarPreview(rawDataUrl);
+        setEditDeleteAvatar(false);
+        setEditError(null);
+      };
+      img.src = rawDataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteAvatar = () => {
+    setEditAvatarPreview(null);
+    setEditDeleteAvatar(true);
+    setEditError(null);
+  };
+
+  const handleSaveProfile = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmedName = editName.trim();
+    const rawUser = editUsername.trim().replace(/^@+/, "").toLowerCase();
+
+    if (!trimmedName || trimmedName.length < 2) {
+      setEditError("Ism kamida 2 ta belgidan iborat bo'lishi kerak");
+      return;
+    }
+    if (!rawUser || rawUser.length < 5) {
+      setEditError("Username kamida 5 ta belgidan iborat bo'lishi kerak");
+      return;
+    }
+    if (!/^[a-z0-9_.]{5,30}$/.test(rawUser)) {
+      setEditError("Username faqat lotin harflari, raqamlar, pastki chiziq (_) va nuqta (.) dan iborat bo'lishi mumkin");
+      return;
+    }
+
+    setEditSaving(true);
+    setEditError(null);
+    setEditSuccessMsg(null);
+
+    try {
+      const patch: {
+        name?: string;
+        username?: string;
+        avatarUrl?: string | null;
+        deleteAvatar?: boolean;
+      } = {
+        name: trimmedName,
+        username: rawUser,
+      };
+
+      if (editDeleteAvatar) {
+        patch.deleteAvatar = true;
+        patch.avatarUrl = null;
+      } else if (editAvatarPreview && editAvatarPreview !== user?.avatarUrl) {
+        patch.avatarUrl = editAvatarPreview;
+      }
+
+      await updateProfile(patch);
+      setEditSuccessMsg("Profil ma'lumotlari muvaffaqiyatli saqlandi!");
+      setTimeout(() => {
+        setEditProfileModalOpen(false);
+        setEditSuccessMsg(null);
+      }, 700);
+    } catch (err: any) {
+      setEditError(err?.message || "Profilni yangilashda xatolik yuz berdi");
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const clientIdRef = useRef<string>(getOrCreateClientId());
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -2587,69 +2719,25 @@ export default function UserHome() {
                 PREMIUM
               </span>
             )}
-            <label
-              title="Profil rasmini yangilash"
+            <button
+              type="button"
+              onClick={handleOpenEditProfile}
+              title="Profilni tahrirlash"
               className={cn(
-                "flex h-20 w-20 items-center justify-center rounded-full p-0.5 transition-all duration-300 cursor-pointer",
+                "relative flex h-20 w-20 items-center justify-center rounded-full p-0.5 transition-all duration-300 cursor-pointer overflow-hidden",
                 user?.isPremium
                   ? "bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_35px_rgba(245,158,11,0.7)] ring-2 ring-amber-400/80"
                   : "bg-gradient-to-tr from-violet-600 via-indigo-600 to-fuchsia-500 shadow-[0_0_25px_rgba(139,92,246,0.5)]"
               )}
             >
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = async (ev) => {
-                    const rawDataUrl = ev.target?.result as string;
-                    if (!rawDataUrl) return;
-                    const img = new Image();
-                    img.onload = async () => {
-                      let finalDataUrl = rawDataUrl;
-                      try {
-                        const maxDim = 360;
-                        let w = img.width || maxDim;
-                        let h = img.height || maxDim;
-                        if (w > maxDim || h > maxDim) {
-                          if (w > h) {
-                            h = Math.round((h * maxDim) / w);
-                            w = maxDim;
-                          } else {
-                            w = Math.round((w * maxDim) / h);
-                            h = maxDim;
-                          }
-                        }
-                        const canvas = document.createElement("canvas");
-                        canvas.width = w;
-                        canvas.height = h;
-                        const ctx = canvas.getContext("2d");
-                        if (ctx) {
-                          ctx.drawImage(img, 0, 0, w, h);
-                          finalDataUrl = canvas.toDataURL("image/jpeg", 0.86);
-                        }
-                      } catch {
-                        /* fallback */
-                      }
-                      try {
-                        await uploadAvatar(finalDataUrl);
-                        await refreshUser();
-                      } catch {
-                        /* ignore */
-                      }
-                    };
-                    img.src = rawDataUrl;
-                  };
-                  reader.readAsDataURL(file);
-                }}
-              />
               <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0d0822] overflow-hidden">
                 <SpeakerAvatar size={76} src={user?.avatarUrl} name={displayName} />
               </div>
-            </label>
+              <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center rounded-full">
+                <Camera className="h-5 w-5 text-white" />
+                <span className="text-[9px] font-bold text-white mt-0.5">Tahrirlash</span>
+              </div>
+            </button>
             <span className="absolute bottom-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#0d0822]" />
           </div>
 
@@ -2663,6 +2751,14 @@ export default function UserHome() {
                   <span className="text-zinc-300 font-semibold">{user.countryCode}</span>
                 </div>
               )}
+              <button
+                type="button"
+                onClick={handleOpenEditProfile}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/35 bg-violet-600/20 hover:bg-violet-600/35 text-violet-200 hover:text-white px-3 py-1 text-xs font-semibold transition-all cursor-pointer shadow-sm hover:scale-[1.02]"
+              >
+                <Edit3 className="h-3.5 w-3.5 text-violet-300" />
+                <span>Profilni tahrirlash</span>
+              </button>
             </div>
             <p className="mt-0.5 text-xs font-mono font-medium text-violet-300">
               @{displayUsername}
@@ -2732,8 +2828,17 @@ export default function UserHome() {
           </div>
         </div>
 
-        {/* ── Action Buttons for Balance & Premium ── */}
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
+        {/* ── Action Buttons for Balance, Premium & Profilni tahrirlash ── */}
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <button
+            type="button"
+            onClick={handleOpenEditProfile}
+            className="flex items-center justify-center gap-2 rounded-xl border border-violet-500/40 bg-gradient-to-r from-violet-600/35 via-fuchsia-600/30 to-indigo-600/35 hover:border-violet-400 hover:brightness-110 py-2.5 px-3 text-xs font-bold text-white shadow-[0_0_18px_rgba(139,92,246,0.25)] transition-all cursor-pointer"
+          >
+            <Edit3 className="h-4 w-4 text-violet-300" />
+            <span>Profilni tahrirlash</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setDepositModalOpen(true)}
@@ -6577,6 +6682,175 @@ export default function UserHome() {
                 {dt.meeting.yes}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Profilni tahrirlash modali ── */}
+      {editProfileModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-3xl border border-violet-500/30 bg-gradient-to-b from-[#140c2e] via-[#0d0822] to-[#0a061a] p-6 shadow-2xl text-left relative overflow-hidden">
+            {/* Ambient background glow */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-violet-600/25 blur-3xl"
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-fuchsia-600/20 blur-3xl"
+            />
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] relative z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-violet-500/30 bg-violet-500/15 text-violet-300">
+                  <Edit3 className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Profilni tahrirlash</h3>
+                  <p className="text-[11px] text-zinc-400">Ism, username va rasm ma'lumotlarini o'zgartirish</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !editSaving && setEditProfileModalOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-zinc-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="mt-5 space-y-4 relative z-10">
+              {/* Avatar Section */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3.5">
+                <div className="relative shrink-0">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 p-0.5 shadow-lg">
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0d0822] overflow-hidden">
+                      {editAvatarPreview && !editDeleteAvatar ? (
+                        <img
+                          src={resolveAvatarUrl(editAvatarPreview) || editAvatarPreview}
+                          alt="Preview"
+                          className="h-full w-full object-cover rounded-full"
+                        />
+                      ) : (
+                        <span className="text-2xl font-bold text-white">
+                          {(editName || displayName || "A").trim().charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 flex flex-col gap-2 text-center sm:text-left">
+                  <p className="text-xs font-semibold text-white">Profil rasmi</p>
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <label className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/35 bg-violet-600/20 hover:bg-violet-600/30 text-violet-200 px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer">
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>Yangi rasm yuklash</span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleSelectNewAvatar(file);
+                        }}
+                      />
+                    </label>
+
+                    {(editAvatarPreview || user?.avatarUrl) && !editDeleteAvatar && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteAvatar}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Rasmni o'chirish</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-zinc-400">PNG, JPG yoki WEBP (avtomatik siqiladi va saqlanadi)</p>
+                </div>
+              </div>
+
+              {/* Ism Field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-300">Ism</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Ismingizni kiriting"
+                  maxLength={60}
+                  className="w-full rounded-xl border border-white/[0.1] bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400 transition-all"
+                />
+              </div>
+
+              {/* Username Field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-300">Username</label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3 text-sm font-mono font-bold text-violet-400">@</span>
+                  <input
+                    type="text"
+                    value={editUsername}
+                    onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ""))}
+                    placeholder="username"
+                    maxLength={30}
+                    className="w-full rounded-xl border border-white/[0.1] bg-white/[0.04] pl-8 pr-3.5 py-2.5 text-sm font-mono text-white placeholder-zinc-500 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400 transition-all"
+                  />
+                </div>
+                <p className="text-[11px] text-zinc-400">
+                  Kamida 5 ta belgi: faqat kichik lotin harflari, raqamlar, pastki chiziq (_) va nuqta (.)
+                </p>
+              </div>
+
+              {/* Error Message */}
+              {editError && (
+                <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                  <span>{editError}</span>
+                </div>
+              )}
+
+              {/* Success Message */}
+              {editSuccessMsg && (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">
+                  <Check className="h-4 w-4 shrink-0 text-emerald-400" />
+                  <span>{editSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={editSaving}
+                  onClick={() => setEditProfileModalOpen(false)}
+                  className="rounded-xl border-white/10 text-xs px-4"
+                >
+                  Bekor qilish
+                </Button>
+                <Button
+                  type="submit"
+                  variant="glow"
+                  size="sm"
+                  disabled={editSaving}
+                  className="rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 text-xs px-5 font-bold cursor-pointer"
+                >
+                  {editSaving ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                      Saqlanmoqda...
+                    </>
+                  ) : (
+                    "Saqlash"
+                  )}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

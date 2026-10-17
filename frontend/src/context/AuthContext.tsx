@@ -53,6 +53,12 @@ interface AuthContextValue {
   signInWithGoogle: (email: string, name?: string) => Promise<AuthResponse>;
   checkUsername: (username: string) => Promise<{ available: boolean; username: string }>;
   uploadAvatar: (base64Image: string) => Promise<{ success: boolean; avatarUrl: string }>;
+  updateProfile: (patch: {
+    name?: string;
+    username?: string;
+    avatarUrl?: string | null;
+    deleteAvatar?: boolean;
+  }) => Promise<AuthUser>;
   completeOnboarding: (answers: OnboardingAnswers) => Promise<void>;
   refreshUser: () => Promise<void>;
   logout: () => void;
@@ -308,6 +314,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(withCachedAvatar({ ...data.user, avatarUrl: data.user.avatarUrl || answers.avatarUrl }, token));
   };
 
+  const updateProfile = async (patch: {
+    name?: string;
+    username?: string;
+    avatarUrl?: string | null;
+    deleteAvatar?: boolean;
+  }) => {
+    if (!token) throw new Error("Not signed in");
+    const data = await apiPost<{ success: boolean; user: AuthUser; message?: string }>(
+      "/api/auth/profile",
+      patch,
+      token
+    );
+    if (data?.user) {
+      if (patch.deleteAvatar) {
+        try {
+          localStorage.removeItem("ls_user_avatar");
+          if (user?.id) localStorage.removeItem(`ls_user_avatar_${user.id}`);
+        } catch {
+          /* ignore */
+        }
+      } else if (patch.avatarUrl && patch.avatarUrl.startsWith("data:image/")) {
+        try {
+          localStorage.setItem("ls_user_avatar", patch.avatarUrl);
+          if (user?.id) localStorage.setItem(`ls_user_avatar_${user.id}`, patch.avatarUrl);
+        } catch {
+          /* ignore */
+        }
+      }
+      const updatedUser = withCachedAvatar(data.user, token);
+      setUser(updatedUser);
+      return updatedUser || data.user;
+    }
+    throw new Error(data?.message || "Profilni yangilashda xatolik");
+  };
+
   const refreshUser = async () => {
     if (!token) return;
     try {
@@ -359,6 +400,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         checkUsername,
         uploadAvatar,
+        updateProfile,
         completeOnboarding,
         refreshUser,
         logout,

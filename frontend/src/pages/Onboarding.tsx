@@ -201,7 +201,7 @@ export default function Onboarding() {
 
         try {
           const res = await uploadAvatar(base64);
-          if (res.avatarUrl && res.avatarUrl.startsWith("data:image/")) {
+          if (res && res.avatarUrl) {
             setAvatarUrl(res.avatarUrl);
           }
         } catch {

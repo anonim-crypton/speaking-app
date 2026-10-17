@@ -9,6 +9,7 @@ const sessionStore = require("../utils/sessionStore");
 const supabase = require("../lib/supabase");
 const { authRequired, JWT_SECRET } = require("../middleware/auth");
 const { userSlug } = require("../utils/slug");
+const { saveAvatarFile } = require("../utils/avatarStorage");
 
 const router = express.Router();
 
@@ -989,7 +990,7 @@ router.post("/messages/read", authRequired, async (req, res) => {
 
 /**
  * POST /api/auth/upload-avatar
- * Accepts base64 image, stores portable Data URL in user profile and Supabase so it works across Vercel + Render.
+ * Accepts base64 image, writes to backend/media/avatars/, stores URL and dataUrl, syncs to Supabase.
  */
 router.post("/upload-avatar", authRequired, async (req, res) => {
   try {
@@ -998,46 +999,20 @@ router.post("/upload-avatar", authRequired, async (req, res) => {
       return res.status(400).json({ success: false, message: "Rasm ma'lumotlari kiritilmadi" });
     }
 
-    const matches = image.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
-    let mimeSubtype = "jpeg";
-    let ext = "jpg";
-    let base64Payload = image;
-    let buffer;
-    if (matches) {
-      mimeSubtype = matches[1].toLowerCase();
-      ext = mimeSubtype === "jpeg" ? "jpg" : mimeSubtype === "svg+xml" ? "svg" : mimeSubtype;
-      base64Payload = matches[2];
-      buffer = Buffer.from(base64Payload, "base64");
-    } else {
-      buffer = Buffer.from(image, "base64");
-      base64Payload = buffer.toString("base64");
-    }
-
-    if (!buffer || buffer.length === 0) {
+    const saved = saveAvatarFile(req.user.id, image);
+    if (!saved) {
       return res.status(400).json({ success: false, message: "Yaroqsiz rasm formati" });
     }
 
-    // Also save to local media directory for local static access if needed
-    try {
-      const uploadDir = path.join(__dirname, "../media/avatars");
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      const filename = `avatar_${req.user.id}_${Date.now()}.${ext}`;
-      const filePath = path.join(uploadDir, filename);
-      fs.writeFileSync(filePath, buffer);
-    } catch {
-      /* ignore ephemeral disk error */
-    }
-
-    // Portable data URL works seamlessly across Vercel, Render, and Supabase
-    const avatarUrl = `data:image/${mimeSubtype};base64,${base64Payload}`;
+    const avatarUrl = saved.relativeUrl;
+    const avatarDataUrl = saved.dataUrl;
 
     // Update local store
     const currentOnboarding = req.user.onboarding ? { ...req.user.onboarding, avatarUrl } : undefined;
     const updated =
       store.updateUser(req.user.id, {
         avatarUrl,
+        avatarDataUrl,
         ...(currentOnboarding ? { onboarding: currentOnboarding } : {}),
       }) || req.user;
 
@@ -1047,6 +1022,7 @@ router.post("/upload-avatar", authRequired, async (req, res) => {
     return res.json({
       success: true,
       avatarUrl,
+      dataUrl: avatarDataUrl,
       user: publicUser(updated),
       message: "Profil rasmi muvaffaqiyatli saqlandi",
     });
@@ -1055,6 +1031,115 @@ router.post("/upload-avatar", authRequired, async (req, res) => {
     return res.status(500).json({ success: false, message: "Rasmni yuklashda xatolik yuz berdi" });
   }
 });
+
+/**
+ * PUT or POST /api/auth/profile
+ * Updates user profile: name, username, avatarUrl (or deleteAvatar).
+ * Persists to backend/media/avatars/, local store, and Supabase profiles.
+ */
+async function handleUpdateProfile(req, res) {
+  try {
+    const { name, username, avatarUrl, deleteAvatar } = req.body || {};
+    const me = store.findById(req.user.id) || req.user;
+    const patch = {};
+
+    // 1. Validate Name
+    if (name !== undefined) {
+      const cleanName = String(name || "").trim();
+      if (cleanName.length < 2 || cleanName.length > 60) {
+        return res.status(400).json({
+          success: false,
+          code: "NAME_INVALID",
+          message: "Ism kamida 2 ta va ko'pi bilan 60 ta belgidan iborat bo'lishi kerak",
+        });
+      }
+      patch.name = cleanName;
+    }
+
+    // 2. Validate Username
+    if (username !== undefined) {
+      const cleanUsername = String(username || "")
+        .trim()
+        .replace(/^@+/, "")
+        .toLowerCase();
+      if (cleanUsername.length < 5 || cleanUsername.length > 30) {
+        return res.status(400).json({
+          success: false,
+          code: "USERNAME_TOO_SHORT",
+          message: "Username kamida 5 ta belgidan iborat bo'lishi kerak",
+        });
+      }
+      if (!/^[a-z0-9_.]{5,30}$/.test(cleanUsername)) {
+        return res.status(400).json({
+          success: false,
+          code: "USERNAME_INVALID",
+          message: "Username faqat lotin harflari, raqamlar, pastki chiziq (_) va nuqta (.) dan iborat bo'lishi mumkin",
+        });
+      }
+
+      // Check if username changed and is taken
+      const currentCleanUsername = String(me.username || "").toLowerCase();
+      if (cleanUsername !== currentCleanUsername) {
+        const takenLocal = store.findByUsername(cleanUsername, me.id);
+        const takenRemote = await supabase.isUsernameTakenInSupabase(cleanUsername, me.id);
+        if (takenLocal || takenRemote) {
+          return res.status(409).json({
+            success: false,
+            code: "USERNAME_TAKEN",
+            message: "Bu username allaqachon band. Iltimos, boshqa username tanlang.",
+          });
+        }
+      }
+      patch.username = cleanUsername;
+    }
+
+    // 3. Avatar handling
+    if (deleteAvatar) {
+      patch.avatarUrl = null;
+      patch.avatarDataUrl = null;
+    } else if (avatarUrl !== undefined && avatarUrl !== null && typeof avatarUrl === "string") {
+      const trimmed = avatarUrl.trim();
+      if (!trimmed) {
+        patch.avatarUrl = null;
+        patch.avatarDataUrl = null;
+      } else if (trimmed.startsWith("data:image/") || trimmed.length > 100) {
+        const saved = saveAvatarFile(me.id, trimmed);
+        if (saved) {
+          patch.avatarUrl = saved.relativeUrl;
+          patch.avatarDataUrl = saved.dataUrl;
+        } else {
+          patch.avatarUrl = trimmed;
+        }
+      } else {
+        patch.avatarUrl = trimmed;
+      }
+    }
+
+    // Update local store
+    const updated = store.updateUser(me.id, patch) || me;
+
+    // Sync to Supabase profiles
+    const supabasePayload = {
+      id: me.id,
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.username !== undefined ? { username: patch.username } : {}),
+      avatarUrl: patch.avatarUrl !== undefined ? patch.avatarUrl : (me.avatarUrl || null),
+    };
+    await supabase.saveProfile(supabasePayload);
+
+    return res.json({
+      success: true,
+      message: "Profil ma'lumotlari muvaffaqiyatli saqlandi!",
+      user: publicUser(updated),
+    });
+  } catch (err) {
+    console.error("Update profile error:", err);
+    return res.status(500).json({ success: false, message: "Profilni saqlashda xatolik yuz berdi" });
+  }
+}
+
+router.put("/profile", authRequired, handleUpdateProfile);
+router.post("/profile", authRequired, handleUpdateProfile);
 
 module.exports = router;
 module.exports.PHONE_REGIONS = PHONE_REGIONS;
