@@ -74,34 +74,20 @@ function readStoredToken(): string | null {
   }
 }
 
-function withCachedAvatar(u: AuthUser | null, token?: string | null): AuthUser | null {
+function withCachedAvatar(u: AuthUser | null, _token?: string | null): AuthUser | null {
   if (!u) return null;
   try {
     const userKey = `ls_user_avatar_${u.id}`;
-    const cachedForUser = localStorage.getItem(userKey);
-    const cachedLast = localStorage.getItem("ls_user_avatar");
-
-    if (u.avatarUrl && u.avatarUrl.startsWith("data:image/")) {
-      localStorage.setItem(userKey, u.avatarUrl);
-      localStorage.setItem("ls_user_avatar", u.avatarUrl);
+    if (u.avatarUrl) {
+      if (u.avatarUrl.startsWith("data:image/")) {
+        localStorage.setItem(userKey, u.avatarUrl);
+      }
       return u;
     }
 
-    const bestCached =
-      (cachedForUser && cachedForUser.startsWith("data:image/") ? cachedForUser : null) ||
-      (cachedLast && cachedLast.startsWith("data:image/") ? cachedLast : null);
-
-    // If server returned null or a broken relative /media/ path, restore the cached data URL and sync to backend
-    if (bestCached && (!u.avatarUrl || u.avatarUrl.startsWith("/media/"))) {
-      if (token) {
-        void apiPost("/api/auth/upload-avatar", { image: bestCached }, token).catch(() => {});
-      }
-      return { ...u, avatarUrl: bestCached };
-    }
-
-    if (u.avatarUrl) {
-      localStorage.setItem(userKey, u.avatarUrl);
-      localStorage.setItem("ls_user_avatar", u.avatarUrl);
+    const cachedForUser = localStorage.getItem(userKey);
+    if (cachedForUser && cachedForUser.startsWith("data:image/")) {
+      return { ...u, avatarUrl: cachedForUser };
     }
   } catch {
     /* ignore storage errors */

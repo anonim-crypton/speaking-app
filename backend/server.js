@@ -41,7 +41,7 @@ app.get("/media/avatars/:filename", (req, res, next) => {
     return res.sendFile(filePath);
   }
   try {
-    const match = req.params.filename.match(/^avatar_([^_]+)_/);
+    const match = req.params.filename.match(/^avatar_([^_.]+)/);
     const userId = match ? match[1] : null;
     if (userId) {
       const user = store.findById(userId);

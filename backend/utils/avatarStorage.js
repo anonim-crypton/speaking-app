@@ -52,24 +52,24 @@ function saveAvatarFile(userId, imageString) {
   if (!buffer || buffer.length === 0) return null;
 
   const safeUserId = String(userId || "guest").replace(/[^a-zA-Z0-9_-]/g, "");
-  const filename = `avatar_${safeUserId}_${Date.now()}.${ext}`;
+  const filename = `avatar_${safeUserId}.${ext}`;
   const filePath = path.join(AVATARS_DIR, filename);
 
   try {
-    // Clean up old avatar files for this user to save space
+    // Ensure only 1 avatar file exists for this user (remove any previous format/extension)
     try {
       const existing = fs.readdirSync(AVATARS_DIR);
       for (const f of existing) {
-        if (f.startsWith(`avatar_${safeUserId}_`) && f !== filename) {
+        if (f.startsWith(`avatar_${safeUserId}`) && f !== filename) {
           try {
             fs.unlinkSync(path.join(AVATARS_DIR, f));
           } catch {
-            /* ignore unlink error */
+            /* ignore */
           }
         }
       }
     } catch {
-      /* ignore readdir error */
+      /* ignore */
     }
 
     fs.writeFileSync(filePath, buffer);
