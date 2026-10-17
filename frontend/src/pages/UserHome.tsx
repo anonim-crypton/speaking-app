@@ -50,6 +50,12 @@ import {
   Ban,
   ShieldAlert,
   Headset,
+  Search,
+  UserPlus,
+  UserMinus,
+  MessageCircle,
+  Medal,
+  Loader2,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -127,7 +133,7 @@ function getOrCreateClientId(): string {
 
 export default function UserHome() {
   const { slug } = useParams<{ slug: string }>();
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, refreshUser } = useAuth();
   const { lang } = useLanguage();
   const dt = DASHBOARD_TRANSLATIONS[lang] ?? DASHBOARD_TRANSLATIONS.uz;
 
@@ -270,15 +276,115 @@ export default function UserHome() {
   // Real-time online users count
   const [onlineCount, setOnlineCount] = useState<number>(1);
 
-  // Diamonds & Daily reward state
+  // Diamonds & Daily reward state (5 diamonds once per 24h)
   const [diamonds, setDiamonds] = useState<number>(user?.diamonds ?? 0);
-  const [dailyProgress, setDailyProgress] = useState<number>(0);
+  const [lastDailyClaimAt, setLastDailyClaimAt] = useState<string | null>(
+    user?.lastDailyClaimAt || null
+  );
+  const [dailyRemainingSec, setDailyRemainingSec] = useState<number>(0);
+  const [claimingDaily, setClaimingDaily] = useState(false);
+  const [streakDays, setStreakDays] = useState<number>(user?.streakDays ?? 1);
+  const [talkSeconds, setTalkSeconds] = useState<number>(user?.talkSeconds ?? 0);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackSuccessMsg, setFeedbackSuccessMsg] = useState<string | null>(null);
+
+  // Social State: History, Friends, Leaderboard, Direct Messages
+  const [talkHistory, setTalkHistory] = useState<
+    Array<{
+      partnerId: string;
+      name: string;
+      username: string;
+      avatarUrl: string | null;
+      isPremium?: boolean;
+      isVerified?: boolean;
+      language?: string;
+      durationSeconds?: number;
+      talkedAt: string;
+    }>
+  >([]);
+  const [friendsList, setFriendsList] = useState<
+    Array<{
+      id: string;
+      name: string;
+      username: string;
+      avatarUrl: string | null;
+      isPremium?: boolean;
+      isVerified?: boolean;
+    }>
+  >([]);
+  const [incomingRequests, setIncomingRequests] = useState<
+    Array<{
+      id: string;
+      fromUserId: string;
+      name: string;
+      username: string;
+      avatarUrl: string | null;
+      isPremium?: boolean;
+      isVerified?: boolean;
+      createdAt: string;
+    }>
+  >([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<string[]>([]);
+  const [friendSearchQuery, setFriendSearchQuery] = useState("");
+  const [friendSearchResults, setFriendSearchResults] = useState<
+    Array<{
+      id: string;
+      name: string;
+      username: string;
+      avatarUrl: string | null;
+      isPremium?: boolean;
+      isVerified?: boolean;
+      relation: "none" | "friends" | "outgoing" | "incoming";
+    }>
+  >([]);
+  const [friendSearchLoading, setFriendSearchLoading] = useState(false);
+  const [friendActionMsg, setFriendActionMsg] = useState<string | null>(null);
+
+  // Rating / Leaderboard state
+  const [leaderboard, setLeaderboard] = useState<
+    Array<{
+      id: string;
+      rank: number;
+      name: string;
+      username: string;
+      avatarUrl: string | null;
+      isPremium?: boolean;
+      isVerified?: boolean;
+      diamonds: number;
+      streakDays: number;
+      talkSeconds: number;
+      score: number;
+    }>
+  >([]);
+  const [ratingSort, setRatingSort] = useState<"all" | "diamonds" | "streak" | "talk">("all");
+
+  // Direct Message (User-to-User) Modal state
+  const [dmPartner, setDmPartner] = useState<{
+    id: string;
+    name: string;
+    username: string;
+    avatarUrl?: string | null;
+    isPremium?: boolean;
+    isVerified?: boolean;
+  } | null>(null);
+  const [dmMessages, setDmMessages] = useState<
+    Array<{
+      id: string;
+      fromUserId: string;
+      toUserId: string;
+      senderName: string;
+      senderUsername: string;
+      text: string;
+      createdAt: string;
+    }>
+  >([]);
+  const [dmInput, setDmInput] = useState("");
+  const [dmSending, setDmSending] = useState(false);
+  const dmEndRef = useRef<HTMLDivElement | null>(null);
 
   const displayName =
     user?.name ||
@@ -424,6 +530,15 @@ export default function UserHome() {
           if (typeof data.user.diamonds === "number") {
             setDiamonds(data.user.diamonds);
           }
+          if (data.user.lastDailyClaimAt !== undefined) {
+            setLastDailyClaimAt(data.user.lastDailyClaimAt || null);
+          }
+          if (typeof data.user.streakDays === "number") {
+            setStreakDays(data.user.streakDays);
+          }
+          if (typeof data.user.talkSeconds === "number") {
+            setTalkSeconds(data.user.talkSeconds);
+          }
         }
       } catch {
         /* silent */
@@ -436,6 +551,246 @@ export default function UserHome() {
       es?.close();
     };
   }, [user?.id]);
+
+  // 24-hour Daily Diamond Countdown Timer
+  useEffect(() => {
+    const updateRemaining = () => {
+      if (!lastDailyClaimAt) {
+        setDailyRemainingSec(0);
+        return;
+      }
+      const claimedMs = new Date(lastDailyClaimAt).getTime();
+      if (isNaN(claimedMs)) {
+        setDailyRemainingSec(0);
+        return;
+      }
+      const nextMs = claimedMs + 24 * 60 * 60 * 1000;
+      const diffSec = Math.max(0, Math.ceil((nextMs - Date.now()) / 1000));
+      setDailyRemainingSec(diffSec);
+    };
+    updateRemaining();
+    const timer = window.setInterval(updateRemaining, 1000);
+    return () => window.clearInterval(timer);
+  }, [lastDailyClaimAt]);
+
+  // Fetch Social Data (Talk History, Friends, Leaderboard)
+  const fetchSocialData = async () => {
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    try {
+      const [histRes, frRes, lbRes] = await Promise.all([
+        fetch(`${API_BASE}/api/social/history`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        }),
+        fetch(`${API_BASE}/api/social/friends`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        }),
+        fetch(`${API_BASE}/api/social/leaderboard`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        }),
+      ]);
+      const [histData, frData, lbData] = await Promise.all([
+        histRes.json().catch(() => null),
+        frRes.json().catch(() => null),
+        lbRes.json().catch(() => null),
+      ]);
+      if (histData?.success && Array.isArray(histData.history)) {
+        setTalkHistory(histData.history);
+      }
+      if (frData?.success) {
+        if (Array.isArray(frData.friends)) setFriendsList(frData.friends);
+        if (Array.isArray(frData.incomingRequests)) setIncomingRequests(frData.incomingRequests);
+        if (Array.isArray(frData.outgoingRequests)) setOutgoingRequests(frData.outgoingRequests);
+      }
+      if (lbData?.success && Array.isArray(lbData.leaderboard)) {
+        setLeaderboard(lbData.leaderboard);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    void fetchSocialData();
+    const interval = window.setInterval(fetchSocialData, 2500);
+    return () => window.clearInterval(interval);
+  }, [token, activeTab]);
+
+  // Live search users for Friends page
+  useEffect(() => {
+    const q = friendSearchQuery.trim();
+    if (!q) {
+      setFriendSearchResults([]);
+      setFriendSearchLoading(false);
+      return;
+    }
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    setFriendSearchLoading(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/social/search?q=${encodeURIComponent(q)}`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.users)) {
+          setFriendSearchResults(data.users);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        setFriendSearchLoading(false);
+      }
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [friendSearchQuery, token, friendsList.length, incomingRequests.length, outgoingRequests.length]);
+
+  // Direct Message Polling when DM Modal is open
+  const fetchDmMessages = async (partnerId: string) => {
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken || !partnerId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/social/dm/${partnerId}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.messages)) {
+        setDmMessages(data.messages);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    if (!dmPartner?.id) return;
+    void fetchDmMessages(dmPartner.id);
+    const interval = window.setInterval(() => {
+      void fetchDmMessages(dmPartner.id);
+    }, 1500);
+    return () => window.clearInterval(interval);
+  }, [dmPartner?.id, token]);
+
+  const handleOpenDmModal = (partner: {
+    id: string;
+    name: string;
+    username: string;
+    avatarUrl?: string | null;
+    isPremium?: boolean;
+    isVerified?: boolean;
+  }) => {
+    setDmPartner(partner);
+    setDmMessages([]);
+    void fetchDmMessages(partner.id);
+    setTimeout(() => {
+      dmEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 200);
+  };
+
+  const handleSendDmMessage = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!dmPartner?.id || !dmInput.trim() || dmSending) return;
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    const textToSend = dmInput.trim();
+    setDmSending(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/social/dm/${dmPartner.id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ text: textToSend }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setDmInput("");
+        if (Array.isArray(data.messages)) {
+          setDmMessages(data.messages);
+        } else {
+          await fetchDmMessages(dmPartner.id);
+        }
+        void fetchSocialData();
+        setTimeout(() => {
+          dmEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setDmSending(false);
+    }
+  };
+
+  const handleSendFriendRequest = async (toUserId: string) => {
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/social/friends/request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ toUserId }),
+      });
+      const data = await res.json();
+      if (data?.message) {
+        setFriendActionMsg(data.message);
+        setTimeout(() => setFriendActionMsg(null), 3500);
+      }
+      await fetchSocialData();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleRespondFriendRequest = async (fromUserId: string, action: "accept" | "reject") => {
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/social/friends/respond`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ fromUserId, action }),
+      });
+      const data = await res.json();
+      if (data?.message) {
+        setFriendActionMsg(data.message);
+        setTimeout(() => setFriendActionMsg(null), 3500);
+      }
+      await fetchSocialData();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleRemoveFriend = async (friendId: string) => {
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/social/friends/remove`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ friendId }),
+      });
+      const data = await res.json();
+      if (data?.message) {
+        setFriendActionMsg(data.message);
+        setTimeout(() => setFriendActionMsg(null), 3500);
+      }
+      await fetchSocialData();
+    } catch {
+      /* ignore */
+    }
+  };
 
   const sendSignal = async (type: "offer" | "answer" | "ice-candidate", payload: any) => {
     if (!activeRoomId) return;
@@ -1050,10 +1405,62 @@ export default function UserHome() {
     }
   };
 
-  const handleClaimDiamond = () => {
-    if (dailyProgress >= 10) return;
-    setDailyProgress((p) => p + 1);
-    setDiamonds((d) => d + 10);
+  const isDailyClaimed = dailyRemainingSec > 0;
+  const dailyProgress = isDailyClaimed ? 5 : 0;
+
+  const formatCountdown = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+
+  const formatTalkDuration = (seconds: number) => {
+    const sec = Math.max(0, Number(seconds || 0));
+    if (sec === 0) return `0 ${dt.stats.hours}`;
+    const hours = Math.floor(sec / 3600);
+    const mins = Math.floor((sec % 3600) / 60);
+    if (hours > 0 && mins > 0) return `${hours} soat ${mins} daq`;
+    if (hours > 0) return `${hours} ${dt.stats.hours}`;
+    if (mins > 0) return `${mins} daqiqa`;
+    return `${sec} soniya`;
+  };
+
+  const handleClaimDiamond = async () => {
+    if (isDailyClaimed || claimingDaily) return;
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    setClaimingDaily(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/claim-daily`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        if (typeof data.diamonds === "number") {
+          setDiamonds(data.diamonds);
+        } else {
+          setDiamonds((d) => d + 5);
+        }
+        if (data.lastDailyClaimAt) {
+          setLastDailyClaimAt(data.lastDailyClaimAt);
+        } else {
+          setLastDailyClaimAt(new Date().toISOString());
+        }
+        void refreshUser();
+      } else if (data?.lastDailyClaimAt) {
+        setLastDailyClaimAt(data.lastDailyClaimAt);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setClaimingDaily(false);
+    }
   };
 
   // Auto-unlock desktop WebRTC audio on user interaction
@@ -1473,67 +1880,589 @@ export default function UserHome() {
   );
 
   const renderHistoryView = () => (
-    <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[58vh] text-center px-4 animate-in fade-in duration-200">
-      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-violet-500/10 text-violet-300 mb-5 shadow-[0_0_35px_rgba(139,92,246,0.25)]">
-        <History className="h-10 w-10" />
+    <div className="mx-auto max-w-4xl flex flex-col gap-6 animate-in fade-in duration-200 pb-10">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl">
+        <div className="flex items-center gap-3.5">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/15 text-violet-300 shadow-[0_0_20px_rgba(139,92,246,0.25)]">
+            <History className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-white">{dt.sidebar.history}</h1>
+            <p className="text-xs text-zinc-400">
+              Oxirgi marta speaking va chat qilib gaplashgan speakerlar tarixi
+            </p>
+          </div>
+        </div>
+        <span className="self-start sm:self-center rounded-full border border-violet-500/30 bg-violet-500/15 px-3.5 py-1 text-xs font-bold text-violet-300">
+          {talkHistory.length} ta speaker
+        </span>
       </div>
-      <h3 className="text-xl font-bold text-white">Hozircha suhbatlar tarixi mavjud emas</h3>
-      <p className="mt-2.5 max-w-md mx-auto text-sm text-zinc-400 leading-relaxed">
-        Suhbatdoshlar bilan suhbatlashganingizdan so'ng barcha gaplashish tarixingiz shu yerda saqlanadi.
-      </p>
 
-      <button
-        type="button"
-        onClick={() => setActiveTab("home")}
-        className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-7 py-3 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-      >
-        <Play className="h-4 w-4 fill-white" />
-        <span>Suhbatni boshlash</span>
-      </button>
+      {talkHistory.length === 0 ? (
+        <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[46vh] text-center px-4">
+          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-violet-500/10 text-violet-300 mb-5 shadow-[0_0_35px_rgba(139,92,246,0.25)]">
+            <History className="h-10 w-10" />
+          </div>
+          <h3 className="text-xl font-bold text-white">Hozircha suhbatlar tarixi mavjud emas</h3>
+          <p className="mt-2.5 max-w-md mx-auto text-sm text-zinc-400 leading-relaxed">
+            Suhbatdoshlar bilan speaking yoki chat qilib gaplashganingizdan so'ng ularning ro'yxati shu yerda saqlanadi.
+          </p>
+          <button
+            type="button"
+            onClick={() => setActiveTab("home")}
+            className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-7 py-3 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+          >
+            <Play className="h-4 w-4 fill-white" />
+            <span>Suhbatni boshlash</span>
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {talkHistory.map((item, idx) => {
+            const talkedDate = item.talkedAt
+              ? new Date(item.talkedAt).toLocaleString("uz-UZ", {
+                  day: "2-digit",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "Yaqinda";
+            return (
+              <div
+                key={`${item.partnerId}_${idx}`}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-[#0b071b]/85 p-4 sm:p-5 shadow-lg backdrop-blur-xl hover:border-violet-500/35 transition-all"
+              >
+                {/* Left: Avatar + Name + Username */}
+                <div className="flex items-center gap-4 min-w-0">
+                  <SpeakerAvatar
+                    name={item.name}
+                    avatarUrl={item.avatarUrl}
+                    isPremium={Boolean(item.isPremium)}
+                    size="md"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-sm sm:text-base font-bold text-white">
+                        {item.name}
+                      </p>
+                      {(item.isPremium || item.isVerified) && <VerifiedBadge size={16} />}
+                    </div>
+                    <p className="truncate text-xs font-medium text-violet-300 mt-0.5">
+                      @{item.username}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right: Message button + Last talked timestamp */}
+                <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 sm:gap-4 border-t sm:border-t-0 border-white/[0.06] pt-3 sm:pt-0">
+                  <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs text-zinc-300">
+                    <Clock className="h-3.5 w-3.5 text-violet-400 shrink-0" />
+                    <span>Oxirgi suhbat: <strong className="text-white">{talkedDate}</strong></span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleOpenDmModal({
+                        id: item.partnerId,
+                        name: item.name,
+                        username: item.username,
+                        avatarUrl: item.avatarUrl,
+                        isPremium: item.isPremium,
+                        isVerified: item.isVerified,
+                      })
+                    }
+                    className="inline-flex items-center gap-2 rounded-xl border border-violet-500/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-[0_0_18px_rgba(139,92,246,0.35)] hover:brightness-110 transition-all cursor-pointer"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    <span>Xabar yozish</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 
   const renderFriendsView = () => (
-    <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[58vh] text-center px-4 animate-in fade-in duration-200">
-      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-sky-500/10 text-sky-400 mb-5 shadow-[0_0_35px_rgba(56,189,248,0.25)]">
-        <Users className="h-10 w-10" />
+    <div className="mx-auto max-w-6xl flex flex-col gap-6 animate-in fade-in duration-200 pb-10">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl">
+        <div className="flex items-center gap-3.5">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-sky-500/30 bg-sky-500/15 text-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.25)]">
+            <Users className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-white">{dt.sidebar.friends}</h1>
+            <p className="text-xs text-zinc-400">
+              Ism yoki @username orqali foydalanuvchilarni toping, do'stlashing va suhbatlashing
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-3.5 py-1 text-xs font-bold text-sky-300">
+            Do'stlar: {friendsList.length}
+          </span>
+          {incomingRequests.length > 0 && (
+            <span className="rounded-full border border-amber-500/40 bg-amber-500/20 px-3.5 py-1 text-xs font-bold text-amber-300 animate-pulse">
+              Takliflar: {incomingRequests.length}
+            </span>
+          )}
+        </div>
       </div>
-      <h3 className="text-xl font-bold text-white">{dt.friends.emptyTitle}</h3>
-      <p className="mt-2.5 max-w-md mx-auto text-sm text-zinc-400 leading-relaxed">
-        {dt.friends.emptyDesc}
-      </p>
 
-      <button
-        type="button"
-        onClick={() => setActiveTab("home")}
-        className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-7 py-3 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-      >
-        <Play className="h-4 w-4 fill-white" />
-        <span>{dt.friends.startMeeting}</span>
-      </button>
+      {friendActionMsg && (
+        <div className="rounded-2xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3 text-xs font-semibold text-emerald-300 flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-emerald-400" />
+            <span>{friendActionMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFriendActionMsg(null)}
+            className="text-emerald-300 hover:text-white cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Main 2-Column Layout: Left (Search + Accepted Friends) | Right (Incoming Friend Requests) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* LEFT COLUMN (7 cols): Search Users + Accepted Friends List */}
+        <div className="lg:col-span-7 flex flex-col gap-6">
+          {/* 1. Search Box Card */}
+          <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-4">
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <Search className="h-4 w-4 text-sky-400" />
+                <span>Foydalanuvchilarni qidirish</span>
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Ism yoki @username yozing (masalan: <span className="text-sky-300 font-semibold">ozod</span>)
+              </p>
+            </div>
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+              <input
+                type="text"
+                value={friendSearchQuery}
+                onChange={(e) => setFriendSearchQuery(e.target.value)}
+                placeholder="Ism yoki @username orqali qidiring..."
+                className="w-full rounded-2xl border border-white/15 bg-white/[0.04] pl-11 pr-10 py-3 text-xs sm:text-sm text-white placeholder-zinc-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 transition-all"
+              />
+              {friendSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setFriendSearchQuery("")}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Search Results List */}
+            {friendSearchQuery.trim().length > 0 && (
+              <div className="flex flex-col gap-2.5 pt-2 border-t border-white/[0.06] max-h-[360px] overflow-y-auto pr-1">
+                {friendSearchLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-8 text-xs text-zinc-400">
+                    <Loader2 className="h-4 w-4 animate-spin text-sky-400" />
+                    <span>Qidirilmoqda...</span>
+                  </div>
+                ) : friendSearchResults.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-zinc-400">
+                    "{friendSearchQuery}" bo'yicha foydalanuvchi topilmadi
+                  </div>
+                ) : (
+                  friendSearchResults.map((u) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3.5 hover:border-sky-500/35 transition-all"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SpeakerAvatar
+                          name={u.name}
+                          avatarUrl={u.avatarUrl}
+                          isPremium={Boolean(u.isPremium)}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="truncate text-sm font-bold text-white">{u.name}</p>
+                            {(u.isPremium || u.isVerified) && <VerifiedBadge size={15} />}
+                          </div>
+                          <p className="truncate text-xs text-sky-300">@{u.username}</p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        {u.relation === "friends" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300">
+                            <UserCheck className="h-3.5 w-3.5" />
+                            <span>Do'stlar</span>
+                          </span>
+                        ) : u.relation === "outgoing" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>Yuborilgan</span>
+                          </span>
+                        ) : u.relation === "incoming" ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleRespondFriendRequest(u.id, "accept")}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-1.5 text-xs font-bold text-white transition-all cursor-pointer"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            <span>Qabul qilish</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void handleSendFriendRequest(u.id)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-sky-500/40 bg-gradient-to-r from-sky-500 to-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-[0_0_15px_rgba(56,189,248,0.3)] hover:brightness-110 transition-all cursor-pointer"
+                          >
+                            <UserPlus className="h-3.5 w-3.5" />
+                            <span>Do'stlashish</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 2. Accepted Friends List Card (Qabul qilingan do'stlar ro'yxati) */}
+          <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+              <div className="flex items-center gap-2.5">
+                <UserCheck className="h-5 w-5 text-emerald-400" />
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-white">
+                    Qabul qilingan do'stlar ro'yxati
+                  </h2>
+                  <p className="text-[11px] text-zinc-400">
+                    Sizning tasdiqlangan do'stlaringiz
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-0.5 text-xs font-bold text-emerald-300">
+                {friendsList.length} ta
+              </span>
+            </div>
+
+            {friendsList.length === 0 ? (
+              <div className="py-10 text-center">
+                <Users className="h-10 w-10 text-zinc-600 mx-auto mb-2.5" />
+                <p className="text-sm font-semibold text-zinc-300">Hozircha qabul qilingan do'stlar yo'q</p>
+                <p className="text-xs text-zinc-500 mt-1">
+                  Yuqoridagi qidiruv orqali foydalanuvchilarni topib, do'stlik taklifi yuboring.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {friendsList.map((fr) => (
+                  <div
+                    key={fr.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4 hover:border-white/15 transition-all"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <SpeakerAvatar
+                        name={fr.name}
+                        avatarUrl={fr.avatarUrl}
+                        isPremium={Boolean(fr.isPremium)}
+                        size="md"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate text-sm font-bold text-white">{fr.name}</p>
+                          {(fr.isPremium || fr.isVerified) && <VerifiedBadge size={15} />}
+                        </div>
+                        <p className="truncate text-xs text-violet-300">@{fr.username}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleOpenDmModal({
+                            id: fr.id,
+                            name: fr.name,
+                            username: fr.username,
+                            avatarUrl: fr.avatarUrl,
+                            isPremium: fr.isPremium,
+                            isVerified: fr.isVerified,
+                          })
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/40 bg-violet-500/15 hover:bg-violet-500/25 px-3.5 py-2 text-xs font-bold text-violet-200 transition-all cursor-pointer"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        <span>Xabar yozish</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => void handleRemoveFriend(fr.id)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/35 bg-red-500/10 hover:bg-red-500/20 px-3 py-2 text-xs font-bold text-red-300 transition-all cursor-pointer"
+                        title="Do'stlar ro'yxatidan o'chirish"
+                      >
+                        <UserMinus className="h-3.5 w-3.5" />
+                        <span>O'chirish</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN (5 cols): Incoming Friend Requests ("Do'stlik taklifi") */}
+        <div className="lg:col-span-5 flex flex-col gap-6">
+          <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/15 text-amber-400">
+                  <UserPlus className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-white">Do'stlik taklifi</h2>
+                  <p className="text-[11px] text-zinc-400">
+                    Sizga yuborilgan do'stlashish so'rovlari
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-0.5 text-xs font-bold text-amber-300">
+                {incomingRequests.length}
+              </span>
+            </div>
+
+            {incomingRequests.length === 0 ? (
+              <div className="py-12 text-center">
+                <UserPlus className="h-10 w-10 text-zinc-600 mx-auto mb-2.5" />
+                <p className="text-sm font-semibold text-zinc-300">Yangi do'stlik takliflari yo'q</p>
+                <p className="text-xs text-zinc-500 mt-1">
+                  Kimdir sizga do'stlashish taklifini yuborsa, shu yerda ko'rinadi.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {incomingRequests.map((req) => (
+                  <div
+                    key={req.id || req.fromUserId}
+                    className="flex flex-col gap-3.5 rounded-2xl border border-amber-500/25 bg-amber-500/[0.04] p-4"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <SpeakerAvatar
+                        name={req.name}
+                        avatarUrl={req.avatarUrl}
+                        isPremium={Boolean(req.isPremium)}
+                        size="md"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate text-sm font-bold text-white">{req.name}</p>
+                          {(req.isPremium || req.isVerified) && <VerifiedBadge size={15} />}
+                        </div>
+                        <p className="truncate text-xs text-amber-300">@{req.username}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => void handleRespondFriendRequest(req.fromUserId, "accept")}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-110 py-2 text-xs font-bold text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all cursor-pointer"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        <span>Qabul qilish</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleRespondFriendRequest(req.fromUserId, "reject")}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-500/35 bg-red-500/10 hover:bg-red-500/20 py-2 text-xs font-bold text-red-300 transition-all cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        <span>Rad etish</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 
-  const renderRatingView = () => (
-    <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[58vh] text-center px-4 animate-in fade-in duration-200">
-      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-500/10 text-amber-400 mb-5 shadow-[0_0_35px_rgba(245,158,11,0.25)]">
-        <Trophy className="h-10 w-10" />
-      </div>
-      <h3 className="text-xl font-bold text-white">Hozircha reyting ma'lumotlari mavjud emas</h3>
-      <p className="mt-2.5 max-w-md mx-auto text-sm text-zinc-400 leading-relaxed">
-        Foydalanuvchilar suhbatlashgan sari haftalik va oylik reyting jadvali shu yerda shakllanib boradi.
-      </p>
+  const renderRatingView = () => {
+    const sortedList = [...leaderboard].sort((a, b) => {
+      if (ratingSort === "diamonds") return b.diamonds - a.diamonds;
+      if (ratingSort === "streak") return b.streakDays - a.streakDays;
+      if (ratingSort === "talk") return b.talkSeconds - a.talkSeconds;
+      return b.score - a.score;
+    });
 
-      <button
-        type="button"
-        onClick={() => setActiveTab("home")}
-        className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-7 py-3 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-      >
-        <Play className="h-4 w-4 fill-white" />
-        <span>Suhbatni boshlash</span>
-      </button>
-    </div>
-  );
+    return (
+      <div className="mx-auto max-w-5xl flex flex-col gap-6 animate-in fade-in duration-200 pb-10">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/15 text-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.25)]">
+              <Trophy className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold text-white">{dt.sidebar.rating}</h1>
+              <p className="text-xs text-zinc-400">
+                Eng ko'p olmos yig'gan, har kuni faol bo'lgan va soatlab speaking qilgan foydalanuvchilar reytingi
+              </p>
+            </div>
+          </div>
+
+          {/* Sort Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: "all", label: "Umumiy", icon: Trophy },
+              { id: "diamonds", label: "Ko'p olmoslar", icon: Gem },
+              { id: "streak", label: "Doimiy faollar", icon: Flame },
+              { id: "talk", label: "Ko'p speaking", icon: Clock },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const active = ratingSort === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setRatingSort(tab.id as any)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all cursor-pointer",
+                    active
+                      ? "border-amber-400/50 bg-amber-500/20 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+                      : "border-white/10 bg-white/[0.03] text-zinc-400 hover:bg-white/[0.07] hover:text-white"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Leaderboard List */}
+        {sortedList.length === 0 ? (
+          <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[42vh] text-center px-4">
+            <Trophy className="h-12 w-12 text-amber-400 mb-3" />
+            <h3 className="text-lg font-bold text-white">Reyting yuklanmoqda...</h3>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {sortedList.map((item, index) => {
+              const pos = index + 1;
+              const isMe = String(item.id) === String(user?.id);
+              return (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border p-4 sm:p-5 backdrop-blur-xl transition-all",
+                    pos === 1
+                      ? "border-amber-400/45 bg-gradient-to-r from-amber-500/15 via-[#0b071b]/90 to-[#0b071b]/90 shadow-[0_0_25px_rgba(245,158,11,0.12)]"
+                      : pos === 2
+                      ? "border-slate-300/35 bg-gradient-to-r from-slate-400/10 via-[#0b071b]/90 to-[#0b071b]/90"
+                      : pos === 3
+                      ? "border-orange-400/35 bg-gradient-to-r from-orange-500/10 via-[#0b071b]/90 to-[#0b071b]/90"
+                      : isMe
+                      ? "border-violet-500/45 bg-violet-500/10"
+                      : "border-white/[0.08] bg-[#0b071b]/85"
+                  )}
+                >
+                  {/* Left: Rank + Avatar + Name */}
+                  <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+                    <div
+                      className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-extrabold text-sm border",
+                        pos === 1
+                          ? "border-amber-300 bg-gradient-to-br from-amber-400 to-yellow-600 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.5)]"
+                          : pos === 2
+                          ? "border-slate-300 bg-gradient-to-br from-slate-200 to-slate-400 text-slate-950"
+                          : pos === 3
+                          ? "border-orange-300 bg-gradient-to-br from-orange-400 to-amber-700 text-white"
+                          : "border-white/10 bg-white/[0.04] text-zinc-300"
+                      )}
+                    >
+                      {pos <= 3 ? <Medal className="h-5 w-5" /> : `#${pos}`}
+                    </div>
+
+                    <SpeakerAvatar
+                      name={item.name}
+                      avatarUrl={item.avatarUrl}
+                      isPremium={Boolean(item.isPremium)}
+                      size="md"
+                    />
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="truncate text-sm sm:text-base font-bold text-white">
+                          {item.name}
+                        </p>
+                        {(item.isPremium || item.isVerified) && <VerifiedBadge size={16} />}
+                        {isMe && (
+                          <span className="rounded-md bg-violet-500/25 border border-violet-400/40 px-2 py-0.5 text-[10px] font-bold text-violet-200">
+                            Siz
+                          </span>
+                        )}
+                      </div>
+                      <p className="truncate text-xs text-zinc-400 mt-0.5">@{item.username}</p>
+                    </div>
+                  </div>
+
+                  {/* Right: 3 Metrics (Diamonds, Streak Days, Speaking Time) */}
+                  <div className="grid grid-cols-3 sm:flex items-center gap-2 sm:gap-3 border-t sm:border-t-0 border-white/[0.06] pt-3 sm:pt-0">
+                    <div className="flex items-center gap-1.5 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-1.5">
+                      <Gem className="h-3.5 w-3.5 text-violet-300 shrink-0" />
+                      <div className="text-left">
+                        <p className="text-[10px] text-zinc-400 leading-none">Olmos</p>
+                        <p className="text-xs font-extrabold text-white tabular-nums mt-0.5">
+                          {item.diamonds}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5">
+                      <Flame className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                      <div className="text-left">
+                        <p className="text-[10px] text-zinc-400 leading-none">Faollik</p>
+                        <p className="text-xs font-extrabold text-white tabular-nums mt-0.5">
+                          {item.streakDays} kun
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-1.5">
+                      <Clock className="h-3.5 w-3.5 text-sky-400 shrink-0" />
+                      <div className="text-left">
+                        <p className="text-[10px] text-zinc-400 leading-none">Speaking</p>
+                        <p className="text-xs font-extrabold text-white tabular-nums mt-0.5">
+                          {formatTalkDuration(item.talkSeconds)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderAchievementsView = () => (
     <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[58vh] text-center px-4 animate-in fade-in duration-200">
@@ -2364,7 +3293,7 @@ export default function UserHome() {
                     </div>
                   </div>
 
-                  {/* ── B. 3-Metric Stats Bar (all 0) ── */}
+                  {/* ── B. 3-Metric Stats Bar (Streak, Speaking Time, Diamonds) ── */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="flex items-center gap-4 rounded-2xl border border-white/[0.08] bg-[#0b071b]/80 p-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-400">
@@ -2374,7 +3303,7 @@ export default function UserHome() {
                         <p className="truncate text-xs font-medium text-zinc-400">{dt.stats.streak}</p>
                         <div className="mt-1 flex items-center gap-2">
                           <span className="text-lg font-bold tracking-tight text-white tabular-nums">
-                            0 {dt.stats.days}
+                            {streakDays} {dt.stats.days}
                           </span>
                           <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
                             <Flame className="h-3 w-3 text-amber-400" />
@@ -2391,7 +3320,7 @@ export default function UserHome() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-medium text-zinc-400">{dt.stats.talkTime}</p>
                         <p className="mt-1 text-lg font-bold tracking-tight text-white tabular-nums">
-                          0 {dt.stats.hours}
+                          {formatTalkDuration(talkSeconds)}
                         </p>
                       </div>
                     </div>
@@ -2653,24 +3582,46 @@ export default function UserHome() {
                         <Info className="h-3.5 w-3.5 text-zinc-500" />
                       </div>
                       <span className="text-xs font-bold text-zinc-300 tabular-nums">
-                        {dailyProgress} / 10
+                        {dailyProgress} / 5
                       </span>
                     </div>
 
                     <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/[0.07]">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-300"
-                        style={{ width: `${(dailyProgress / 10) * 100}%` }}
+                        style={{ width: `${(dailyProgress / 5) * 100}%` }}
                       />
                     </div>
 
                     <button
                       type="button"
-                      onClick={handleClaimDiamond}
-                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] hover:border-amber-500/30 py-2 text-xs font-semibold text-amber-300 transition-all"
+                      disabled={isDailyClaimed || claimingDaily}
+                      onClick={() => void handleClaimDiamond()}
+                      className={cn(
+                        "w-full inline-flex items-center justify-center gap-2 rounded-xl border py-2.5 px-3 text-xs font-bold transition-all",
+                        isDailyClaimed
+                          ? "border-white/[0.08] bg-white/[0.03] text-zinc-400 cursor-not-allowed"
+                          : "border-amber-500/35 bg-gradient-to-r from-amber-500/20 to-yellow-500/15 hover:from-amber-500/30 hover:to-yellow-500/25 text-amber-300 cursor-pointer shadow-[0_0_20px_rgba(245,158,11,0.15)]"
+                      )}
                     >
-                      <Gem className="h-3.5 w-3.5 text-amber-400" />
-                      <span>{dt.reward.claimBtn}</span>
+                      {isDailyClaimed ? (
+                        <>
+                          <Clock className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+                          <span className="font-mono tabular-nums">
+                            Keyingi olmos: {formatCountdown(dailyRemainingSec)}
+                          </span>
+                        </>
+                      ) : claimingDaily ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
+                          <span>Olinmoqda...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Gem className="h-3.5 w-3.5 text-amber-400" />
+                          <span>5 ta olmosni olish</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
@@ -3134,6 +4085,112 @@ export default function UserHome() {
             >
               Yopish
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Speaker / Do'st bilan shaxsiy chat (Direct Message) Modali ── */}
+      {dmPartner && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-5 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg h-[540px] max-h-[88vh] rounded-3xl border border-white/[0.12] bg-[#0c0820]/95 shadow-[0_20px_60px_rgba(0,0,0,0.85)] backdrop-blur-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* DM Header */}
+            <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.03] px-5 py-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <SpeakerAvatar
+                  name={dmPartner.name}
+                  avatarUrl={dmPartner.avatarUrl}
+                  isPremium={Boolean(dmPartner.isPremium)}
+                  size="sm"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="truncate text-sm sm:text-base font-bold text-white">
+                      {dmPartner.name}
+                    </h3>
+                    {(dmPartner.isPremium || dmPartner.isVerified) && <VerifiedBadge size={15} />}
+                  </div>
+                  <p className="truncate text-xs text-violet-300">@{dmPartner.username}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDmPartner(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* DM Messages Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 text-xs">
+              {dmMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center py-10 px-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/25 bg-violet-500/10 text-violet-300 mb-3">
+                    <MessageCircle className="h-7 w-7" />
+                  </div>
+                  <p className="text-sm font-semibold text-zinc-200">
+                    {dmPartner.name} bilan yozishmani boshlang
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1 max-w-xs">
+                    Yozgan xabarlaringiz suhbatdoshingizga darhol yetib boradi.
+                  </p>
+                </div>
+              ) : (
+                dmMessages.map((m, idx) => {
+                  const isMine = String(m.fromUserId) === String(user?.id);
+                  const timeStr = m.createdAt
+                    ? new Date(m.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "";
+                  return (
+                    <div
+                      key={m.id || idx}
+                      className={cn(
+                        "flex flex-col max-w-[82%] rounded-2xl px-4 py-2.5 shadow-md leading-relaxed",
+                        isMine
+                          ? "ml-auto bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-br-sm"
+                          : "mr-auto bg-white/[0.06] border border-white/10 text-zinc-100 rounded-bl-sm"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-0.5">
+                        <span className="text-[10px] font-bold opacity-80">
+                          {isMine ? "Siz" : m.senderName || dmPartner.name}
+                        </span>
+                        <span className="text-[10px] opacity-60 font-mono">{timeStr}</span>
+                      </div>
+                      <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">{m.text}</p>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={dmEndRef} />
+            </div>
+
+            {/* DM Input Form */}
+            <form
+              onSubmit={handleSendDmMessage}
+              className="flex items-center gap-2.5 border-t border-white/[0.08] bg-[#0a061a] p-3 sm:p-4"
+            >
+              <input
+                type="text"
+                placeholder={`@${dmPartner.username} ga xabar yozing...`}
+                value={dmInput}
+                onChange={(e) => setDmInput(e.target.value)}
+                maxLength={500}
+                className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!dmInput.trim() || dmSending}
+                className="flex items-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-[0_0_15px_rgba(139,92,246,0.4)] disabled:opacity-50 hover:brightness-110 transition-all cursor-pointer shrink-0"
+              >
+                <Send className="h-4 w-4" />
+                <span className="hidden sm:inline">Yuborish</span>
+              </button>
+            </form>
           </div>
         </div>
       )}

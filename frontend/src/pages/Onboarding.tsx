@@ -6,6 +6,7 @@ import {
   AtSign,
   Camera,
   CheckCircle2,
+  Gem,
   GraduationCap,
   Heart,
   HelpCircle,
@@ -26,6 +27,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useMessages } from "@/i18n/messages";
 import { useAuth, type OnboardingAnswers } from "@/context/AuthContext";
 import { useRegion } from "@/context/RegionContext";
+import { apiPost } from "@/lib/api";
 import { getCachedRtt, loaderDuration } from "@/lib/network";
 import { cn } from "@/lib/utils";
 
@@ -75,7 +77,7 @@ function OptionCard({
 export default function Onboarding() {
   const { t } = useLanguage();
   const { m, errorText } = useMessages();
-  const { isAuthed, loading, user, checkUsername, uploadAvatar, completeOnboarding } = useAuth();
+  const { isAuthed, loading, user, token, checkUsername, uploadAvatar, completeOnboarding, refreshUser } = useAuth();
   const { country: detectedCountry } = useRegion();
   const navigate = useNavigate();
 
@@ -84,6 +86,21 @@ export default function Onboarding() {
   const [phase, setPhase] = useState<"questions" | "saving" | "done">("questions");
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [claimingBonus, setClaimingBonus] = useState(false);
+
+  const handleClaimOnboardingBonus = async () => {
+    if (claimingBonus) return;
+    setClaimingBonus(true);
+    try {
+      await apiPost("/api/auth/claim-onboarding-bonus", {}, token);
+      await refreshUser();
+    } catch (err) {
+      console.error("Failed to claim onboarding bonus:", err);
+    } finally {
+      setClaimingBonus(false);
+      navigate("/");
+    }
+  };
 
   // Step 0 asks Name for phone & google users (or if user.name is missing);
   // for email/password users who already typed their name at registration, asks Age while keeping their name.
@@ -564,38 +581,53 @@ export default function Onboarding() {
       {/* ── Biroz Loading animatsiyasi ── */}
       <LoadingScreen visible={phase === "saving"} label={t.onboarding.saving || "Ma'lumotlar saqlanmoqda..."} />
 
-      {/* ── Tabriklash oynasi (Modali) ── */}
+      {/* ── Tabriklash va 10+ Olmos Hadya oynasi (Modali) ── */}
       {phase === "done" ? (
         <div className="fixed inset-0 z-[120] grid place-items-center bg-night-950/85 p-5 backdrop-blur-md">
-          <div className="relative w-full max-w-[480px] rounded-3xl border border-brand-500/40 bg-card p-8 text-center shadow-glow-lg sm:p-10 animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-[480px] rounded-3xl border border-amber-400/40 bg-card p-8 text-center shadow-glow-lg sm:p-10 animate-in fade-in zoom-in-95 duration-200">
             {/* X (Yopish) tugmasi */}
             <button
               type="button"
-              onClick={() => navigate("/")}
+              onClick={() => void handleClaimOnboardingBonus()}
               aria-label="Yopish"
               className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border border-border/70 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>
 
-            <span className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-gradient-to-br from-violet-500 via-purple-600 to-fuchsia-500 shadow-glow">
-              <Sparkles className="h-10 w-10 text-white" />
-            </span>
+            <div className="relative mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 via-orange-500 to-fuchsia-600 shadow-[0_0_35px_rgba(245,158,11,0.45)]">
+              <Gem className="h-12 w-12 text-white drop-shadow" />
+              <span className="absolute -bottom-2 rounded-full border border-amber-300/60 bg-gradient-to-r from-amber-400 to-yellow-500 px-3 py-0.5 text-xs font-black uppercase tracking-wider text-slate-950 shadow-md">
+                +10 OLMOS
+              </span>
+            </div>
 
-            <h2 className="mt-6 text-2xl font-extrabold tracking-tight sm:text-3xl text-foreground">
-              {t.onboarding.thanksTitle || "Tabriklaymiz!"}
+            <h2 className="mt-7 text-2xl font-extrabold tracking-tight sm:text-3xl text-foreground">
+              Tabriklaymiz!
             </h2>
-            <p className="mt-3 text-base leading-relaxed text-muted-foreground">
-              {t.onboarding.thanksText || "Savolimizga javob berganingiz uchun rahmat"}
+            <p className="mt-3 text-base font-medium leading-relaxed text-slate-200">
+              Ro'yxatdan o'tib savollarga javob berganingiz uchun sizga{" "}
+              <span className="font-extrabold text-amber-400">10+ ta olmos</span> hadya qilindi!
             </p>
 
             <Button
               variant="glow"
               size="lg"
-              className="mt-7 w-full"
-              onClick={() => navigate("/")}
+              disabled={claimingBonus}
+              className="mt-7 w-full gap-2.5 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-600 text-base font-bold text-white shadow-[0_10px_28px_-6px_rgba(245,158,11,0.55)] hover:opacity-95"
+              onClick={() => void handleClaimOnboardingBonus()}
             >
-              {t.onboarding.close || "Yopish"}
+              {claimingBonus ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Olmos olinmoqda...</span>
+                </>
+              ) : (
+                <>
+                  <Gem className="h-5 w-5" />
+                  <span>Olmosni olish</span>
+                </>
+              )}
             </Button>
           </div>
         </div>

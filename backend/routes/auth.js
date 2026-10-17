@@ -43,9 +43,42 @@ function publicUser(user) {
     isBanned: Boolean(user.isBanned),
     diamondHistory: user.diamondHistory || [],
     adminMessages: user.adminMessages || [],
+    lastDailyClaimAt: user.lastDailyClaimAt || null,
+    onboardingBonusClaimed: Boolean(user.onboardingBonusClaimed),
+    streakDays: Number(user.streakDays || 1),
+    talkSeconds: Number(user.talkSeconds || 0),
     onboardingCompleted: Boolean(user.onboardingCompleted && user.username),
     createdAt: user.createdAt,
   };
+}
+
+function touchUserDailyActivity(user) {
+  if (!user || !user.id) return user;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const lastDate = user.lastActiveDate || null;
+  let streak = Number(user.streakDays || 1);
+  if (lastDate === todayStr) {
+    return user;
+  }
+  if (lastDate) {
+    const diffMs = new Date(todayStr).getTime() - new Date(lastDate).getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    // Increment streak if consecutive day OR skipped at most 1 day ("har kuni yoki 1 kun kirib 1 kun kirmaydigan")
+    if (diffDays === 1 || diffDays === 2) {
+      streak += 1;
+    } else if (diffDays > 2) {
+      streak = 1;
+    }
+  } else {
+    streak = Math.max(1, streak);
+  }
+  return (
+    store.updateUser(user.id, {
+      lastActiveDate: todayStr,
+      lastSeenAt: new Date().toISOString(),
+      streakDays: streak,
+    }) || user
+  );
 }
 
 const normCountry = (value) =>
@@ -545,7 +578,99 @@ router.post("/login", async (req, res) => {
 
 /* ─────────────────────────────── current user ───────────────────────── */
 router.get("/me", authRequired, (req, res) => {
-  res.json({ success: true, user: publicUser(req.user), sid: req.sid || null });
+  const updatedUser = touchUserDailyActivity(req.user);
+  res.json({ success: true, user: publicUser(updatedUser), sid: req.sid || null });
+});
+
+/* ─────────────────────────────── Onboarding +10 Diamonds Bonus ──────── */
+router.post("/claim-onboarding-bonus", authRequired, async (req, res) => {
+  try {
+    const user = store.findById(req.user.id) || req.user;
+    if (user.onboardingBonusClaimed) {
+      return res.json({
+        success: true,
+        alreadyClaimed: true,
+        diamonds: Number(user.diamonds || 0),
+        user: publicUser(user),
+      });
+    }
+    const newDiamonds = Number(user.diamonds || 0) + 10;
+    const history = Array.isArray(user.diamondHistory) ? [...user.diamondHistory] : [];
+    history.unshift({
+      id: "gift_onb_" + Date.now(),
+      amount: 10,
+      reason: "Ro'yxatdan o'tish va savollarga javob berish mukofoti (+10 Olmos)",
+      createdAt: new Date().toISOString(),
+    });
+    const updated = store.updateUser(user.id, {
+      diamonds: newDiamonds,
+      onboardingBonusClaimed: true,
+      diamondHistory: history,
+    });
+    void supabase.updateRow("profiles", "id", user.id, { diamonds: newDiamonds });
+    return res.json({
+      success: true,
+      diamonds: newDiamonds,
+      user: publicUser(updated || user),
+      message: "Tabriklaymiz! Sizga 10 ta olmos taqdim etildi!",
+    });
+  } catch (err) {
+    console.error("Claim onboarding bonus error:", err);
+    return res.status(500).json({ success: false, message: "Olmosni olishda xatolik yuz berdi" });
+  }
+});
+
+/* ─────────────────────────────── Daily +5 Diamonds Reward (24h) ─────── */
+router.post("/claim-daily", authRequired, async (req, res) => {
+  try {
+    const user = store.findById(req.user.id) || req.user;
+    const now = Date.now();
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+    if (user.lastDailyClaimAt) {
+      const lastMs = new Date(user.lastDailyClaimAt).getTime();
+      if (!isNaN(lastMs) && now - lastMs < COOLDOWN_MS) {
+        const remainingMs = COOLDOWN_MS - (now - lastMs);
+        return res.status(400).json({
+          success: false,
+          alreadyClaimed: true,
+          remainingSeconds: Math.ceil(remainingMs / 1000),
+          lastDailyClaimAt: user.lastDailyClaimAt,
+          nextClaimAt: new Date(lastMs + COOLDOWN_MS).toISOString(),
+          diamonds: Number(user.diamonds || 0),
+          message: "Kunlik olmos allaqachon olingan. Keyingi kunlik olmos uchun taymerni kuting.",
+        });
+      }
+    }
+
+    const nowIso = new Date(now).toISOString();
+    const newDiamonds = Number(user.diamonds || 0) + 5;
+    const history = Array.isArray(user.diamondHistory) ? [...user.diamondHistory] : [];
+    history.unshift({
+      id: "daily_" + now,
+      amount: 5,
+      reason: "Kunlik olmos mukofoti (+5 Olmos)",
+      createdAt: nowIso,
+    });
+
+    const updated = store.updateUser(user.id, {
+      diamonds: newDiamonds,
+      lastDailyClaimAt: nowIso,
+      diamondHistory: history,
+    });
+    void supabase.updateRow("profiles", "id", user.id, { diamonds: newDiamonds });
+
+    return res.json({
+      success: true,
+      diamonds: newDiamonds,
+      lastDailyClaimAt: nowIso,
+      nextClaimAt: new Date(now + COOLDOWN_MS).toISOString(),
+      user: publicUser(updated || user),
+      message: "5 ta kunlik olmos hisobingizga qo'shildi!",
+    });
+  } catch (err) {
+    console.error("Claim daily diamonds error:", err);
+    return res.status(500).json({ success: false, message: "Kunlik olmosni olishda xatolik" });
+  }
 });
 
 router.get("/devices", authRequired, (req, res) => {

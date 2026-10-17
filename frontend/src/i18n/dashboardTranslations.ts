@@ -213,8 +213,8 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
     },
     reward: {
       dailyTitle: "Kunlik olmos mukofoti",
-      dailyDesc: "Har kuni kirib, 10 ta bepul olmos oling!",
-      claimBtn: "10 ta olmos olish",
+      dailyDesc: "Har kuni kirib, 5 ta bepul olmos oling!",
+      claimBtn: "5 ta olmosni olish",
       claimed: "Bugungi olindi",
       balance: "Balans",
       topUp: "Hisobni to'ldirish",

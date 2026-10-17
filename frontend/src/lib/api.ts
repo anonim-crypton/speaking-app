@@ -21,8 +21,12 @@ export interface AuthUser {
   isPremium?: boolean;
   isVerified?: boolean;
   isBanned?: boolean;
-  diamondHistory?: Array<{ amount: number; type: string; date: string }>;
+  diamondHistory?: Array<{ amount: number; type?: string; reason?: string; date?: string; createdAt?: string }>;
   adminMessages?: Array<{ id: string; text: string; sender?: string; isAdmin?: boolean; createdAt?: string }>;
+  lastDailyClaimAt?: string | null;
+  onboardingBonusClaimed?: boolean;
+  streakDays?: number;
+  talkSeconds?: number;
   onboardingCompleted: boolean;
   createdAt: string;
 }

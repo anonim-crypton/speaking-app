@@ -81,9 +81,60 @@ function broadcastToRoom(room, payload, excludeKey = null) {
   }
 }
 
+function recordTalkHistory(pA, pB, language, durationSec = 0) {
+  try {
+    const nowIso = new Date().toISOString();
+    const pairs = [
+      [pA, pB],
+      [pB, pA],
+    ];
+    for (const [selfP, partnerP] of pairs) {
+      if (!selfP?.userId) continue;
+      const u = store.findById(selfP.userId);
+      if (!u) continue;
+      const partnerId = partnerP.userId || partnerP.clientId || partnerP.id;
+      const history = Array.isArray(u.talkHistory) ? [...u.talkHistory] : [];
+      const existingIdx = history.findIndex((h) => String(h.partnerId) === String(partnerId));
+      const prevDuration = existingIdx >= 0 ? Number(history[existingIdx].durationSeconds || 0) : 0;
+      const entry = {
+        partnerId: String(partnerId),
+        name: partnerP.name || "Foydalanuvchi",
+        username: partnerP.username || "speaker",
+        avatarUrl: partnerP.avatarUrl || null,
+        isPremium: Boolean(partnerP.isPremium),
+        isVerified: Boolean(partnerP.isVerified),
+        language: language || "en",
+        durationSeconds: prevDuration + Math.max(0, Math.round(durationSec)),
+        talkedAt: nowIso,
+      };
+      if (existingIdx >= 0) {
+        history.splice(existingIdx, 1);
+      }
+      history.unshift(entry);
+      const nextTalkSeconds = Number(u.talkSeconds || 0) + Math.max(0, Math.round(durationSec));
+      store.updateUser(u.id, {
+        talkHistory: history.slice(0, 100),
+        talkSeconds: nextTalkSeconds,
+      });
+    }
+  } catch (err) {
+    console.warn("Failed to record talk history:", err);
+  }
+}
+
 function destroyRoom(roomId, reason = "ended") {
   const room = activeRooms.get(roomId);
   if (!room) return;
+
+  try {
+    const parts = Array.from(room.participants.values());
+    if (parts.length >= 2) {
+      const durationSec = Math.max(1, Math.round((Date.now() - (room.createdAt || Date.now())) / 1000));
+      recordTalkHistory(parts[0], parts[1], room.language, durationSec);
+    }
+  } catch (e) {
+    console.warn("Room stats error:", e);
+  }
 
   broadcastToRoom(room, { type: "room_closed", roomId, reason });
 
@@ -226,6 +277,9 @@ function tryMatchInPool(language, key) {
     activeRooms.set(roomId, room);
     keyToRoomId.set(candidateKey, roomId);
     keyToRoomId.set(key, roomId);
+
+    // Record immediately in both users' talkHistory so it shows up even while or right after speaking
+    recordTalkHistory(p1, p2, language, 0);
 
     return room;
   }
