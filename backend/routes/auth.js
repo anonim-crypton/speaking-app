@@ -1144,3 +1144,4 @@ router.post("/profile", authRequired, handleUpdateProfile);
 module.exports = router;
 module.exports.PHONE_REGIONS = PHONE_REGIONS;
 module.exports.publicUser = publicUser;
+module.exports.handleUpdateProfile = handleUpdateProfile;

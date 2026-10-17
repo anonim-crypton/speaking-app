@@ -12,6 +12,8 @@ const socialRoutes = require("./routes/social");
 const clubsRoutes = require("./routes/clubs");
 const adminRoutes = require("./routes/admin");
 const supabase = require("./lib/supabase");
+const { authRequired } = require("./middleware/auth");
+const { handleUpdateProfile } = require("./routes/auth");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -76,6 +78,13 @@ app.use("/api/matchmaking", matchmakingRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/clubs", clubsRoutes);
 app.use("/api/admin", adminRoutes);
+
+// Profile update aliases
+app.all(
+  ["/api/profile", "/api/profile/", "/api/user/profile", "/api/user/profile/"],
+  authRequired,
+  handleUpdateProfile
+);
 
 // Redirect /admin and /speak-admin on port 5000 directly to React Admin Panel on 5173
 app.get("/admin", (req, res) => {

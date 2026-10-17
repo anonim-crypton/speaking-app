@@ -48,13 +48,11 @@ function SpeakerAvatarComponent({
       : 36;
 
   const imageSrc = useMemo(() => {
-    if (src || avatarUrl) return resolveAvatarUrl(src || avatarUrl);
-    try {
-      const fallback = localStorage.getItem("ls_user_avatar");
-      return resolveAvatarUrl(fallback);
-    } catch {
-      return null;
+    const raw = src || avatarUrl;
+    if (raw && typeof raw === "string" && raw.trim()) {
+      return resolveAvatarUrl(raw);
     }
+    return null;
   }, [src, avatarUrl]);
 
   useEffect(() => {

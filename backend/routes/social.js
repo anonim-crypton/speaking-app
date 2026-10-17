@@ -142,17 +142,18 @@ async function syncRemoteProfilesIfNeeded() {
       for (const p of data) {
         if (!p || !p.id) continue;
         const extractedUsername = supabase.extractProfileUsername(p);
+        const remoteAvatar = p.avatar_url || p.avatarUrl || p.avatar || null;
         const existing = localMap.get(String(p.id));
         if (existing) {
           if (
-            (p.avatar_url && p.avatar_url !== existing.avatarUrl) ||
+            (remoteAvatar && remoteAvatar !== existing.avatarUrl) ||
             (p.name && p.name !== existing.name) ||
             (extractedUsername && extractedUsername !== existing.username)
           ) {
             store.updateUser(p.id, {
               name: p.name || existing.name,
               username: extractedUsername || existing.username,
-              avatarUrl: p.avatar_url || existing.avatarUrl || null,
+              avatarUrl: remoteAvatar || existing.avatarUrl || null,
             });
           }
         } else {
@@ -160,7 +161,7 @@ async function syncRemoteProfilesIfNeeded() {
             id: p.id,
             name: p.name || null,
             username: extractedUsername || null,
-            avatarUrl: p.avatar_url || null,
+            avatarUrl: remoteAvatar || null,
             email: p.email || null,
             phone: p.phone || null,
             provider: p.provider || "password",
