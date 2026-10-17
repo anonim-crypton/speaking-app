@@ -110,48 +110,58 @@ async function syncUsersFromSupabase() {
   if (!client) return localUsers;
 
   try {
-    const [{ data: profiles }, { data: allMessages }] = await Promise.all([
+    const [{ data: profiles, error: pErr }, { data: allMessages }] = await Promise.all([
       client.from("profiles").select("*"),
       client.from("messages").select("*").order("created_at", { ascending: true }),
     ]);
 
-    const userMap = new Map();
-    for (const u of localUsers) {
-      if (u && u.id) userMap.set(u.id, { ...u });
+    if (pErr) {
+      console.warn("Failed to fetch Supabase profiles in admin:", pErr.message);
+      return localUsers;
     }
 
-    if (Array.isArray(profiles)) {
-      for (const p of profiles) {
-        if (!p || !p.id) continue;
-        const existing = userMap.get(p.id) || {};
-        const extractedUsername = supabase.extractProfileUsername(p) || existing.username || null;
-        userMap.set(p.id, {
-          ...existing,
-          id: p.id,
-          name: p.name || existing.name || null,
-          username: extractedUsername,
-          avatarUrl: p.avatar_url || existing.avatarUrl || null,
-          email: p.email || existing.email || null,
-          phone: p.phone || existing.phone || null,
-          provider: p.provider || existing.provider || "password",
-          countryCode: p.country_code || existing.countryCode || null,
-          age: p.age ?? existing.age ?? null,
-          purpose: p.purpose ?? existing.purpose ?? null,
-          gender: p.gender ?? existing.gender ?? null,
-          diamonds: typeof p.diamonds === "number" ? Math.max(p.diamonds, Number(existing.diamonds || 0)) : Number(existing.diamonds || 0),
-          isPremium: Boolean(p.is_premium ?? existing.isPremium ?? false),
-          isVerified: Boolean(p.is_verified ?? existing.isVerified ?? false),
-          isBanned: Boolean(p.is_banned ?? existing.isBanned ?? false),
-          onboardingCompleted: Boolean(p.onboarding_completed ?? existing.onboardingCompleted ?? false),
-          createdAt: p.created_at || existing.createdAt || new Date().toISOString(),
-        });
-      }
+    if (!Array.isArray(profiles)) {
+      return localUsers;
+    }
+
+    const localMap = new Map();
+    for (const u of localUsers) {
+      if (u && u.id) localMap.set(String(u.id), { ...u });
+    }
+
+    // Supabase profiles is the master DB. Only keep users that currently exist in Supabase!
+    const userMap = new Map();
+    for (const p of profiles) {
+      if (!p || !p.id) continue;
+      const pid = String(p.id);
+      const existing = localMap.get(pid) || {};
+      const extractedUsername = supabase.extractProfileUsername(p) || existing.username || null;
+      userMap.set(pid, {
+        ...existing,
+        id: p.id,
+        name: p.name || existing.name || null,
+        username: extractedUsername,
+        avatarUrl: p.avatar_url || existing.avatarUrl || null,
+        email: p.email || existing.email || null,
+        phone: p.phone || existing.phone || null,
+        provider: p.provider || existing.provider || "password",
+        countryCode: p.country_code || existing.countryCode || null,
+        age: p.age ?? existing.age ?? null,
+        purpose: p.purpose ?? existing.purpose ?? null,
+        gender: p.gender ?? existing.gender ?? null,
+        diamonds: typeof p.diamonds === "number" ? p.diamonds : Number(existing.diamonds || 0),
+        isPremium: Boolean(p.is_premium ?? existing.isPremium ?? false),
+        isVerified: Boolean(p.is_verified ?? existing.isVerified ?? false),
+        isBanned: Boolean(p.is_banned ?? existing.isBanned ?? false),
+        onboardingCompleted: Boolean(p.onboarding_completed ?? existing.onboardingCompleted ?? false),
+        createdAt: p.created_at || existing.createdAt || new Date().toISOString(),
+      });
     }
 
     if (Array.isArray(allMessages)) {
       for (const rm of allMessages) {
         if (!rm || !rm.user_id) continue;
-        const target = userMap.get(rm.user_id);
+        const target = userMap.get(String(rm.user_id));
         if (!target) continue;
         const msgs = Array.isArray(target.adminMessages) ? [...target.adminMessages] : [];
         const exists = msgs.some(
@@ -175,8 +185,18 @@ async function syncUsersFromSupabase() {
 
     const merged = Array.from(userMap.values());
     writeJson(USERS_FILE, merged);
+
+    // Clean up sessions for deleted users
+    const currentSessions = readJson(SESSIONS_FILE, []);
+    const validUserIds = new Set(userMap.keys());
+    const validSessions = currentSessions.filter((s) => !s.userId || validUserIds.has(String(s.userId)));
+    if (validSessions.length !== currentSessions.length) {
+      writeJson(SESSIONS_FILE, validSessions);
+    }
+
     return merged;
-  } catch {
+  } catch (err) {
+    console.error("syncUsersFromSupabase error:", err);
     return localUsers;
   }
 }
@@ -267,9 +287,27 @@ router.get(["/users", "/users/"], async (req, res) => {
     );
   }
 
+  const sessions = readJson(SESSIONS_FILE, []);
+  const usersWithDevices = users.map((u) => ({
+    ...u,
+    devices: sessions
+      .filter((s) => s && String(s.userId) === String(u.id))
+      .map((s) => ({
+        id: s.id,
+        userId: s.userId,
+        deviceName: s.deviceName,
+        ip: s.ip,
+        userAgent: s.userAgent,
+        createdAt: s.createdAt,
+        lastActive: s.lastActive,
+        blocked: Boolean(s.blocked),
+        revoked: Boolean(s.revoked),
+      })),
+  }));
+
   return res.json({
     success: true,
-    users,
+    users: usersWithDevices,
   });
 });
 

@@ -137,8 +137,14 @@ async function syncRemoteProfilesIfNeeded() {
     const client = supabase.getSupabase();
     const { data } = await client.from("profiles").select("*");
     if (Array.isArray(data)) {
+      const remoteIds = new Set(data.map((p) => String(p.id)));
       const localUsers = store.readUsers();
-      const localMap = new Map(localUsers.map((u) => [String(u.id), u]));
+      for (const u of localUsers) {
+        if (!remoteIds.has(String(u.id))) {
+          store.deleteUser(u.id);
+        }
+      }
+      const localMap = new Map(store.readUsers().map((u) => [String(u.id), u]));
       for (const p of data) {
         if (!p || !p.id) continue;
         const extractedUsername = supabase.extractProfileUsername(p);

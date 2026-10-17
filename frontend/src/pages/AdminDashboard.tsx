@@ -84,6 +84,7 @@ interface UserItem {
     sentAt?: string;
     read?: boolean;
   }>;
+  devices?: DeviceItem[];
   createdAt?: string;
 }
 
@@ -805,24 +806,6 @@ export default function AdminDashboard() {
                     </span>
                   )}
                 </button>
-
-                {/* Qurilmalar */}
-                <button
-                  onClick={() => setCurrentTab("devices")}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all outline-none focus:outline-none ring-0 ${
-                    currentTab === "devices"
-                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
-                      : "text-zinc-400 border border-transparent hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <Smartphone className="w-5 h-5 ml-1.5" />
-                    <span>Qurilmalar</span>
-                  </div>
-                  <span className="rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-2.5 py-0.5 text-xs font-mono font-bold">
-                    {devices.length || 1}
-                  </span>
-                </button>
               </div>
             </div>
 
@@ -975,14 +958,14 @@ export default function AdminDashboard() {
                   <div className="text-xs text-zinc-400 mt-2 font-medium">Taqiqlangan hisoblar</div>
                 </div>
 
-                {/* KARTA 3: Jami Qurilmalar (Cyan/Blue Glow) */}
+                {/* KARTA 3: Jami Olmoslar (Cyan/Blue Glow) */}
                 <div className="rounded-3xl border border-cyan-500/40 bg-gradient-to-br from-[#072d42]/70 via-[#071d33]/80 to-[#08121f]/90 p-5 shadow-[0_0_25px_rgba(6,182,212,0.18)] backdrop-blur-xl flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-2.5 mb-3">
                       <div className="h-9 w-9 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0">
                         <Gem className="w-5 h-5" />
                       </div>
-                      <span className="text-sm font-semibold text-zinc-200 truncate">Jami Qurilmalar</span>
+                      <span className="text-sm font-semibold text-zinc-200 truncate">Jami Olmoslar</span>
                     </div>
                     <div className="flex items-baseline gap-2">
                       <div className="text-3xl font-extrabold text-white">{stats ? (stats.totalDiamonds || 1) : 1}</div>
@@ -1546,6 +1529,112 @@ export default function AdminDashboard() {
                                       </div>
                                     )}
                                   </div>
+
+                                  {/* 5. HISOBGA KIRGAN QURILMALAR RO'YXATI (100% ANIQ VA REAL-TIME) */}
+                                  {(() => {
+                                    const userDevices = (u.devices && u.devices.length > 0)
+                                      ? u.devices
+                                      : devices.filter((d) => d.userId === u.id);
+                                    return (
+                                      <div className="rounded-2xl border border-cyan-500/30 bg-[#081224] p-5 shadow-lg">
+                                        <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center gap-2.5">
+                                            <div className="h-7 w-7 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 flex items-center justify-center">
+                                              <Smartphone className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                              <span className="text-xs font-bold text-white uppercase tracking-wider">
+                                                Hisobga Kirgan Qurilmalar
+                                              </span>
+                                              <span className="ml-2 text-[11px] text-zinc-400">
+                                                (100% aniq ro'yxat)
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <span className="text-xs font-mono text-cyan-300 font-bold px-2.5 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20">
+                                            {userDevices.length} ta qurilma
+                                          </span>
+                                        </div>
+
+                                        {userDevices.length === 0 ? (
+                                          <div className="py-6 text-center text-xs text-zinc-500 font-mono bg-white/[0.02] rounded-xl border border-white/5">
+                                            Ushbu foydalanuvchi hisobiga hali birorta ham qurilmadan kirilmagan
+                                          </div>
+                                        ) : (
+                                          <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                                            {userDevices.map((d) => (
+                                              <div
+                                                key={d.id}
+                                                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-cyan-500/30 transition-all gap-3"
+                                              >
+                                                <div className="flex items-start gap-3">
+                                                  <div className="h-8 w-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-cyan-400 mt-0.5">
+                                                    <Smartphone className="w-4 h-4" />
+                                                  </div>
+                                                  <div>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                      <span className="text-xs font-bold text-white">
+                                                        {d.deviceName || "Noma'lum Qurilma"}
+                                                      </span>
+                                                      <span className="text-[10px] font-mono font-bold text-cyan-300 px-1.5 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30">
+                                                        IP: {d.ip}
+                                                      </span>
+                                                      {d.blocked ? (
+                                                        <span className="text-[10px] font-bold text-rose-300 px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/30">
+                                                          🚫 Bloklangan
+                                                        </span>
+                                                      ) : (
+                                                        <span className="text-[10px] font-bold text-emerald-300 px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30">
+                                                          ✓ Faol
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                    <div className="flex items-center gap-3 text-[11px] text-zinc-400 font-mono mt-1 flex-wrap">
+                                                      <span>Birinchi kirish: <strong className="text-zinc-300">{d.createdAt ? new Date(d.createdAt).toLocaleString() : "—"}</strong></span>
+                                                      <span>•</span>
+                                                      <span>Oxirgi faollik: <strong className="text-cyan-300">{d.lastActive ? new Date(d.lastActive).toLocaleString() : "—"}</strong></span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                                  {d.blocked ? (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleDeviceAction(d.id, "unblock")}
+                                                      className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 px-2.5 py-1 text-xs font-bold text-emerald-300 transition-all outline-none focus:outline-none"
+                                                    >
+                                                      Ochish
+                                                    </button>
+                                                  ) : (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleDeviceAction(d.id, "block")}
+                                                      className="rounded-lg border border-rose-500/40 bg-rose-500/15 hover:bg-rose-500/25 px-2.5 py-1 text-xs font-bold text-rose-300 transition-all outline-none focus:outline-none"
+                                                    >
+                                                      Bloklash
+                                                    </button>
+                                                  )}
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      if (confirm("Ushbu qurilma seansini o'chirmoqchimisiz?")) {
+                                                        handleDeviceAction(d.id, "revoke");
+                                                      }
+                                                    }}
+                                                    className="rounded-lg border border-white/10 bg-white/5 hover:bg-rose-500/20 p-1.5 text-zinc-400 hover:text-rose-300 transition-all outline-none focus:outline-none"
+                                                    title="Seansni o'chirish"
+                                                  >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </td>
                             </tr>
