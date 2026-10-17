@@ -31,6 +31,7 @@ import type { UserNavTab } from "@/components/UserSidebar";
 
 interface AccountMenuProps {
   onSelectTab?: (tab: UserNavTab) => void;
+  diamondsOverride?: number;
 }
 
 /** 
@@ -40,7 +41,7 @@ interface AccountMenuProps {
  * Olmoslar soni, XP Daraja, Profil, Do'stlar, Gaplashish tarixi, Yordam, Sozlamalar,
  * chiziq, Shikoyat bo'limi, Admin bilan bog'lanish, chiziq, Hisobdan chiqish.
  */
-export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
+export default function AccountMenu({ onSelectTab, diamondsOverride }: AccountMenuProps = {}) {
   const { t } = useLanguage();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -59,7 +60,15 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
     user?.phone ||
     "Foydalanuvchi";
 
-  const diamonds = user?.diamonds ?? 0;
+  const localSavedDiamonds = (() => {
+    try {
+      const v = Number(localStorage.getItem(`ls_local_diamonds_${user?.id || "guest"}`) || 0);
+      return isNaN(v) ? 0 : v;
+    } catch {
+      return 0;
+    }
+  })();
+  const diamonds = Math.max(diamondsOverride ?? 0, user?.diamonds ?? 0, localSavedDiamonds);
   const xp = user?.xp ?? 0;
   const level = user?.level ?? Math.floor(xp / 100) + 1;
   const xpInLevel = xp % 100;

@@ -376,11 +376,48 @@ export default function UserHome() {
   const [onlineCount, setOnlineCount] = useState<number>(1);
 
   // Diamonds & Daily reward state (5 diamonds once per 24h)
-  const [diamonds, setDiamonds] = useState<number>(user?.diamonds ?? 0);
-  const [lastDailyClaimAt, setLastDailyClaimAt] = useState<string | null>(
-    user?.lastDailyClaimAt || null
-  );
-  const [dailyRemainingSec, setDailyRemainingSec] = useState<number>(0);
+  const dailyClaimStorageKey = `ls_daily_claim_${user?.id || "guest"}`;
+  const dailyDiamondsStorageKey = `ls_local_diamonds_${user?.id || "guest"}`;
+
+  const [diamonds, setDiamonds] = useState<number>(() => {
+    const serverDiamonds = user?.diamonds ?? 0;
+    try {
+      const saved = Number(localStorage.getItem(`ls_local_diamonds_${user?.id || "guest"}`) || 0);
+      return Math.max(serverDiamonds, isNaN(saved) ? 0 : saved);
+    } catch {
+      return serverDiamonds;
+    }
+  });
+  const [lastDailyClaimAt, setLastDailyClaimAt] = useState<string | null>(() => {
+    if (user?.lastDailyClaimAt) return user.lastDailyClaimAt;
+    try {
+      const saved = localStorage.getItem(`ls_daily_claim_${user?.id || "guest"}`);
+      if (saved) {
+        const ms = new Date(saved).getTime();
+        if (!isNaN(ms) && Date.now() - ms < 24 * 60 * 60 * 1000) {
+          return saved;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  });
+  const [dailyRemainingSec, setDailyRemainingSec] = useState<number>(() => {
+    const initialClaim =
+      user?.lastDailyClaimAt ||
+      (() => {
+        try {
+          return localStorage.getItem(`ls_daily_claim_${user?.id || "guest"}`);
+        } catch {
+          return null;
+        }
+      })();
+    if (!initialClaim) return 0;
+    const ms = new Date(initialClaim).getTime();
+    if (isNaN(ms)) return 0;
+    return Math.max(0, Math.ceil((ms + 24 * 60 * 60 * 1000 - Date.now()) / 1000));
+  });
   const [claimingDaily, setClaimingDaily] = useState(false);
   const [streakDays, setStreakDays] = useState<number>(user?.streakDays ?? 1);
   const [talkSeconds, setTalkSeconds] = useState<number>(user?.talkSeconds ?? 0);
@@ -677,10 +714,39 @@ export default function UserHome() {
         const data = await res.json();
         if (data?.user) {
           if (typeof data.user.diamonds === "number") {
-            setDiamonds(data.user.diamonds);
+            let localSaved = 0;
+            try {
+              localSaved = Number(localStorage.getItem(dailyDiamondsStorageKey) || 0);
+            } catch {
+              localSaved = 0;
+            }
+            const nextDiamonds = Math.max(data.user.diamonds, isNaN(localSaved) ? 0 : localSaved);
+            setDiamonds(nextDiamonds);
           }
-          if (data.user.lastDailyClaimAt !== undefined) {
-            setLastDailyClaimAt(data.user.lastDailyClaimAt || null);
+          if (data.user.lastDailyClaimAt) {
+            setLastDailyClaimAt(data.user.lastDailyClaimAt);
+            try {
+              localStorage.setItem(dailyClaimStorageKey, data.user.lastDailyClaimAt);
+            } catch {
+              /* ignore */
+            }
+          } else {
+            try {
+              const savedClaim = localStorage.getItem(dailyClaimStorageKey);
+              if (savedClaim) {
+                const ms = new Date(savedClaim).getTime();
+                if (!isNaN(ms) && Date.now() - ms < 24 * 60 * 60 * 1000) {
+                  setLastDailyClaimAt(savedClaim);
+                } else {
+                  localStorage.removeItem(dailyClaimStorageKey);
+                  setLastDailyClaimAt(null);
+                }
+              } else {
+                setLastDailyClaimAt(null);
+              }
+            } catch {
+              setLastDailyClaimAt(null);
+            }
           }
           if (typeof data.user.streakDays === "number") {
             setStreakDays(data.user.streakDays);
@@ -2187,9 +2253,33 @@ export default function UserHome() {
 
   const handleClaimDiamond = async () => {
     if (isDailyClaimed || claimingDaily) return;
-    const authToken = token || localStorage.getItem("ls_token");
-    if (!authToken) return;
     setClaimingDaily(true);
+
+    // 1. Immediately update UI: fill green progress bar (5/5), add +5 diamonds, start 24h countdown
+    const nowIso = new Date().toISOString();
+    setLastDailyClaimAt(nowIso);
+    setDailyRemainingSec(24 * 60 * 60);
+    setDiamonds((prev) => {
+      const next = prev + 5;
+      try {
+        localStorage.setItem(dailyDiamondsStorageKey, String(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+    try {
+      localStorage.setItem(dailyClaimStorageKey, nowIso);
+    } catch {
+      /* ignore */
+    }
+
+    // 2. Sync with backend & Supabase
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) {
+      setClaimingDaily(false);
+      return;
+    }
     try {
       const res = await fetch(`${API_BASE}/api/auth/claim-daily`, {
         method: "POST",
@@ -2202,21 +2292,35 @@ export default function UserHome() {
       const data = await res.json();
       if (data?.success) {
         if (typeof data.diamonds === "number") {
-          setDiamonds(data.diamonds);
-        } else {
-          setDiamonds((d) => d + 5);
+          setDiamonds((prev) => {
+            const synced = Math.max(prev, data.diamonds);
+            try {
+              localStorage.setItem(dailyDiamondsStorageKey, String(synced));
+            } catch {
+              /* ignore */
+            }
+            return synced;
+          });
         }
         if (data.lastDailyClaimAt) {
           setLastDailyClaimAt(data.lastDailyClaimAt);
-        } else {
-          setLastDailyClaimAt(new Date().toISOString());
+          try {
+            localStorage.setItem(dailyClaimStorageKey, data.lastDailyClaimAt);
+          } catch {
+            /* ignore */
+          }
         }
         void refreshUser();
       } else if (data?.lastDailyClaimAt) {
         setLastDailyClaimAt(data.lastDailyClaimAt);
+        try {
+          localStorage.setItem(dailyClaimStorageKey, data.lastDailyClaimAt);
+        } catch {
+          /* ignore */
+        }
       }
     } catch {
-      /* ignore */
+      /* keep optimistic local claim & +5 diamonds */
     } finally {
       setClaimingDaily(false);
     }
@@ -5282,7 +5386,10 @@ export default function UserHome() {
 
               {/* Desktop Account Menu (Telefonda pastdagi navigatsiyada, Desktopda esa tepada chiqadi) */}
               <div className="hidden md:block">
-                <AccountMenu onSelectTab={(tab) => setActiveTab(tab)} />
+                <AccountMenu
+                  onSelectTab={(tab) => setActiveTab(tab)}
+                  diamondsOverride={diamonds}
+                />
               </div>
             </div>
           </header>
@@ -6013,20 +6120,37 @@ export default function UserHome() {
                   <div className="rounded-2xl border border-white/[0.08] bg-[#0b071b]/85 p-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-2xl flex flex-col gap-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-amber-400">
+                        <div
+                          className={cn(
+                            "flex h-8 w-8 items-center justify-center rounded-lg border transition-colors",
+                            isDailyClaimed
+                              ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-400"
+                              : "border-amber-500/25 bg-amber-500/10 text-amber-400"
+                          )}
+                        >
                           <Gem className="h-4 w-4" />
                         </div>
                         <span className="text-[13px] font-semibold text-white">{dt.reward.dailyTitle}</span>
                         <Info className="h-3.5 w-3.5 text-zinc-500" />
                       </div>
-                      <span className="text-xs font-bold text-zinc-300 tabular-nums">
+                      <span
+                        className={cn(
+                          "text-xs font-bold tabular-nums transition-colors",
+                          isDailyClaimed ? "text-emerald-400" : "text-zinc-300"
+                        )}
+                      >
                         {dailyProgress} / 5
                       </span>
                     </div>
 
-                    <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/[0.07]">
+                    <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-300"
+                        className={cn(
+                          "h-full rounded-full transition-all duration-500",
+                          isDailyClaimed
+                            ? "bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.65)]"
+                            : "bg-gradient-to-r from-amber-500 to-yellow-400"
+                        )}
                         style={{ width: `${(dailyProgress / 5) * 100}%` }}
                       />
                     </div>
@@ -6038,15 +6162,15 @@ export default function UserHome() {
                       className={cn(
                         "w-full inline-flex items-center justify-center gap-2 rounded-xl border py-2.5 px-3 text-xs font-bold transition-all",
                         isDailyClaimed
-                          ? "border-white/[0.08] bg-white/[0.03] text-zinc-400 cursor-not-allowed"
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 cursor-not-allowed shadow-[0_0_15px_rgba(16,185,129,0.12)]"
                           : "border-amber-500/35 bg-gradient-to-r from-amber-500/20 to-yellow-500/15 hover:from-amber-500/30 hover:to-yellow-500/25 text-amber-300 cursor-pointer shadow-[0_0_20px_rgba(245,158,11,0.15)]"
                       )}
                     >
                       {isDailyClaimed ? (
                         <>
-                          <Clock className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+                          <Clock className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
                           <span className="font-mono tabular-nums">
-                            Keyingi olmos: {formatCountdown(dailyRemainingSec)}
+                            {formatCountdown(dailyRemainingSec)}
                           </span>
                         </>
                       ) : claimingDaily ? (
