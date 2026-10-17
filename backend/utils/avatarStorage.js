@@ -19,6 +19,15 @@ function saveAvatarFile(userId, imageString) {
   const trimmed = imageString.trim();
   if (!trimmed) return null;
 
+  // If already a media URL or HTTP URL, do not re-save
+  if (trimmed.startsWith("/media/") || trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return {
+      relativeUrl: trimmed,
+      filename: path.basename(trimmed),
+      dataUrl: null,
+    };
+  }
+
   ensureAvatarsDir();
 
   let mimeSubtype = "jpeg";
@@ -47,6 +56,22 @@ function saveAvatarFile(userId, imageString) {
   const filePath = path.join(AVATARS_DIR, filename);
 
   try {
+    // Clean up old avatar files for this user to save space
+    try {
+      const existing = fs.readdirSync(AVATARS_DIR);
+      for (const f of existing) {
+        if (f.startsWith(`avatar_${safeUserId}_`) && f !== filename) {
+          try {
+            fs.unlinkSync(path.join(AVATARS_DIR, f));
+          } catch {
+            /* ignore unlink error */
+          }
+        }
+      }
+    } catch {
+      /* ignore readdir error */
+    }
+
     fs.writeFileSync(filePath, buffer);
     return {
       relativeUrl: `/media/avatars/${filename}`,

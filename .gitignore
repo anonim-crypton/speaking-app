@@ -37,6 +37,12 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+# Media uploads
+backend/media/avatars/*
+!backend/media/avatars/.gitkeep
+backend/media/books/*
+!backend/media/books/.gitkeep
+
 # Python / Django
 __pycache__/
 *.py[cod]
@@ -44,4 +50,5 @@ __pycache__/
 *.sqlite3
 backend/django_admin/db.sqlite3
 .pytest_cache/
+
 
