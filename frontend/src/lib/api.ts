@@ -18,6 +18,10 @@ export interface AuthUser {
   countryCode: string | null;
   region: string | null;
   diamonds: number;
+  xp?: number;
+  level?: number;
+  completedDailyTasks?: string[];
+  totalTasksCompleted?: number;
   isPremium?: boolean;
   isVerified?: boolean;
   isBanned?: boolean;

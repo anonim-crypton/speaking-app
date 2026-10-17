@@ -23,6 +23,8 @@ const signToken = (user, sid = null) =>
   });
 
 function publicUser(user) {
+  const xp = Number(user.xp || 0);
+  const level = Math.floor(xp / 100) + 1;
   return {
     id: user.id,
     slug: userSlug(user.id),
@@ -38,6 +40,10 @@ function publicUser(user) {
     purpose: user.purpose ?? user.onboarding?.purpose ?? null,
     gender: user.gender ?? user.onboarding?.gender ?? null,
     diamonds: user.diamonds || 0,
+    xp,
+    level,
+    completedDailyTasks: Array.isArray(user.completedDailyTasks) ? user.completedDailyTasks : [],
+    totalTasksCompleted: Number(user.totalTasksCompleted || 0),
     isPremium: Boolean(user.isPremium),
     isVerified: Boolean(user.isVerified),
     isBanned: Boolean(user.isBanned),

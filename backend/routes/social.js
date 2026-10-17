@@ -2,18 +2,27 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const store = require("../utils/store");
+const supabase = require("../lib/supabase");
 const { authRequired } = require("../middleware/auth");
 
 const router = express.Router();
 
 const DATA_DIR = path.join(__dirname, "..", "data");
 const DM_FILE = path.join(DATA_DIR, "direct_messages.json");
+const BOOKS_FILE = path.join(DATA_DIR, "books.json");
+const BOOKS_MEDIA_DIR = path.join(__dirname, "..", "media", "books");
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+if (!fs.existsSync(BOOKS_MEDIA_DIR)) {
+  fs.mkdirSync(BOOKS_MEDIA_DIR, { recursive: true });
+}
 if (!fs.existsSync(DM_FILE)) {
   fs.writeFileSync(DM_FILE, JSON.stringify([], null, 2), "utf8");
+}
+if (!fs.existsSync(BOOKS_FILE)) {
+  fs.writeFileSync(BOOKS_FILE, JSON.stringify([], null, 2), "utf8");
 }
 
 function readDMs() {
@@ -33,6 +42,23 @@ function writeDMs(list) {
   }
 }
 
+function readBooks() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(BOOKS_FILE, "utf8"));
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeBooks(list) {
+  try {
+    fs.writeFileSync(BOOKS_FILE, JSON.stringify(list, null, 2), "utf8");
+  } catch (e) {
+    console.warn("Failed to write books:", e);
+  }
+}
+
 function formatPublicProfile(u) {
   if (!u) return null;
   const fallbackName =
@@ -44,6 +70,8 @@ function formatPublicProfile(u) {
     u.username ||
     (u.email ? u.email.split("@")[0].toLowerCase() : null) ||
     String(u.id || "user").slice(0, 8);
+  const xp = Number(u.xp || 0);
+  const level = Math.floor(xp / 100) + 1;
   return {
     id: u.id,
     name: fallbackName,
@@ -52,6 +80,8 @@ function formatPublicProfile(u) {
     isPremium: Boolean(u.isPremium),
     isVerified: Boolean(u.isVerified),
     diamonds: Number(u.diamonds) || 0,
+    xp,
+    level,
     streakDays: Math.max(1, Number(u.streakDays) || 1),
     talkSeconds: Number(u.talkSeconds) || 0,
     countryCode: u.countryCode || u.onboarding?.countryCode || "UZ",
@@ -124,6 +154,7 @@ router.get("/history", authRequired, (req, res) => {
           isPremium: prof.isPremium,
           isVerified: prof.isVerified,
           language: item.language || "uz",
+          durationSeconds: Number(item.durationSeconds || 0),
           talkedAt: item.talkedAt || livePartner.updatedAt || new Date().toISOString(),
         };
       }
@@ -136,6 +167,7 @@ router.get("/history", authRequired, (req, res) => {
         isPremium: Boolean(item.isPremium),
         isVerified: Boolean(item.isVerified),
         language: item.language || "uz",
+        durationSeconds: Number(item.durationSeconds || 0),
         talkedAt: item.talkedAt || new Date().toISOString(),
       };
     });
@@ -243,7 +275,7 @@ router.get("/friends", authRequired, (req, res) => {
 
 router.post("/friends/request", authRequired, (req, res) => {
   try {
-    const { targetUserId } = req.body || {};
+    const targetUserId = req.body?.toUserId || req.body?.targetUserId;
     if (!targetUserId || targetUserId === req.user.id) {
       return res.status(400).json({ success: false, message: "Noto'g'ri foydalanuvchi" });
     }
@@ -268,7 +300,6 @@ router.post("/friends/request", authRequired, (req, res) => {
     const nowIso = new Date().toISOString();
 
     if (theyRequestedMe) {
-      // Auto-accept mutual request
       const nextMyIncoming = myIncoming.filter((r) =>
         typeof r === "string" ? r !== target.id : r.fromUserId !== target.id
       );
@@ -297,7 +328,6 @@ router.post("/friends/request", authRequired, (req, res) => {
       });
     }
 
-    // Add to my outgoing and target's incoming
     const myOutgoing = Array.isArray(me.friendRequestsOut) ? [...me.friendRequestsOut] : [];
     if (!myOutgoing.includes(target.id)) {
       myOutgoing.push(target.id);
@@ -326,7 +356,8 @@ router.post("/friends/request", authRequired, (req, res) => {
 
 router.post("/friends/respond", authRequired, (req, res) => {
   try {
-    const { requesterId, action } = req.body || {};
+    const requesterId = req.body?.fromUserId || req.body?.requesterId;
+    const action = req.body?.action;
     if (!requesterId || !["accept", "reject"].includes(action)) {
       return res.status(400).json({ success: false, message: "Noto'g'ri so'rov" });
     }
@@ -423,11 +454,16 @@ router.get("/dm/:partnerId", authRequired, (req, res) => {
     const allDMs = readDMs();
 
     const conversation = allDMs
-      .filter(
-        (m) =>
-          (m.fromId === myId && m.toId === partnerId) ||
-          (m.fromId === partnerId && m.toId === myId)
-      )
+      .filter((m) => {
+        const f = m.fromUserId || m.fromId;
+        const t = m.toUserId || m.toId;
+        return (f === myId && t === partnerId) || (f === partnerId && t === myId);
+      })
+      .map((m) => ({
+        ...m,
+        fromUserId: m.fromUserId || m.fromId,
+        toUserId: m.toUserId || m.toId,
+      }))
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     return res.json({
@@ -456,19 +492,34 @@ router.post("/dm/:partnerId", authRequired, (req, res) => {
       id: "dm_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
       fromId: myId,
       toId: partnerId,
+      fromUserId: myId,
+      toUserId: partnerId,
       senderName: me.name || me.username || "Foydalanuvchi",
+      senderUsername: me.username || "speaker",
       text,
       createdAt: new Date().toISOString(),
     };
     allDMs.push(newMsg);
     writeDMs(allDMs.slice(-2000));
 
-    // Also update talkHistory between both users so "Mening tarixim" reflects latest chat time
     touchTalkHistoryBetween(myId, partnerId);
+
+    const conversation = allDMs
+      .filter((m) => {
+        const f = m.fromUserId || m.fromId;
+        const t = m.toUserId || m.toId;
+        return (f === myId && t === partnerId) || (f === partnerId && t === myId);
+      })
+      .map((m) => ({
+        ...m,
+        fromUserId: m.fromUserId || m.fromId,
+        toUserId: m.toUserId || m.toId,
+      }));
 
     return res.status(201).json({
       success: true,
       message: newMsg,
+      messages: conversation,
     });
   } catch (err) {
     console.error("Send DM error:", err);
@@ -483,26 +534,251 @@ router.get("/leaderboard", (req, res) => {
       .readUsers()
       .filter((u) => u && !u.isBanned && (u.name || u.username));
 
-    const formatted = allUsers.map((u) => {
-      const prof = formatPublicProfile(u);
-      // Composite activity score combining diamonds, streak consistency, and speaking hours
-      const score =
-        prof.diamonds * 10 +
-        prof.streakDays * 25 +
-        Math.floor(prof.talkSeconds / 60) * 5;
-      return {
-        ...prof,
-        score,
-      };
-    });
+    const formatted = allUsers
+      .map((u) => {
+        const prof = formatPublicProfile(u);
+        const score =
+          prof.diamonds * 10 +
+          prof.streakDays * 35 +
+          Math.floor(prof.talkSeconds / 60) * 5 +
+          prof.xp * 2;
+        return {
+          ...prof,
+          score,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .map((item, idx) => ({
+        ...item,
+        rank: idx + 1,
+      }));
 
     return res.json({
       success: true,
+      leaderboard: formatted,
       users: formatted,
     });
   } catch (err) {
     console.error("Leaderboard error:", err);
     return res.status(500).json({ success: false, message: "Reytingni yuklashda xatolik" });
+  }
+});
+
+/* ───────────────────────── 5. DAILY TASKS & GAME COMPLETION (+1 OLMO & +XP) ───────────────────────── */
+router.post("/tasks/complete", authRequired, async (req, res) => {
+  try {
+    const { taskId, language, xpEarned = 20 } = req.body || {};
+    if (!taskId) {
+      return res.status(400).json({ success: false, message: "Topshiriq ID kiritilmadi" });
+    }
+    const user = store.findById(req.user.id) || req.user;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const taskKey = `${todayStr}:${language || "en"}:${taskId}`;
+    const completedList = Array.isArray(user.completedDailyTasks) ? [...user.completedDailyTasks] : [];
+
+    if (completedList.includes(taskKey)) {
+      const curXp = Number(user.xp || 0);
+      return res.json({
+        success: true,
+        alreadyCompleted: true,
+        diamonds: Number(user.diamonds || 0),
+        xp: curXp,
+        level: Math.floor(curXp / 100) + 1,
+        completedDailyTasks: completedList,
+        message: "Ushbu kunlik topshiriq allaqachon bajarilgan",
+      });
+    }
+
+    completedList.push(taskKey);
+    const addedXp = Math.max(5, Math.min(100, Number(xpEarned) || 20));
+    const newDiamonds = Number(user.diamonds || 0) + 1;
+    const newXp = Number(user.xp || 0) + addedXp;
+    const newLevel = Math.floor(newXp / 100) + 1;
+    const totalTasksCompleted = Number(user.totalTasksCompleted || 0) + 1;
+
+    const history = Array.isArray(user.diamondHistory) ? [...user.diamondHistory] : [];
+    history.unshift({
+      id: "task_" + Date.now(),
+      amount: 1,
+      reason: `Kunlik topshiriq bajarildi (+1 Olmos, +${addedXp} XP)`,
+      createdAt: new Date().toISOString(),
+    });
+
+    store.updateUser(user.id, {
+      diamonds: newDiamonds,
+      xp: newXp,
+      level: newLevel,
+      completedDailyTasks: completedList.slice(-500),
+      totalTasksCompleted,
+      diamondHistory: history.slice(0, 200),
+    });
+
+    void supabase.updateRow("profiles", "id", user.id, { diamonds: newDiamonds });
+
+    return res.json({
+      success: true,
+      diamonds: newDiamonds,
+      xp: newXp,
+      level: newLevel,
+      completedDailyTasks: completedList,
+      totalTasksCompleted,
+      message: `Topshiriq bajarildi! +1 ta Olmos va +${addedXp} XP qo'shildi!`,
+    });
+  } catch (err) {
+    console.error("Complete task error:", err);
+    return res.status(500).json({ success: false, message: "Topshiriqni saqlashda xatolik" });
+  }
+});
+
+router.post("/game/complete", authRequired, async (req, res) => {
+  try {
+    const { xpEarned = 25, diamondsEarned = 1 } = req.body || {};
+    const user = store.findById(req.user.id) || req.user;
+    const addedXp = Math.max(5, Math.min(150, Number(xpEarned) || 25));
+    const addedDiamonds = Math.max(0, Math.min(5, Number(diamondsEarned) || 1));
+
+    const newDiamonds = Number(user.diamonds || 0) + addedDiamonds;
+    const newXp = Number(user.xp || 0) + addedXp;
+    const newLevel = Math.floor(newXp / 100) + 1;
+
+    const history = Array.isArray(user.diamondHistory) ? [...user.diamondHistory] : [];
+    if (addedDiamonds > 0) {
+      history.unshift({
+        id: "game_" + Date.now(),
+        amount: addedDiamonds,
+        reason: `Topshiriqli o'yin g'alabasi (+${addedDiamonds} Olmos, +${addedXp} XP)`,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    store.updateUser(user.id, {
+      diamonds: newDiamonds,
+      xp: newXp,
+      level: newLevel,
+      diamondHistory: history.slice(0, 200),
+    });
+
+    if (addedDiamonds > 0) {
+      void supabase.updateRow("profiles", "id", user.id, { diamonds: newDiamonds });
+    }
+
+    return res.json({
+      success: true,
+      diamonds: newDiamonds,
+      xp: newXp,
+      level: newLevel,
+      message: `O'yin yakunlandi! +${addedDiamonds} ta Olmos va +${addedXp} XP olindi!`,
+    });
+  } catch (err) {
+    console.error("Complete game error:", err);
+    return res.status(500).json({ success: false, message: "O'yin natijasini saqlashda xatolik" });
+  }
+});
+
+/* ───────────────────────── 6. FOYDALI KITOBLAR (ADMIN UPLOAD & USER VIEW) ───────────────────────── */
+router.get("/books", (req, res) => {
+  try {
+    const books = readBooks();
+    return res.json({
+      success: true,
+      books,
+    });
+  } catch (err) {
+    console.error("Get books error:", err);
+    return res.status(500).json({ success: false, message: "Kitoblarni yuklashda xatolik" });
+  }
+});
+
+router.post("/books", (req, res) => {
+  try {
+    const {
+      title,
+      bio,
+      coverImageBase64,
+      coverImageName,
+      bookFileBase64,
+      bookFileName,
+      bookFileSize,
+    } = req.body || {};
+
+    if (!title || !String(title).trim()) {
+      return res.status(400).json({ success: false, message: "Kitob nomi kiritilishi shart" });
+    }
+    if (!bookFileBase64) {
+      return res.status(400).json({ success: false, message: "Kitob fayli yuklanishi shart" });
+    }
+
+    let coverUrl = null;
+    if (coverImageBase64 && typeof coverImageBase64 === "string") {
+      const imgMatch = coverImageBase64.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+      let ext = "jpg";
+      let buf;
+      if (imgMatch) {
+        ext = imgMatch[1].toLowerCase();
+        if (ext === "jpeg") ext = "jpg";
+        buf = Buffer.from(imgMatch[2], "base64");
+      } else {
+        buf = Buffer.from(coverImageBase64, "base64");
+      }
+      const coverFile = `cover_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${ext}`;
+      fs.writeFileSync(path.join(BOOKS_MEDIA_DIR, coverFile), buf);
+      coverUrl = `/media/books/${coverFile}`;
+    }
+
+    let fileUrl = null;
+    const rawFileStr = String(bookFileBase64);
+    const dataPrefixIdx = rawFileStr.indexOf(";base64,");
+    const base64Data = dataPrefixIdx >= 0 ? rawFileStr.slice(dataPrefixIdx + 8) : rawFileStr;
+    const fileBuf = Buffer.from(base64Data, "base64");
+
+    const safeOriginalName = String(bookFileName || "book.pdf")
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .slice(-80);
+    const savedFileName = `book_${Date.now()}_${safeOriginalName}`;
+    fs.writeFileSync(path.join(BOOKS_MEDIA_DIR, savedFileName), fileBuf);
+    fileUrl = `/media/books/${savedFileName}`;
+
+    const newBook = {
+      id: "book_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      title: String(title).trim(),
+      bio: String(bio || "").trim(),
+      coverUrl,
+      fileUrl,
+      fileName: bookFileName || safeOriginalName,
+      fileSize: bookFileSize || fileBuf.length,
+      createdAt: new Date().toISOString(),
+    };
+
+    const books = readBooks();
+    books.unshift(newBook);
+    writeBooks(books);
+
+    return res.status(201).json({
+      success: true,
+      book: newBook,
+      books,
+      message: "Kitob muvaffaqiyatli yuklandi!",
+    });
+  } catch (err) {
+    console.error("Upload book error:", err);
+    return res.status(500).json({ success: false, message: "Kitobni yuklashda xatolik yuz berdi" });
+  }
+});
+
+router.delete("/books/:bookId", (req, res) => {
+  try {
+    const { bookId } = req.params;
+    const books = readBooks();
+    const filtered = books.filter((b) => b.id !== bookId);
+    writeBooks(filtered);
+    return res.json({
+      success: true,
+      books: filtered,
+      message: "Kitob o'chirildi",
+    });
+  } catch (err) {
+    console.error("Delete book error:", err);
+    return res.status(500).json({ success: false, message: "Kitobni o'chirishda xatolik" });
   }
 });
 

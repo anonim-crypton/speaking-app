@@ -10,6 +10,7 @@ import {
   Settings,
   User,
   Users,
+  Zap,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -36,7 +37,7 @@ interface AccountMenuProps {
  * Navbar account qismi:
  * Spiker avatar + kiritilgan ism.
  * Bosilganda ochiladigan dropdown:
- * Olmoslar soni, Profil, Do'stlar, Gaplashish tarixi, Yordam, Sozlamalar,
+ * Olmoslar soni, XP Daraja, Profil, Do'stlar, Gaplashish tarixi, Yordam, Sozlamalar,
  * chiziq, Shikoyat bo'limi, Admin bilan bog'lanish, chiziq, Hisobdan chiqish.
  */
 export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
@@ -59,6 +60,9 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
     "Foydalanuvchi";
 
   const diamonds = user?.diamonds ?? 0;
+  const xp = user?.xp ?? 0;
+  const level = user?.level ?? Math.floor(xp / 100) + 1;
+  const xpInLevel = xp % 100;
   const isPremium = Boolean(user?.isPremium);
 
   return (
@@ -85,7 +89,7 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-[260px] p-2 bg-[#0e0a24]/95 border-white/[0.12] backdrop-blur-xl shadow-2xl z-50">
+      <DropdownMenuContent align="end" className="w-[275px] p-2.5 bg-[#0e0a24]/95 border-white/[0.12] backdrop-blur-xl shadow-2xl z-50">
         {/* ── Foydalanuvchi ismi va avatari ── */}
         <div
           onClick={() => handleTabClick("profile")}
@@ -94,7 +98,7 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
           <div className={cn("relative shrink-0 rounded-full", isPremium && "p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_12px_rgba(245,158,11,0.5)]")}>
             <SpeakerAvatar size={36} src={user?.avatarUrl} />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <p className="truncate text-sm font-bold text-white">{displayName}</p>
               {isPremium && <VerifiedBadge size={16} />}
@@ -112,7 +116,7 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
         </div>
 
         {/* ── 1. Yig'gan olmoslar soni ── */}
-        <div className="mt-2 flex items-center gap-2.5 rounded-xl border border-violet-500/30 bg-gradient-to-r from-violet-600/20 to-fuchsia-500/15 px-3 py-2.5">
+        <div className="mt-2 flex items-center gap-2.5 rounded-xl border border-violet-500/30 bg-gradient-to-r from-violet-600/20 to-fuchsia-500/15 px-3 py-2">
           <Gem className="h-4 w-4 shrink-0 text-violet-300 animate-pulse" />
           <span className="text-xs font-semibold text-zinc-300">
             {t.account.diamonds || "Olmoslar"}
@@ -120,6 +124,27 @@ export default function AccountMenu({ onSelectTab }: AccountMenuProps = {}) {
           <span className="ml-auto text-base font-extrabold tabular-nums text-violet-200">
             {diamonds}
           </span>
+        </div>
+
+        {/* ── 1.5. XP va Daraja (Level) ko'rsatkichi ── */}
+        <div className="mt-1.5 flex flex-col gap-1.5 rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-600/15 to-teal-500/10 px-3 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Zap className="h-4 w-4 text-emerald-400" />
+              <span className="text-xs font-bold text-emerald-300">
+                {level}-Daraja (Level {level})
+              </span>
+            </div>
+            <span className="text-xs font-extrabold tabular-nums text-white">
+              {xp} XP
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-300 transition-all duration-300"
+              style={{ width: `${Math.max(4, xpInLevel)}%` }}
+            />
+          </div>
         </div>
 
         <DropdownMenuSeparator className="my-2 bg-white/[0.08]" />

@@ -56,6 +56,12 @@ import {
   MessageCircle,
   Medal,
   Loader2,
+  ClipboardCheck,
+  Gamepad2,
+  Zap,
+  Lock,
+  Download,
+  RotateCcw,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -72,6 +78,14 @@ import AiLoader from "@/components/ui/ai-loader";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { API_BASE } from "@/lib/api";
+import {
+  getDailyTasksForUser,
+  getTaskGameQuestions,
+  LANGUAGE_META,
+  TIER_META,
+  type LanguageKey,
+  type DailyTaskQuestion,
+} from "@/data/dailyTasksBank";
 
 const MAX_SEARCH_SECONDS = 120; // 2 daqiqa kutish limiti
 
@@ -357,10 +371,60 @@ export default function UserHome() {
       diamonds: number;
       streakDays: number;
       talkSeconds: number;
+      xp?: number;
+      level?: number;
       score: number;
     }>
   >([]);
-  const [ratingSort, setRatingSort] = useState<"all" | "diamonds" | "streak" | "talk">("all");
+  const [ratingSort, setRatingSort] = useState<"all" | "diamonds" | "streak" | "talk" | "xp">("all");
+
+  // XP, Level, Daily Tasks, Task Game & Books state
+  const [userXp, setUserXp] = useState<number>(user?.xp ?? 0);
+  const [userLevel, setUserLevel] = useState<number>(user?.level ?? 1);
+  const [completedDailyTasks, setCompletedDailyTasks] = useState<Record<string, string[]>>(
+    user?.completedDailyTasks && !Array.isArray(user.completedDailyTasks)
+      ? user.completedDailyTasks
+      : {}
+  );
+  const [totalTasksCompleted, setTotalTasksCompleted] = useState<number>(
+    user?.totalTasksCompleted ?? 0
+  );
+  const [taskLang, setTaskLang] = useState<LanguageKey>("en");
+  const [taskSelectedAnswers, setTaskSelectedAnswers] = useState<Record<string, number>>({});
+  const [taskSubmittedResult, setTaskSubmittedResult] = useState<
+    Record<string, "correct" | "wrong">
+  >({});
+  const [submittingTaskId, setSubmittingTaskId] = useState<string | null>(null);
+  const [taskToastMsg, setTaskToastMsg] = useState<string | null>(null);
+
+  // Task Game ("Topshiriqli o'yin") state
+  const [gameLang, setGameLang] = useState<LanguageKey>("en");
+  const [gameQuestions, setGameQuestions] = useState<DailyTaskQuestion[]>([]);
+  const [gameIndex, setGameIndex] = useState<number>(0);
+  const [gameSelectedOption, setGameSelectedOption] = useState<number | null>(null);
+  const [gameResultState, setGameResultState] = useState<"idle" | "correct" | "wrong">("idle");
+  const [gameLives, setGameLives] = useState<number>(3);
+  const [gameCorrectCount, setGameCorrectCount] = useState<number>(0);
+  const [gameFinished, setGameFinished] = useState<boolean>(false);
+  const [gameClaimedReward, setGameClaimedReward] = useState<{
+    xpEarned: number;
+    diamondReward: number;
+  } | null>(null);
+  const [gameClaiming, setGameClaiming] = useState<boolean>(false);
+
+  // Books ("Foydali kitoblar") state
+  const [booksList, setBooksList] = useState<
+    Array<{
+      id: string;
+      title: string;
+      bio: string;
+      coverUrl: string | null;
+      fileUrl: string;
+      fileName: string;
+      fileSize?: number;
+      createdAt: string;
+    }>
+  >([]);
 
   // Direct Message (User-to-User) Modal state
   const [dmPartner, setDmPartner] = useState<{
@@ -539,6 +603,18 @@ export default function UserHome() {
           if (typeof data.user.talkSeconds === "number") {
             setTalkSeconds(data.user.talkSeconds);
           }
+          if (typeof data.user.xp === "number") {
+            setUserXp(data.user.xp);
+          }
+          if (typeof data.user.level === "number") {
+            setUserLevel(data.user.level);
+          }
+          if (data.user.completedDailyTasks && typeof data.user.completedDailyTasks === "object") {
+            setCompletedDailyTasks(data.user.completedDailyTasks);
+          }
+          if (typeof data.user.totalTasksCompleted === "number") {
+            setTotalTasksCompleted(data.user.totalTasksCompleted);
+          }
         }
       } catch {
         /* silent */
@@ -573,12 +649,12 @@ export default function UserHome() {
     return () => window.clearInterval(timer);
   }, [lastDailyClaimAt]);
 
-  // Fetch Social Data (Talk History, Friends, Leaderboard)
+  // Fetch Social Data (Talk History, Friends, Leaderboard, Books)
   const fetchSocialData = async () => {
     const authToken = token || localStorage.getItem("ls_token");
     if (!authToken) return;
     try {
-      const [histRes, frRes, lbRes] = await Promise.all([
+      const [histRes, frRes, lbRes, booksRes] = await Promise.all([
         fetch(`${API_BASE}/api/social/history`, {
           headers: { Authorization: `Bearer ${authToken}` },
         }),
@@ -588,11 +664,13 @@ export default function UserHome() {
         fetch(`${API_BASE}/api/social/leaderboard`, {
           headers: { Authorization: `Bearer ${authToken}` },
         }),
+        fetch(`${API_BASE}/api/social/books`),
       ]);
-      const [histData, frData, lbData] = await Promise.all([
+      const [histData, frData, lbData, booksData] = await Promise.all([
         histRes.json().catch(() => null),
         frRes.json().catch(() => null),
         lbRes.json().catch(() => null),
+        booksRes.json().catch(() => null),
       ]);
       if (histData?.success && Array.isArray(histData.history)) {
         setTalkHistory(histData.history);
@@ -605,6 +683,9 @@ export default function UserHome() {
       if (lbData?.success && Array.isArray(lbData.leaderboard)) {
         setLeaderboard(lbData.leaderboard);
       }
+      if (booksData?.success && Array.isArray(booksData.books)) {
+        setBooksList(booksData.books);
+      }
     } catch {
       /* ignore */
     }
@@ -615,6 +696,113 @@ export default function UserHome() {
     const interval = window.setInterval(fetchSocialData, 2500);
     return () => window.clearInterval(interval);
   }, [token, activeTab]);
+
+  // Initialize or reset Task Game when language changes
+  const startNewTaskGame = (langKey: LanguageKey = gameLang) => {
+    const qs = getTaskGameQuestions(langKey);
+    setGameQuestions(qs);
+    setGameIndex(0);
+    setGameSelectedOption(null);
+    setGameResultState("idle");
+    setGameLives(3);
+    setGameCorrectCount(0);
+    setGameFinished(false);
+    setGameClaimedReward(null);
+  };
+
+  useEffect(() => {
+    startNewTaskGame(gameLang);
+  }, [gameLang]);
+
+  const handleSubmitDailyTaskAnswer = async (task: DailyTaskQuestion) => {
+    const selectedIdx = taskSelectedAnswers[task.id];
+    if (selectedIdx === undefined) return;
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const alreadyDone = (completedDailyTasks[todayKey] || []).includes(task.id);
+    if (alreadyDone) return;
+
+    if (selectedIdx !== task.correctIndex) {
+      setTaskSubmittedResult((prev) => ({ ...prev, [task.id]: "wrong" }));
+      return;
+    }
+
+    setTaskSubmittedResult((prev) => ({ ...prev, [task.id]: "correct" }));
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken || submittingTaskId) return;
+
+    setSubmittingTaskId(task.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/social/tasks/complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          taskId: task.id,
+          language: task.language,
+          difficultyTier: task.tier,
+          xpEarned: task.xpReward,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (typeof data.diamonds === "number") setDiamonds(data.diamonds);
+        if (typeof data.xp === "number") setUserXp(data.xp);
+        if (typeof data.level === "number") setUserLevel(data.level);
+        if (data.completedDailyTasks) setCompletedDailyTasks(data.completedDailyTasks);
+        if (typeof data.totalTasksCompleted === "number") {
+          setTotalTasksCompleted(data.totalTasksCompleted);
+        }
+        setTaskToastMsg(
+          data.message || `Barakalla! +1 ta olmos va +${task.xpReward} XP taqdim etildi!`
+        );
+        setTimeout(() => setTaskToastMsg(null), 4000);
+        await refreshUser();
+        void fetchSocialData();
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setSubmittingTaskId(null);
+    }
+  };
+
+  const handleFinishGameClaim = async (finalCorrectCount: number) => {
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken || gameClaiming || finalCorrectCount <= 0) return;
+    setGameClaiming(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/social/game/complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          language: gameLang,
+          correctCount: finalCorrectCount,
+          totalQuestions: gameQuestions.length || 1,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (typeof data.diamonds === "number") setDiamonds(data.diamonds);
+        if (typeof data.xp === "number") setUserXp(data.xp);
+        if (typeof data.level === "number") setUserLevel(data.level);
+        setGameClaimedReward({
+          xpEarned: data.xpEarned || finalCorrectCount * 15,
+          diamondReward: data.diamondReward || 1,
+        });
+        await refreshUser();
+        void fetchSocialData();
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setGameClaiming(false);
+    }
+  };
 
   // Live search users for Friends page
   useEffect(() => {
@@ -1671,18 +1859,38 @@ export default function UserHome() {
 
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center">
             <div className="flex items-center justify-center gap-1 text-sm font-bold text-amber-300">
-              <span>0 {dt.stats.days}</span>
+              <span>{streakDays} {dt.stats.days}</span>
               <Flame className="h-3.5 w-3.5 text-amber-400" />
             </div>
             <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">{dt.profile.streak}</p>
           </div>
 
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-sm font-bold text-emerald-300">
-              <span>#1</span>
-              <Trophy className="h-3.5 w-3.5 text-emerald-400" />
+            <div className="flex items-center justify-center gap-1 text-sm font-bold text-cyan-300">
+              <span>{userLevel}-daraja</span>
+              <Zap className="h-3.5 w-3.5 text-cyan-400 fill-cyan-400" />
             </div>
-            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">{dt.profile.rank}</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">{userXp} XP</p>
+          </div>
+        </div>
+
+        {/* ── XP va Daraja Progress Bar (Telefon Profil saxifasi uchun) ── */}
+        <div className="mt-3.5 rounded-2xl border border-cyan-500/25 bg-gradient-to-r from-cyan-500/10 via-violet-500/10 to-indigo-500/10 p-3.5">
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="inline-flex items-center gap-1.5 font-extrabold text-cyan-300">
+              <Zap className="h-4 w-4 text-cyan-400 fill-cyan-400" />
+              {userLevel}-Daraja (Level {userLevel})
+            </span>
+            <span className="font-mono font-bold text-white">
+              {userXp} XP{" "}
+              <span className="text-zinc-400 font-normal">({userXp % 100}/100 XP)</span>
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-violet-500 to-fuchsia-500 transition-all duration-500"
+              style={{ width: `${Math.min(100, Math.max(6, userXp % 100))}%` }}
+            />
           </div>
         </div>
 
@@ -1741,6 +1949,66 @@ export default function UserHome() {
             <div className="text-left">
               <p className="text-sm font-semibold text-white">{dt.sidebar.history}</p>
               <p className="text-[11px] text-zinc-400">O'tkazilgan suhbatlar va mashg'ulotlar</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
+        {/* 1.1 Kunlik topshiriqlar */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("daily_tasks")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-400 group-hover:scale-105 transition-transform">
+              <ClipboardCheck className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Kunlik topshiriqlar</p>
+              <p className="text-[11px] text-zinc-400">Har kuni 5 tilda topshiriqlar (+1 olmos va XP)</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
+        {/* 1.2 Topshiriqli o'yin */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("task_game")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-400 group-hover:scale-105 transition-transform">
+              <Gamepad2 className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Topshiriqli o'yin</p>
+              <p className="text-[11px] text-zinc-400">Interaktiv til o'yini orqali XP va olmos yig'ing</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
+        {/* 1.3 Foydali kitoblar (Premium) */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("books")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/15 text-amber-300 group-hover:scale-105 transition-transform">
+              <BookOpen className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold text-white">Foydali kitoblar</p>
+                <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-400/45 bg-gradient-to-r from-amber-500/25 to-yellow-500/25 px-1.5 py-0.5 text-[9px] font-black text-amber-300">
+                  <Crown className="h-2.5 w-2.5 text-amber-300" />
+                  PRO
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400">Premium foydalanuvchilar uchun elektron kitoblar</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
@@ -2307,6 +2575,7 @@ export default function UserHome() {
       if (ratingSort === "diamonds") return b.diamonds - a.diamonds;
       if (ratingSort === "streak") return b.streakDays - a.streakDays;
       if (ratingSort === "talk") return b.talkSeconds - a.talkSeconds;
+      if (ratingSort === "xp") return (b.xp || 0) - (a.xp || 0);
       return b.score - a.score;
     });
 
@@ -2321,7 +2590,7 @@ export default function UserHome() {
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-white">{dt.sidebar.rating}</h1>
               <p className="text-xs text-zinc-400">
-                Eng ko'p olmos yig'gan, har kuni faol bo'lgan va soatlab speaking qilgan foydalanuvchilar reytingi
+                Eng ko'p olmos yig'gan, XP darajasi yuqori, har kuni faol bo'lgan va soatlab speaking qilgan foydalanuvchilar reytingi
               </p>
             </div>
           </div>
@@ -2330,6 +2599,7 @@ export default function UserHome() {
           <div className="flex flex-wrap items-center gap-2">
             {[
               { id: "all", label: "Umumiy", icon: Trophy },
+              { id: "xp", label: "XP va Daraja", icon: Zap },
               { id: "diamonds", label: "Ko'p olmoslar", icon: Gem },
               { id: "streak", label: "Doimiy faollar", icon: Flame },
               { id: "talk", label: "Ko'p speaking", icon: Clock },
@@ -2367,6 +2637,8 @@ export default function UserHome() {
             {sortedList.map((item, index) => {
               const pos = index + 1;
               const isMe = String(item.id) === String(user?.id);
+              const itemXp = item.xp ?? 0;
+              const itemLevel = item.level ?? Math.floor(itemXp / 100) + 1;
               return (
                 <div
                   key={item.id}
@@ -2413,6 +2685,10 @@ export default function UserHome() {
                           {item.name}
                         </p>
                         {(item.isPremium || item.isVerified) && <VerifiedBadge size={16} />}
+                        <span className="inline-flex items-center gap-1 rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[10px] font-extrabold text-cyan-300">
+                          <Zap className="h-2.5 w-2.5 fill-cyan-400 text-cyan-400" />
+                          {itemLevel}-daraja
+                        </span>
                         {isMe && (
                           <span className="rounded-md bg-violet-500/25 border border-violet-400/40 px-2 py-0.5 text-[10px] font-bold text-violet-200">
                             Siz
@@ -2423,8 +2699,18 @@ export default function UserHome() {
                     </div>
                   </div>
 
-                  {/* Right: 3 Metrics (Diamonds, Streak Days, Speaking Time) */}
-                  <div className="grid grid-cols-3 sm:flex items-center gap-2 sm:gap-3 border-t sm:border-t-0 border-white/[0.06] pt-3 sm:pt-0">
+                  {/* Right: 4 Metrics (XP, Diamonds, Streak Days, Speaking Time) */}
+                  <div className="grid grid-cols-2 sm:flex items-center gap-2 sm:gap-2.5 border-t sm:border-t-0 border-white/[0.06] pt-3 sm:pt-0">
+                    <div className="flex items-center gap-1.5 rounded-xl border border-cyan-500/25 bg-cyan-500/10 px-3 py-1.5">
+                      <Zap className="h-3.5 w-3.5 text-cyan-300 fill-cyan-400 shrink-0" />
+                      <div className="text-left">
+                        <p className="text-[10px] text-zinc-400 leading-none">XP Daraja</p>
+                        <p className="text-xs font-extrabold text-white tabular-nums mt-0.5">
+                          {itemXp} XP
+                        </p>
+                      </div>
+                    </div>
+
                     <div className="flex items-center gap-1.5 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-1.5">
                       <Gem className="h-3.5 w-3.5 text-violet-300 shrink-0" />
                       <div className="text-left">
@@ -2453,6 +2739,669 @@ export default function UserHome() {
                           {formatTalkDuration(item.talkSeconds)}
                         </p>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ══════════════════════════════════════════════════════════════════
+      KUNLIK TOPSHIRIQLAR (Daily Tasks — 5 languages, auto daily rotation, A1 -> C1)
+     ══════════════════════════════════════════════════════════════════ */
+  const renderDailyTasksView = () => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayCompletedIds = completedDailyTasks[todayStr] || [];
+    const {
+      tasks: dailyTasks,
+      activeTier,
+      progressionTitle,
+      progressionDescription,
+    } = getDailyTasksForUser(taskLang, todayStr, totalTasksCompleted);
+
+    const completedForLangCount = dailyTasks.filter((t) =>
+      todayCompletedIds.includes(t.id)
+    ).length;
+
+    return (
+      <div className="mx-auto max-w-5xl flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
+        {/* Top Header Card */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-500/35 bg-cyan-500/15 text-cyan-300 shadow-[0_0_25px_rgba(34,211,238,0.2)]">
+                <ClipboardCheck className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-lg sm:text-xl font-bold text-white">
+                    Kunlik topshiriqlar
+                  </h1>
+                  <span className="rounded-full border border-emerald-500/35 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-300">
+                    Har bir topshiriq = +1 💎 Olmos + XP
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  5 ta tildan xohlaganingizni tanlang — topshiriqlar har kuni avtomatik yangilanadi va osondan qiyinga (A1 → C1) sekin-asta o'sib boradi.
+                </p>
+              </div>
+            </div>
+
+            {/* Right Stats Pill */}
+            <div className="flex items-center gap-2.5 self-start sm:self-center">
+              <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2 text-center">
+                <p className="text-[10px] text-cyan-200/80 uppercase font-bold">Sizning darajangiz</p>
+                <p className="text-xs sm:text-sm font-black text-white flex items-center justify-center gap-1 mt-0.5">
+                  <Zap className="h-3.5 w-3.5 text-cyan-400 fill-cyan-400" />
+                  <span>{userLevel}-Daraja • {userXp} XP</span>
+                </p>
+              </div>
+              <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 px-3.5 py-2 text-center">
+                <p className="text-[10px] text-violet-200/80 uppercase font-bold">Bugun bajarildi</p>
+                <p className="text-xs sm:text-sm font-black text-white mt-0.5">
+                  {completedForLangCount} / {dailyTasks.length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 5 Language Selector Pills */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-white/[0.06]">
+            {LANGUAGES.map((l) => {
+              const isSelected = taskLang === l.id;
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => setTaskLang(l.id)}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-2xl border p-3 text-left transition-all cursor-pointer",
+                    isSelected
+                      ? "border-cyan-400/50 bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-white shadow-[0_0_20px_rgba(34,211,238,0.18)]"
+                      : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07] hover:text-white"
+                  )}
+                >
+                  <CountryFlag code={l.flagCode} width={20} className="h-4 w-6 rounded-[3px] shrink-0" />
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-extrabold text-white">{l.name}</p>
+                    <p className="truncate text-[10px] text-zinc-400">
+                      {LANGUAGE_META[l.id].subtitle}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Gradual Progression Banner */}
+          <div className="rounded-2xl border border-violet-500/25 bg-gradient-to-r from-violet-500/10 via-indigo-500/10 to-cyan-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={cn("rounded-lg border px-2.5 py-0.5 text-[11px] font-extrabold", TIER_META[activeTier].badgeClass)}>
+                  {TIER_META[activeTier].label}
+                </span>
+                <span className="text-xs font-bold text-white">{progressionTitle}</span>
+              </div>
+              <p className="text-xs text-zinc-300 mt-1 leading-relaxed">
+                {progressionDescription}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-300">
+                <Clock className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Sana: <strong className="text-white">{todayStr}</strong></span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Toast Feedback */}
+        {taskToastMsg && (
+          <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-3.5 text-xs sm:text-sm font-bold text-emerald-200 flex items-center justify-between shadow-[0_0_25px_rgba(16,185,129,0.2)] animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <Gem className="h-4 w-4 text-emerald-300 shrink-0" />
+              <span>{taskToastMsg}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTaskToastMsg(null)}
+              className="text-emerald-300 hover:text-white cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Daily Task Cards List (Ordered Easy -> Harder) */}
+        <div className="flex flex-col gap-4">
+          {dailyTasks.map((task, idx) => {
+            const isCompleted = todayCompletedIds.includes(task.id);
+            const selectedIdx = taskSelectedAnswers[task.id];
+            const submitState = taskSubmittedResult[task.id];
+            const tierInfo = TIER_META[task.tier];
+
+            return (
+              <div
+                key={task.id}
+                className={cn(
+                  "rounded-3xl border p-5 sm:p-6 backdrop-blur-2xl transition-all",
+                  isCompleted
+                    ? "border-emerald-500/40 bg-emerald-500/[0.06] shadow-[0_0_25px_rgba(16,185,129,0.08)]"
+                    : "border-white/[0.08] bg-[#0b071b]/85 hover:border-violet-500/30"
+                )}
+              >
+                {/* Card Top Row */}
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.06] border border-white/10 text-xs font-extrabold text-white">
+                      #{idx + 1}
+                    </span>
+                    <span className={cn("rounded-lg border px-2.5 py-0.5 text-[11px] font-extrabold", tierInfo.badgeClass)}>
+                      {task.tierLabel}
+                    </span>
+                    <span className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-[11px] font-semibold text-zinc-300">
+                      {task.category}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-xl border border-violet-500/35 bg-violet-500/15 px-2.5 py-1 text-xs font-extrabold text-violet-200">
+                      <Gem className="h-3.5 w-3.5 text-violet-300" />
+                      +1 Olmos
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-xl border border-cyan-500/35 bg-cyan-500/15 px-2.5 py-1 text-xs font-extrabold text-cyan-200">
+                      <Zap className="h-3.5 w-3.5 text-cyan-300 fill-cyan-300" />
+                      +{task.xpReward} XP
+                    </span>
+                    {isCompleted && (
+                      <span className="inline-flex items-center gap-1 rounded-xl border border-emerald-500/45 bg-emerald-500/20 px-3 py-1 text-xs font-extrabold text-emerald-300">
+                        <Check className="h-3.5 w-3.5" />
+                        Topshirildi
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Question Prompt */}
+                <h3 className="text-sm sm:text-base font-bold text-white leading-relaxed mb-1.5">
+                  {task.prompt}
+                </h3>
+                {task.hint && (
+                  <p className="text-xs text-zinc-400 mb-4">💡 Maslahat: {task.hint}</p>
+                )}
+
+                {/* Answer Options */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-4">
+                  {task.options.map((opt, optIdx) => {
+                    const isPicked = selectedIdx === optIdx;
+                    const showCorrect = isCompleted && optIdx === task.correctIndex;
+                    const showWrong =
+                      !isCompleted && submitState === "wrong" && isPicked && optIdx !== task.correctIndex;
+
+                    return (
+                      <button
+                        key={optIdx}
+                        type="button"
+                        disabled={isCompleted}
+                        onClick={() => {
+                          setTaskSelectedAnswers((prev) => ({ ...prev, [task.id]: optIdx }));
+                          setTaskSubmittedResult((prev) => {
+                            const next = { ...prev };
+                            delete next[task.id];
+                            return next;
+                          });
+                        }}
+                        className={cn(
+                          "flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-xs sm:text-sm font-semibold transition-all cursor-pointer",
+                          showCorrect
+                            ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-100"
+                            : showWrong
+                            ? "border-red-500/60 bg-red-500/20 text-red-200"
+                            : isPicked
+                            ? "border-cyan-400/60 bg-cyan-500/20 text-white shadow-[0_0_15px_rgba(34,211,238,0.18)]"
+                            : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07] hover:text-white"
+                        )}
+                      >
+                        <span>
+                          <strong className="mr-2 text-zinc-400">
+                            {String.fromCharCode(65 + optIdx)}.
+                          </strong>
+                          {opt}
+                        </span>
+                        {showCorrect && <Check className="h-4 w-4 text-emerald-300 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Explanation or Submit Bar */}
+                <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/[0.06]">
+                  {isCompleted ? (
+                    <div className="text-xs text-emerald-300 leading-relaxed">
+                      <strong>Izoh:</strong> {task.explanation}
+                    </div>
+                  ) : submitState === "wrong" ? (
+                    <div className="text-xs text-red-300 font-semibold">
+                      Noto'g'ri javob tanlandi. Boshqa variantni tanlab qayta urinib ko'ring!
+                    </div>
+                  ) : (
+                    <div className="text-xs text-zinc-400">
+                      To'g'ri javobni belgilab, <strong className="text-zinc-200">Topshirish</strong> tugmasini bosing.
+                    </div>
+                  )}
+
+                  {!isCompleted && (
+                    <button
+                      type="button"
+                      disabled={selectedIdx === undefined || submittingTaskId === task.id}
+                      onClick={() => void handleSubmitDailyTaskAnswer(task)}
+                      className="self-end sm:self-center inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-600 to-indigo-600 px-5 py-2.5 text-xs font-extrabold text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:brightness-110 disabled:opacity-45 transition-all cursor-pointer"
+                    >
+                      <Check className="h-4 w-4" />
+                      <span>
+                        {submittingTaskId === task.id
+                          ? "Tekshirilmoqda..."
+                          : "Topshirish (+1 💎 va XP)"}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  /* ══════════════════════════════════════════════════════════════════
+      TOPSHIRIQLI O'YIN (Interactive Language Challenge Game)
+     ══════════════════════════════════════════════════════════════════ */
+  const renderTaskGameView = () => {
+    const currentQ = gameQuestions[gameIndex];
+
+    const handleSelectGameOption = (optIdx: number) => {
+      if (gameResultState !== "idle" || gameFinished || !currentQ) return;
+      setGameSelectedOption(optIdx);
+
+      if (optIdx === currentQ.correctIndex) {
+        setGameResultState("correct");
+        setGameCorrectCount((prev) => prev + 1);
+      } else {
+        setGameResultState("wrong");
+        const nextLives = gameLives - 1;
+        setGameLives(nextLives);
+        if (nextLives <= 0) {
+          setTimeout(() => {
+            setGameFinished(true);
+            void handleFinishGameClaim(gameCorrectCount);
+          }, 900);
+        }
+      }
+    };
+
+    const handleNextGameQuestion = () => {
+      if (!currentQ) return;
+      if (gameIndex + 1 >= gameQuestions.length) {
+        setGameFinished(true);
+        void handleFinishGameClaim(gameCorrectCount);
+      } else {
+        setGameIndex((prev) => prev + 1);
+        setGameSelectedOption(null);
+        setGameResultState("idle");
+      }
+    };
+
+    return (
+      <div className="mx-auto max-w-4xl flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
+        {/* Header */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-fuchsia-500/35 bg-fuchsia-500/15 text-fuchsia-300 shadow-[0_0_25px_rgba(217,70,239,0.25)]">
+                <Gamepad2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-lg sm:text-xl font-bold text-white">Topshiriqli o'yin</h1>
+                <p className="text-xs text-zinc-400">
+                  Osondan qiyinga qarab ketma-ket savollarni yeching, XP darajangizni oshiring va bonus olmos yutib oling!
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => startNewTaskGame(gameLang)}
+              className="self-start sm:self-center inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-2 text-xs font-bold text-zinc-200 transition-all cursor-pointer"
+            >
+              <RotateCcw className="h-3.5 w-3.5 text-fuchsia-400" />
+              <span>Qayta boshlash</span>
+            </button>
+          </div>
+
+          {/* 5 Language Selector */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-white/[0.06]">
+            {LANGUAGES.map((l) => {
+              const active = gameLang === l.id;
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => setGameLang(l.id)}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-2xl border p-3 text-left transition-all cursor-pointer",
+                    active
+                      ? "border-fuchsia-400/50 bg-gradient-to-r from-fuchsia-500/20 to-violet-500/20 text-white shadow-[0_0_20px_rgba(217,70,239,0.2)]"
+                      : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07]"
+                  )}
+                >
+                  <CountryFlag code={l.flagCode} width={20} className="h-4 w-5 rounded-[2px] shrink-0" />
+                  <span className="truncate text-xs font-bold">{l.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Game Arena */}
+        {gameFinished ? (
+          <div className="rounded-3xl border border-fuchsia-500/35 bg-[#0b071b]/90 p-8 text-center shadow-2xl backdrop-blur-2xl flex flex-col items-center gap-4">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-fuchsia-500/25 to-violet-600/25 border border-fuchsia-400/40 text-fuchsia-300 shadow-[0_0_35px_rgba(217,70,239,0.3)]">
+              <Trophy className="h-10 w-10 text-amber-400" />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-white">
+              O'yin yakunlandi!
+            </h2>
+            <p className="text-sm text-zinc-300 max-w-md">
+              Siz <strong>{gameQuestions.length}</strong> ta savoldan{" "}
+              <strong className="text-emerald-300">{gameCorrectCount}</strong> tasiga to'g'ri javob berdingiz.
+            </p>
+
+            {gameClaimedReward ? (
+              <div className="flex flex-wrap items-center justify-center gap-3 my-2">
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-violet-500/40 bg-violet-500/15 px-4 py-2.5 text-sm font-black text-violet-200">
+                  <Gem className="h-4 w-4 text-violet-300" />
+                  <span>+{gameClaimedReward.diamondReward} Olmos qo'shildi</span>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/40 bg-cyan-500/15 px-4 py-2.5 text-sm font-black text-cyan-200">
+                  <Zap className="h-4 w-4 text-cyan-300 fill-cyan-300" />
+                  <span>+{gameClaimedReward.xpEarned} XP qo'shildi</span>
+                </div>
+              </div>
+            ) : gameClaiming ? (
+              <p className="text-xs text-zinc-400">Mukofotlar hisobingizga yozilmoqda...</p>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => startNewTaskGame(gameLang)}
+              className="mt-2 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-indigo-600 px-7 py-3 text-xs sm:text-sm font-extrabold text-white shadow-[0_0_25px_rgba(217,70,239,0.45)] hover:brightness-110 transition-all cursor-pointer"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span>Yana o'ynash</span>
+            </button>
+          </div>
+        ) : currentQ ? (
+          <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/90 p-6 sm:p-8 shadow-2xl backdrop-blur-2xl flex flex-col gap-5">
+            {/* Status Bar: Progress, Lives, Correct */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/[0.07]">
+              <div className="flex items-center gap-2">
+                <span className="rounded-xl border border-fuchsia-500/35 bg-fuchsia-500/15 px-3 py-1 text-xs font-extrabold text-fuchsia-300">
+                  Bosqich: {gameIndex + 1} / {gameQuestions.length}
+                </span>
+                <span className={cn("rounded-xl border px-3 py-1 text-xs font-extrabold", TIER_META[currentQ.tier].badgeClass)}>
+                  {currentQ.tierLabel}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs font-bold text-rose-300">
+                  <span>Jonlar:</span>
+                  <span>{"❤️".repeat(Math.max(0, gameLives)) || "🖤"}</span>
+                </div>
+                <div className="flex items-center gap-1 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                  <Check className="h-3.5 w-3.5" />
+                  <span>To'g'ri: {gameCorrectCount}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Question */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-fuchsia-400 mb-1">
+                {currentQ.category}
+              </p>
+              <h2 className="text-base sm:text-lg font-extrabold text-white leading-relaxed">
+                {currentQ.prompt}
+              </h2>
+            </div>
+
+            {/* Options */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {currentQ.options.map((opt, idx) => {
+                const isSelected = gameSelectedOption === idx;
+                const isCorrect = idx === currentQ.correctIndex;
+                const revealCorrect = gameResultState !== "idle" && isCorrect;
+                const revealWrong = gameResultState === "wrong" && isSelected && !isCorrect;
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    disabled={gameResultState !== "idle"}
+                    onClick={() => handleSelectGameOption(idx)}
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-2xl border p-4 text-left text-xs sm:text-sm font-bold transition-all cursor-pointer",
+                      revealCorrect
+                        ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-100 shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                        : revealWrong
+                        ? "border-red-500/60 bg-red-500/20 text-red-200"
+                        : "border-white/10 bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08] hover:border-fuchsia-500/40"
+                    )}
+                  >
+                    <span>
+                      <strong className="mr-2 text-fuchsia-300">
+                        {String.fromCharCode(65 + idx)}.
+                      </strong>
+                      {opt}
+                    </span>
+                    {revealCorrect && <Check className="h-4 w-4 text-emerald-300 shrink-0" />}
+                    {revealWrong && <X className="h-4 w-4 text-red-300 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Result & Next Button */}
+            {gameResultState !== "idle" && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-white/[0.07] animate-in fade-in">
+                <div
+                  className={cn(
+                    "text-xs leading-relaxed font-medium",
+                    gameResultState === "correct" ? "text-emerald-300" : "text-amber-300"
+                  )}
+                >
+                  <strong>
+                    {gameResultState === "correct" ? "✅ Barakalla, to'g'ri!" : "❌ Xato javob!"}
+                  </strong>{" "}
+                  {currentQ.explanation}
+                </div>
+
+                {gameLives > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleNextGameQuestion}
+                    className="self-end sm:self-center inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-violet-600 px-5 py-2.5 text-xs font-extrabold text-white shadow-[0_0_20px_rgba(217,70,239,0.4)] hover:brightness-110 transition-all cursor-pointer shrink-0"
+                  >
+                    <span>
+                      {gameIndex + 1 >= gameQuestions.length
+                        ? "Natijani ko'rish"
+                        : "Keyingi savol"}
+                    </span>
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  /* ══════════════════════════════════════════════════════════════════
+      FOYDALI KITOBLAR (Premium-Gated Books Library uploaded by Admin)
+     ══════════════════════════════════════════════════════════════════ */
+  const renderBooksView = () => {
+    const isVip = Boolean(user?.isPremium);
+
+    const resolveMediaUrl = (url: string | null | undefined) => {
+      if (!url) return "";
+      if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+        return url;
+      }
+      return `${API_BASE}${url.startsWith("/") ? "" : "/"}${url}`;
+    };
+
+    return (
+      <div className="mx-auto max-w-6xl flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
+        {/* Header Card */}
+        <div className="rounded-3xl border border-amber-500/25 bg-gradient-to-r from-[#140d2a]/95 via-[#0b071b]/95 to-[#171026]/95 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-500/15 text-amber-300 shadow-[0_0_25px_rgba(245,158,11,0.25)]">
+              <BookOpen className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold text-white">Foydali kitoblar</h1>
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/45 bg-gradient-to-r from-amber-500/25 to-yellow-500/25 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-300">
+                  <Crown className="h-3 w-3 text-amber-300" />
+                  Premium
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Til o'rganish va speaking mahoratini oshirish uchun saralangan elektron kitoblar va qo'llanmalar
+              </p>
+            </div>
+          </div>
+
+          {!isVip ? (
+            <button
+              type="button"
+              onClick={() => setPremiumModalOpen(true)}
+              className="self-start sm:self-center inline-flex items-center gap-2 rounded-2xl border border-amber-400/45 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-[0_0_25px_rgba(245,158,11,0.4)] hover:brightness-110 transition-all cursor-pointer"
+            >
+              <Crown className="h-4 w-4" />
+              <span>Premium olish</span>
+            </button>
+          ) : (
+            <span className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 px-3.5 py-2 text-xs font-extrabold text-emerald-300">
+              <Crown className="h-4 w-4 text-amber-300" />
+              <span>Premium faol — Barcha kitoblar ochiq</span>
+            </span>
+          )}
+        </div>
+
+        {/* Non-Premium Warning Banner */}
+        {!isVip && (
+          <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Lock className="h-5 w-5 text-amber-300 shrink-0" />
+              <p className="text-xs sm:text-sm text-amber-100">
+                Ushbu bo'limdagi kitoblarni o'qish va yuklab olish uchun hisobingizda{" "}
+                <strong className="text-amber-300">Premium (VIP)</strong> maqomi bo'lishi kerak.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPremiumModalOpen(true)}
+              className="self-start sm:self-center shrink-0 rounded-xl bg-amber-400/20 border border-amber-400/40 px-3.5 py-1.5 text-xs font-bold text-amber-200 hover:bg-amber-400/30 transition-all cursor-pointer"
+            >
+              Batafsil
+            </button>
+          </div>
+        )}
+
+        {/* Books Grid */}
+        {booksList.length === 0 ? (
+          <div className="mx-auto max-w-xl flex flex-col items-center justify-center min-h-[42vh] text-center px-4">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-500/10 text-amber-300 mb-4 border border-amber-500/25">
+              <BookOpen className="h-10 w-10" />
+            </div>
+            <h3 className="text-lg font-bold text-white">Hozircha kitoblar yuklanmagan</h3>
+            <p className="text-xs text-zinc-400 mt-1.5 max-w-sm">
+              Tez orada ma'muriyat tomonidan yangi foydali kitoblar va o'quv qo'llanmalari joylanadi.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {booksList.map((book) => {
+              const coverSrc = resolveMediaUrl(book.coverUrl);
+              const fileHref = resolveMediaUrl(book.fileUrl);
+
+              return (
+                <div
+                  key={book.id}
+                  className="group relative flex flex-col overflow-hidden rounded-3xl border border-white/[0.08] bg-[#0b071b]/90 shadow-xl backdrop-blur-2xl hover:border-amber-500/40 transition-all"
+                >
+                  {/* Book Cover */}
+                  <div className="relative h-52 w-full overflow-hidden bg-gradient-to-br from-violet-950/60 via-[#120b2e] to-amber-950/40 flex items-center justify-center">
+                    {coverSrc ? (
+                      <img
+                        src={coverSrc}
+                        alt={book.title}
+                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <BookOpen className="h-14 w-14 text-amber-300/50" />
+                    )}
+                    <div className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full border border-amber-300/50 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 text-[10px] font-black text-amber-300">
+                      <Crown className="h-3 w-3 text-amber-300" />
+                      <span>PRO</span>
+                    </div>
+                  </div>
+
+                  {/* Book Content */}
+                  <div className="flex flex-1 flex-col justify-between p-5 gap-4">
+                    <div>
+                      <h3 className="text-base font-extrabold text-white line-clamp-1">
+                        {book.title}
+                      </h3>
+                      <p className="mt-1.5 text-xs text-zinc-400 leading-relaxed line-clamp-3">
+                        {book.bio || "Til o'rganuvchilar uchun maxsus elektron qo'llanma."}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-zinc-500 truncate max-w-[130px]">
+                        📄 {book.fileName || "Kitob fayli"}
+                      </span>
+
+                      {isVip ? (
+                        <a
+                          href={fileHref}
+                          download={book.fileName || book.title}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-2 text-xs font-extrabold text-slate-950 shadow-[0_0_18px_rgba(245,158,11,0.35)] hover:brightness-110 transition-all"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          <span>Yuklab olish</span>
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setPremiumModalOpen(true)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 px-3.5 py-2 text-xs font-bold text-amber-300 transition-all cursor-pointer"
+                        >
+                          <Lock className="h-3.5 w-3.5" />
+                          <span>Faqat Premium uchun</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3210,6 +4159,12 @@ export default function UserHome() {
               renderProfileView()
             ) : activeTab === "history" ? (
               renderHistoryView()
+            ) : activeTab === "daily_tasks" ? (
+              renderDailyTasksView()
+            ) : activeTab === "task_game" ? (
+              renderTaskGameView()
+            ) : activeTab === "books" ? (
+              renderBooksView()
             ) : activeTab === "friends" ? (
               renderFriendsView()
             ) : activeTab === "rating" ? (

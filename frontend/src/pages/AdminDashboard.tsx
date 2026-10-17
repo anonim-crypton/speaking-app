@@ -26,9 +26,25 @@ import {
   MessageSquare,
   Send,
   ArrowLeft,
+  BookOpen,
+  Upload,
+  FileText,
+  Image as ImageIcon,
+  Download,
 } from "lucide-react";
-import { adminApiGet, adminApiPost } from "@/lib/api";
+import { adminApiGet, adminApiPost, API_BASE } from "@/lib/api";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+
+interface AdminBookItem {
+  id: string;
+  title: string;
+  bio: string;
+  coverUrl: string | null;
+  fileUrl: string;
+  fileName: string;
+  fileSize?: number;
+  createdAt: string;
+}
 
 interface AdminStats {
   totalUsers: number;
@@ -157,7 +173,7 @@ export default function AdminDashboard() {
 
   // Tab navigation
   const [currentTab, setCurrentTab] = useState<
-    "overview" | "users" | "complaints" | "devices" | "settings" | "announcements" | "logs"
+    "overview" | "users" | "books" | "complaints" | "devices" | "settings" | "announcements" | "logs"
   >("overview");
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ text: string; type: "success" | "error" } | null>(null);
@@ -183,6 +199,17 @@ export default function AdminDashboard() {
   });
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
+
+  // Books management state
+  const [books, setBooks] = useState<AdminBookItem[]>([]);
+  const [bookTitle, setBookTitle] = useState("");
+  const [bookBio, setBookBio] = useState("");
+  const [bookCoverDataUrl, setBookCoverDataUrl] = useState<string | null>(null);
+  const [bookCoverName, setBookCoverName] = useState<string>("");
+  const [bookFileDataUrl, setBookFileDataUrl] = useState<string | null>(null);
+  const [bookFileName, setBookFileName] = useState<string>("");
+  const [bookFileSize, setBookFileSize] = useState<number>(0);
+  const [bookUploading, setBookUploading] = useState(false);
 
   // Modals
   const [diamondModalUser, setDiamondModalUser] = useState<UserItem | null>(null);
@@ -221,10 +248,23 @@ export default function AdminDashboard() {
     }
   }, [currentTab, adminToken, csrfData]);
 
+  const loadBooks = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/social/books`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.books)) {
+        setBooks(data.books);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     if (!adminToken) return;
     setLoading(true);
     try {
+      void loadBooks();
       const [statsRes, usersRes, complaintsRes, devicesRes, settingsRes, annRes, logsRes] =
         await Promise.allSettled([
           adminApiGet<{ success: boolean; stats: AdminStats }>("/stats/", adminToken),
@@ -488,6 +528,95 @@ export default function AdminDashboard() {
     );
   }, [devices, deviceSearch]);
 
+  const handleSelectBookCover = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBookCoverName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setBookCoverDataUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSelectBookFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBookFileName(file.name);
+    setBookFileSize(file.size || 0);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setBookFileDataUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bookTitle.trim()) {
+      notify("Kitob nomini kiriting", "error");
+      return;
+    }
+    if (!bookFileDataUrl) {
+      notify("Kitob faylini tanlang", "error");
+      return;
+    }
+    setBookUploading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/social/books`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: bookTitle.trim(),
+          bio: bookBio.trim(),
+          coverDataUrl: bookCoverDataUrl,
+          fileDataUrl: bookFileDataUrl,
+          fileName: bookFileName || `${bookTitle.trim()}.pdf`,
+          fileSize: bookFileSize,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        notify(data.message || "Kitob muvaffaqiyatli yuklandi!");
+        setBookTitle("");
+        setBookBio("");
+        setBookCoverDataUrl(null);
+        setBookCoverName("");
+        setBookFileDataUrl(null);
+        setBookFileName("");
+        setBookFileSize(0);
+        await loadBooks();
+      } else {
+        notify(data.message || "Kitob yuklashda xatolik", "error");
+      }
+    } catch {
+      notify("Server bilan bog'lanishda xatolik", "error");
+    } finally {
+      setBookUploading(false);
+    }
+  };
+
+  const handleDeleteBook = async (bookId: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/social/books/${encodeURIComponent(bookId)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        notify("Kitob ro'yxatdan o'chirildi");
+        await loadBooks();
+      } else {
+        notify(data.message || "O'chirishda xatolik", "error");
+      }
+    } catch {
+      notify("O'chirishda xatolik", "error");
+    }
+  };
+
   // ── 1. LOGIN SCREEN ───────────────────────────────────────────────────────
   if (!adminToken) {
     return (
@@ -627,6 +756,24 @@ export default function AdminDashboard() {
                   </div>
                   <span className="rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-2.5 py-0.5 text-xs font-mono font-bold">
                     {users.length || 10}
+                  </span>
+                </button>
+
+                {/* Kitoblar (Foydalanuvchilar tugmasining tagidan) */}
+                <button
+                  onClick={() => setCurrentTab("books")}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all outline-none focus:outline-none ring-0 ${
+                    currentTab === "books"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
+                      : "text-zinc-400 border border-transparent hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <BookOpen className="w-5 h-5 ml-1.5" />
+                    <span>Kitoblar</span>
+                  </div>
+                  <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 px-2.5 py-0.5 text-xs font-mono font-bold">
+                    {books.length}
                   </span>
                 </button>
 
@@ -1399,6 +1546,263 @@ export default function AdminDashboard() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── KITOBLAR (BOOKS) TAB ─────────────────────────────────── */}
+          {currentTab === "books" && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Top Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-white/10 bg-[#0d1527]/85 p-5 shadow-xl backdrop-blur-2xl">
+                <div className="flex items-center gap-3.5">
+                  <div className="h-11 w-11 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                      <span>Kitoblar boshqaruvi</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">
+                        <Crown className="w-3 h-3" />
+                        PRO Foydalanuvchilar uchun
+                      </span>
+                    </h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Yangi kitob yuklang — u darhol foydalanuvchilarning "Foydali kitoblar" sahifasida ko'rinadi
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 px-3.5 py-1 text-xs font-mono font-bold self-start sm:self-center">
+                  Jami yuklangan: {books.length} ta kitob
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* 1. LEFT: Kitob Yuklash Formasi (Tagma-tag: Rasm -> Kitob nomi -> Bio -> Fayl -> Yuklash) */}
+                <form
+                  onSubmit={handleUploadBook}
+                  className="lg:col-span-5 rounded-3xl border border-white/10 bg-[#0d1527]/90 p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-4"
+                >
+                  <div className="pb-3 border-b border-white/10">
+                    <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-cyan-400" />
+                      <span>Yangi kitob yuklash</span>
+                    </h3>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Kitob muqovasi, nomi, qisqacha bio va faylini kiriting
+                    </p>
+                  </div>
+
+                  {/* A. Kitob rasmi (Muqova) */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-300 mb-2">
+                      1. Kitob rasmi (Muqova)
+                    </label>
+                    <label className="group relative flex flex-col items-center justify-center h-44 w-full rounded-2xl border-2 border-dashed border-white/15 bg-[#070d1a]/80 hover:border-cyan-400/50 hover:bg-white/[0.03] transition-all cursor-pointer overflow-hidden">
+                      {bookCoverDataUrl ? (
+                        <>
+                          <img
+                            src={bookCoverDataUrl}
+                            alt="Kitob muqovasi"
+                            className="h-full w-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-bold text-white">
+                            Rasmni almashtirish ({bookCoverName || "Tanlangan"})
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center text-center p-4">
+                          <div className="h-11 w-11 rounded-2xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 flex items-center justify-center mb-2">
+                            <ImageIcon className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-bold text-white">
+                            Kitob rasmini tanlash uchun bosing
+                          </span>
+                          <span className="text-[11px] text-zinc-500 mt-0.5">
+                            PNG, JPG yoki WEBP formatda
+                          </span>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSelectBookCover}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* B. Kitob nomi */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                      2. Kitob nomi *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={bookTitle}
+                      onChange={(e) => setBookTitle(e.target.value)}
+                      placeholder="Masalan: English Speaking Mastery B2-C1"
+                      className="w-full rounded-2xl border border-white/10 bg-[#070d1a] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* C. Kitob Bio / Tavsif qismi */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                      3. Kitob haqida bio (Qisqacha tavsif)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={bookBio}
+                      onChange={(e) => setBookBio(e.target.value)}
+                      placeholder="Kitob kimlar uchun mo'ljallangan va nimalarni o'rgatishi haqida qisqacha ma'lumot..."
+                      className="w-full rounded-2xl border border-white/10 bg-[#070d1a] p-3.5 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none leading-relaxed"
+                    />
+                  </div>
+
+                  {/* D. Kitob faylini yuklash tugmasi */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                      4. Kitob fayli (PDF, EPUB, DOCX) *
+                    </label>
+                    <label className="flex items-center justify-between gap-3 rounded-2xl border border-cyan-500/35 bg-cyan-500/10 hover:bg-cyan-500/15 px-4 py-3 text-xs font-bold text-cyan-200 transition-all cursor-pointer">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <FileText className="w-4 h-4 text-cyan-300 shrink-0" />
+                        <span className="truncate">
+                          {bookFileName
+                            ? `Tanlandi: ${bookFileName}`
+                            : "Kitob faylini yuklash (Faylni tanlang)"}
+                        </span>
+                      </div>
+                      <span className="shrink-0 rounded-xl bg-cyan-500/25 border border-cyan-400/40 px-2.5 py-1 text-[11px] text-white">
+                        Fayl tanlash
+                      </span>
+                      <input
+                        type="file"
+                        accept=".pdf,.epub,.doc,.docx,.txt"
+                        onChange={handleSelectBookFile}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* E. Eng pastida Yuklash tugmasi */}
+                  <button
+                    type="submit"
+                    disabled={bookUploading}
+                    className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-600 hover:brightness-110 py-3.5 text-sm font-extrabold text-slate-950 shadow-[0_0_25px_rgba(6,182,212,0.35)] disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>{bookUploading ? "Yuklanmoqda..." : "Yuklash"}</span>
+                  </button>
+                </form>
+
+                {/* 2. RIGHT: Yuklangan kitoblar ro'yxati tarixi */}
+                <div className="lg:col-span-7 rounded-3xl border border-white/10 bg-[#0d1527]/90 p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                        <History className="w-4 h-4 text-amber-400" />
+                        <span>Yuklangan kitoblar ro'yxati tarixi</span>
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Saytga joylangan barcha kitoblar va ularni boshqarish
+                      </p>
+                    </div>
+                    <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-xs font-mono text-zinc-300">
+                      {books.length} ta
+                    </span>
+                  </div>
+
+                  {books.length === 0 ? (
+                    <div className="py-16 text-center">
+                      <BookOpen className="w-11 h-11 text-zinc-600 mx-auto mb-3" />
+                      <p className="text-sm font-bold text-white">Hozircha kitoblar yuklanmagan</p>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Chap tomondagi forma orqali birinchi kitobni yuklang.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3 max-h-[620px] overflow-y-auto pr-1">
+                      {books.map((b) => {
+                        const coverSrc = b.coverUrl
+                          ? b.coverUrl.startsWith("http") || b.coverUrl.startsWith("data:")
+                            ? b.coverUrl
+                            : `${API_BASE}${b.coverUrl.startsWith("/") ? "" : "/"}${b.coverUrl}`
+                          : null;
+                        const fileHref = b.fileUrl
+                          ? b.fileUrl.startsWith("http") || b.fileUrl.startsWith("data:")
+                            ? b.fileUrl
+                            : `${API_BASE}${b.fileUrl.startsWith("/") ? "" : "/"}${b.fileUrl}`
+                          : "#";
+                        const uploadedDate = b.createdAt
+                          ? new Date(b.createdAt).toLocaleString("uz-UZ", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "";
+
+                        return (
+                          <div
+                            key={b.id}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#070d1a]/85 p-4 hover:border-cyan-400/40 transition-all"
+                          >
+                            <div className="flex items-start gap-3.5 min-w-0">
+                              <div className="h-16 w-14 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 flex items-center justify-center">
+                                {coverSrc ? (
+                                  <img
+                                    src={coverSrc}
+                                    alt={b.title}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <BookOpen className="w-6 h-6 text-amber-300/60" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="text-sm font-extrabold text-white truncate">
+                                  {b.title}
+                                </h4>
+                                <p className="text-xs text-zinc-400 line-clamp-2 mt-0.5">
+                                  {b.bio || "Tavsif kiritilmagan"}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-zinc-500 font-mono">
+                                  <span>📄 {b.fileName}</span>
+                                  {uploadedDate && <span>• {uploadedDate}</span>}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                              <a
+                                href={fileHref}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={b.fileName || b.title}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-500/35 bg-cyan-500/15 hover:bg-cyan-500/25 px-3 py-2 text-xs font-bold text-cyan-200 transition-all"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Ko'rish</span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteBook(b.id)}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/35 bg-rose-500/15 hover:bg-rose-500/25 px-3 py-2 text-xs font-bold text-rose-300 transition-all cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>O'chirish</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

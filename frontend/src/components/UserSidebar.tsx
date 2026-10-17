@@ -1,6 +1,9 @@
 import {
   Home,
   History,
+  CheckSquare,
+  Gamepad2,
+  BookOpen,
   Users,
   Trophy,
   Award,
@@ -19,6 +22,9 @@ import { DASHBOARD_TRANSLATIONS } from "@/i18n/dashboardTranslations";
 export type UserNavTab =
   | "home"
   | "history"
+  | "daily_tasks"
+  | "task_game"
+  | "books"
   | "friends"
   | "rating"
   | "achievements"
@@ -45,15 +51,22 @@ export default function UserSidebar({
   const { lang } = useLanguage();
   const t = DASHBOARD_TRANSLATIONS[lang] ?? DASHBOARD_TRANSLATIONS.uz;
 
-  const navItems = [
-    { id: "home" as const, label: t.sidebar.home, icon: Home },
-    { id: "history" as const, label: t.sidebar.history, icon: History },
-    { id: "friends" as const, label: t.sidebar.friends, icon: Users },
-    { id: "rating" as const, label: t.sidebar.rating, icon: Trophy },
-    { id: "achievements" as const, label: t.sidebar.achievements, icon: Award },
-    { id: "devices" as const, label: t.sidebar.devices, icon: Laptop },
-    { id: "help" as const, label: t.sidebar.help, icon: HelpCircle },
-    { id: "feedback" as const, label: t.sidebar.feedback, icon: MessageSquare },
+  const navItems: Array<{
+    id: UserNavTab;
+    label: string;
+    icon: any;
+    isPremiumBadge?: boolean;
+  }> = [
+    { id: "home", label: t.sidebar.home, icon: Home },
+    { id: "history", label: t.sidebar.history, icon: History },
+    { id: "daily_tasks", label: "Kunlik topshiriqlar", icon: CheckSquare },
+    { id: "task_game", label: "Topshiriqli o'yin", icon: Gamepad2 },
+    { id: "books", label: "Foydali kitoblar", icon: BookOpen, isPremiumBadge: true },
+    { id: "friends", label: t.sidebar.friends, icon: Users },
+    { id: "rating", label: t.sidebar.rating, icon: Trophy },
+    { id: "achievements", label: t.sidebar.achievements, icon: Award },
+    { id: "help", label: t.sidebar.help, icon: HelpCircle },
+    { id: "feedback", label: t.sidebar.feedback, icon: MessageSquare },
   ];
 
   return (
@@ -106,7 +119,7 @@ export default function UserSidebar({
               type="button"
               onClick={() => onSelectTab(item.id)}
               className={cn(
-                "group relative flex items-center rounded-xl py-2.5 text-[13px] font-medium transition-all duration-150",
+                "group relative flex items-center rounded-xl py-2.5 text-[13px] font-medium transition-all duration-150 cursor-pointer",
                 isCollapsed ? "justify-center px-0" : "gap-3 px-3",
                 isActive
                   ? "bg-gradient-to-r from-violet-600/25 via-indigo-600/15 to-transparent text-white font-semibold border border-violet-500/30 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]"
@@ -122,15 +135,28 @@ export default function UserSidebar({
               )}
               <div
                 className={cn(
-                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
+                  "relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
                   isActive
                     ? "bg-violet-500/20 text-violet-300"
                     : "text-zinc-400 group-hover:text-zinc-200"
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
+                {isCollapsed && item.isPremiumBadge && (
+                  <Crown className="absolute -top-1 -right-1 h-3 w-3 text-amber-400 drop-shadow" />
+                )}
               </div>
-              {!isCollapsed && <span className="truncate">{item.label}</span>}
+              {!isCollapsed && (
+                <div className="flex flex-1 items-center justify-between min-w-0">
+                  <span className="truncate">{item.label}</span>
+                  {item.isPremiumBadge && (
+                    <span className="ml-1.5 inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                      <Crown className="h-2.5 w-2.5 text-amber-300" />
+                      <span>PRO</span>
+                    </span>
+                  )}
+                </div>
+              )}
             </button>
           );
         })}
