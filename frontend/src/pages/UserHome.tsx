@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Bell,
   Play,
@@ -62,6 +62,8 @@ import {
   Lock,
   Download,
   RotateCcw,
+  SkipForward,
+  UserX,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -87,10 +89,17 @@ import {
   type DailyTaskQuestion,
 } from "@/data/dailyTasksBank";
 
-const MAX_SEARCH_SECONDS = 120; // 2 daqiqa kutish limiti
+const MAX_SEARCH_SECONDS = 60; // 1 daqiqa (60s) kutish limiti, keyin random tildan speaker ulanadi
 
 interface LanguageItem {
-  id: "uz" | "en" | "ru" | "tr" | "ko";
+  id: LanguageKey;
+  name: string;
+  country: string;
+  flagCode: string;
+}
+
+interface ClubLanguageItem {
+  id: "uz" | "en" | "ru" | "ar" | "tr";
   name: string;
   country: string;
   flagCode: string;
@@ -115,12 +124,67 @@ interface ChatMessage {
   isMe?: boolean;
 }
 
+interface ClubMember {
+  id: string;
+  name: string;
+  username: string;
+  avatarUrl?: string | null;
+  isPremium?: boolean;
+  isVerified?: boolean;
+  role?: "owner" | "member";
+  muted?: boolean;
+  mutedByAdmin?: boolean;
+  speaking?: boolean;
+  joinedAt?: string;
+  requestedAt?: string;
+}
+
+interface ClubRoom {
+  id: string;
+  name: string;
+  description: string;
+  maxMembers: number;
+  memberCount: number;
+  language: string;
+  status: "active" | "closed";
+  owner: {
+    id: string;
+    name: string;
+    username: string;
+    avatarUrl?: string | null;
+    isPremium?: boolean;
+    isVerified?: boolean;
+  };
+  members: ClubMember[];
+  pendingRequests: ClubMember[];
+  kickedUserIds?: string[];
+  messages: Array<{
+    id: string;
+    senderId: string;
+    senderName: string;
+    senderUsername: string;
+    senderAvatar?: string | null;
+    isPremium?: boolean;
+    text: string;
+    createdAt: string;
+  }>;
+  createdAt: string;
+}
+
 const LANGUAGES: LanguageItem[] = [
   { id: "uz", name: "O'zbek tili", country: "O'zbekiston", flagCode: "UZ" },
   { id: "en", name: "Ingliz tili", country: "AQSH / Buyuk Britaniya", flagCode: "GB" },
   { id: "ru", name: "Rus tili", country: "Rossiya", flagCode: "RU" },
   { id: "tr", name: "Turk tili", country: "Turkiya", flagCode: "TR" },
   { id: "ko", name: "Koreys tili", country: "Janubiy Koreya", flagCode: "KR" },
+];
+
+const CLUB_LANGUAGES: ClubLanguageItem[] = [
+  { id: "uz", name: "O'zbek tili", country: "O'zbekiston", flagCode: "UZ" },
+  { id: "en", name: "Ingliz tili", country: "AQSH / Buyuk Britaniya", flagCode: "GB" },
+  { id: "ru", name: "Rus tili", country: "Rossiya", flagCode: "RU" },
+  { id: "ar", name: "Arab tili", country: "Saudiya Arabistoni", flagCode: "SA" },
+  { id: "tr", name: "Turk tili", country: "Turkiya", flagCode: "TR" },
 ];
 
 const COMPLAINT_OPTIONS = [
@@ -146,7 +210,9 @@ function getOrCreateClientId(): string {
 }
 
 export default function UserHome() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, clubRoomId: routeClubRoomId } = useParams<{ slug?: string; clubRoomId?: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user, token, logout, refreshUser } = useAuth();
   const { lang } = useLanguage();
   const dt = DASHBOARD_TRANSLATIONS[lang] ?? DASHBOARD_TRANSLATIONS.uz;
@@ -160,6 +226,7 @@ export default function UserHome() {
 
   // Searching, Matchmaking & Microphone state
   const [isSearching, setIsSearching] = useState(false);
+  const [isSearchingInRoom, setIsSearchingInRoom] = useState(false);
   const [requestingMic, setRequestingMic] = useState(false);
   const [searchSeconds, setSearchSeconds] = useState(0);
   const [micError, setMicError] = useState<string | null>(null);
@@ -170,6 +237,24 @@ export default function UserHome() {
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [inMeetingRoom, setInMeetingRoom] = useState(false);
   const [transitionLoading, setTransitionLoading] = useState(false);
+
+  // Club ("Klub") State
+  const [clubRooms, setClubRooms] = useState<ClubRoom[]>([]);
+  const [activeClubRoom, setActiveClubRoom] = useState<ClubRoom | null>(null);
+  const [clubFormName, setClubFormName] = useState("");
+  const [clubFormDesc, setClubFormDesc] = useState("");
+  const [clubFormMaxMembers, setClubFormMaxMembers] = useState<number>(2);
+  const [clubFormLang, setClubFormLang] = useState<ClubLanguageItem>(CLUB_LANGUAGES[1]);
+  const [clubLangDropdownOpen, setClubLangDropdownOpen] = useState(false);
+  const [clubCreating, setClubCreating] = useState(false);
+  const [clubError, setClubError] = useState<string | null>(null);
+  const [clubChatOpen, setClubChatOpen] = useState(false);
+  const [clubChatInput, setClubChatInput] = useState("");
+  const [clubUnreadChat, setClubUnreadChat] = useState(0);
+  const [clubMicMuted, setClubMicMuted] = useState(false);
+  const [clubSpeakingNow, setClubSpeakingNow] = useState(false);
+  const clubChatEndRef = useRef<HTMLDivElement | null>(null);
+  const prevClubMsgCountRef = useRef<number>(0);
 
   // Microphone audio state inside meeting room
   const [isMicMuted, setIsMicMuted] = useState(false);
@@ -649,12 +734,12 @@ export default function UserHome() {
     return () => window.clearInterval(timer);
   }, [lastDailyClaimAt]);
 
-  // Fetch Social Data (Talk History, Friends, Leaderboard, Books)
+  // Fetch Social Data (Talk History, Friends, Leaderboard, Books, Clubs)
   const fetchSocialData = async () => {
     const authToken = token || localStorage.getItem("ls_token");
     if (!authToken) return;
     try {
-      const [histRes, frRes, lbRes, booksRes] = await Promise.all([
+      const [histRes, frRes, lbRes, booksRes, clubsRes] = await Promise.all([
         fetch(`${API_BASE}/api/social/history`, {
           headers: { Authorization: `Bearer ${authToken}` },
         }),
@@ -665,12 +750,16 @@ export default function UserHome() {
           headers: { Authorization: `Bearer ${authToken}` },
         }),
         fetch(`${API_BASE}/api/social/books`),
+        fetch(`${API_BASE}/api/clubs`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        }),
       ]);
-      const [histData, frData, lbData, booksData] = await Promise.all([
+      const [histData, frData, lbData, booksData, clubsData] = await Promise.all([
         histRes.json().catch(() => null),
         frRes.json().catch(() => null),
         lbRes.json().catch(() => null),
         booksRes.json().catch(() => null),
+        clubsRes.json().catch(() => null),
       ]);
       if (histData?.success && Array.isArray(histData.history)) {
         setTalkHistory(histData.history);
@@ -685,6 +774,9 @@ export default function UserHome() {
       }
       if (booksData?.success && Array.isArray(booksData.books)) {
         setBooksList(booksData.books);
+      }
+      if (clubsData?.success && Array.isArray(clubsData.rooms)) {
+        setClubRooms(clubsData.rooms);
       }
     } catch {
       /* ignore */
@@ -1066,7 +1158,12 @@ export default function UserHome() {
     }, 1300);
   };
 
+  const isCreateRoomRoute = location.pathname.startsWith("/create-room");
+  const isClubChatRoomRoute = location.pathname.startsWith("/chat-room");
+  const effectiveClubRoomId = routeClubRoomId || activeClubRoom?.id || null;
+
   const handlePartnerExited = () => {
+    if (isSearchingInRoom) return;
     stopMicStream();
     setTransitionLoading(true);
     window.setTimeout(() => {
@@ -1081,9 +1178,15 @@ export default function UserHome() {
     }, 1200);
   };
 
-  // Search timer with strict 2-minute (120s) limit + polling
+  // Search timer with 1-minute (60s) wait + automatic cross-language random speaker fallback
+  const searchSecondsRef = useRef<number>(0);
   useEffect(() => {
-    if (!isSearching) {
+    searchSecondsRef.current = searchSeconds;
+  }, [searchSeconds]);
+
+  useEffect(() => {
+    const activeSearch = isSearching || isSearchingInRoom;
+    if (!activeSearch) {
       setSearchSeconds(0);
       return;
     }
@@ -1091,22 +1194,33 @@ export default function UserHome() {
     const timer = window.setInterval(() => {
       setSearchSeconds((prev) => {
         const next = prev + 1;
-        if (next >= MAX_SEARCH_SECONDS) {
+        if (next >= MAX_SEARCH_SECONDS + 5) {
+          // Only if even after 1m + 5s cross-language fallback nobody at all is online
           window.clearInterval(timer);
-          stopMicStream();
-          setIsSearching(false);
-          void leaveMatchmakingServer();
+          if (isSearchingInRoom) {
+            setIsSearchingInRoom(false);
+            stopMicStream();
+            void leaveMatchmakingServer();
+            setInMeetingRoom(false);
+            setMatchedPartner(null);
+            setActiveRoomId(null);
+          } else {
+            stopMicStream();
+            setIsSearching(false);
+            void leaveMatchmakingServer();
+          }
           setTimeoutNotice(
-            "2 daqiqa ichida tanlangan tilda bo'sh suhbatdosh topilmadi. Iltimos, qaytadan urinib ko'ring."
+            "1 daqiqa ichida tanlangan tilda va boshqa tillarda bo'sh suhbatdosh topilmadi. Iltimos, qaytadan urinib ko'ring."
           );
           return 0;
         }
-        return next;
+        return Math.min(next, MAX_SEARCH_SECONDS);
       });
     }, 1000);
 
     const pollInterval = window.setInterval(async () => {
       try {
+        const allowCrossLang = searchSecondsRef.current >= MAX_SEARCH_SECONDS - 1;
         const res = await fetch(`${API_BASE}/api/matchmaking/status`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1114,33 +1228,53 @@ export default function UserHome() {
             clientId: clientIdRef.current,
             userId: user?.id || null,
             language: speakerOption.id,
+            allowAnyLanguage: allowCrossLang,
           }),
         });
         const data = await res.json();
         if (data?.status === "matched" && data.partner) {
-          triggerEnterMeeting(data.partner, data.roomId || null, data.role || "callee");
-          setIsSearching(false);
+          if (isSearchingInRoom) {
+            myRoleRef.current = data.role || "callee";
+            setMatchedPartner(data.partner);
+            setActiveRoomId(data.roomId || null);
+            setChatMessages([]);
+            setUnreadChatCount(0);
+            setIsPartnerSpeaking(false);
+            setIsSearchingInRoom(false);
+            setSearchSeconds(0);
+          } else {
+            triggerEnterMeeting(data.partner, data.roomId || null, data.role || "callee");
+            setIsSearching(false);
+          }
         } else if (data?.status === "timeout") {
-          stopMicStream();
-          setIsSearching(false);
+          if (isSearchingInRoom) {
+            setIsSearchingInRoom(false);
+            stopMicStream();
+            setInMeetingRoom(false);
+            setMatchedPartner(null);
+            setActiveRoomId(null);
+          } else {
+            stopMicStream();
+            setIsSearching(false);
+          }
           setTimeoutNotice(
-            "2 daqiqa ichida tanlangan tilda bo'sh suhbatdosh topilmadi. Iltimos, qaytadan urinib ko'ring."
+            "1 daqiqa ichida bo'sh suhbatdosh topilmadi. Iltimos, qaytadan urinib ko'ring."
           );
         }
       } catch {
         /* ignore */
       }
-    }, 1100);
+    }, 950);
 
     return () => {
       window.clearInterval(timer);
       window.clearInterval(pollInterval);
     };
-  }, [isSearching, speakerOption.id, user?.id]);
+  }, [isSearching, isSearchingInRoom, speakerOption.id, user?.id]);
 
   // Real-time Room Heartbeat, Chat, WebRTC Audio & Partner events
   useEffect(() => {
-    if (!inMeetingRoom || !activeRoomId) return;
+    if (!inMeetingRoom || !activeRoomId || isSearchingInRoom) return;
 
     // 1. Establish WebRTC PeerConnection for two-way live microphone audio
     let pc: RTCPeerConnection | null = null;
@@ -1324,11 +1458,11 @@ export default function UserHome() {
       processedSignalIdsRef.current.clear();
       iceCandidatesQueueRef.current = [];
     };
-  }, [inMeetingRoom, activeRoomId, chatOpen, user?.username, displayName, speakerOption.id]);
+  }, [inMeetingRoom, activeRoomId, isSearchingInRoom, chatOpen, user?.username, displayName, speakerOption.id]);
 
   // Local Voice Volume Analyzer (Detect when I speak)
   useEffect(() => {
-    if (!inMeetingRoom || !mediaStreamRef.current) return;
+    if ((!inMeetingRoom && !isClubChatRoomRoute) || !mediaStreamRef.current) return;
 
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -1355,23 +1489,45 @@ export default function UserHome() {
           sum += buffer[i];
         }
         const avg = sum / buffer.length;
-        const speakingNow = avg > 13 && !isMicMuted;
+        const mutedNow = isClubChatRoomRoute ? clubMicMuted : isMicMuted;
+        const speakingNow = avg > 13 && !mutedNow;
 
-        setIsMySpeaking(speakingNow);
+        if (isClubChatRoomRoute) {
+          setClubSpeakingNow(speakingNow);
+        } else {
+          setIsMySpeaking(speakingNow);
+        }
 
-        if (speakingNow !== lastReported && activeRoomId) {
+        if (speakingNow !== lastReported) {
           lastReported = speakingNow;
-          fetch(`${API_BASE}/api/matchmaking/speaking`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              roomId: activeRoomId,
-              clientId: clientIdRef.current,
-              userId: user?.id || null,
-              speaking: speakingNow,
-              muted: isMicMuted,
-            }),
-          }).catch(() => {});
+          if (isClubChatRoomRoute && effectiveClubRoomId) {
+            const authToken = token || localStorage.getItem("ls_token");
+            if (authToken) {
+              fetch(`${API_BASE}/api/clubs/${effectiveClubRoomId}/speaking`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${authToken}`,
+                },
+                body: JSON.stringify({
+                  speaking: speakingNow,
+                  muted: clubMicMuted,
+                }),
+              }).catch(() => {});
+            }
+          } else if (activeRoomId) {
+            fetch(`${API_BASE}/api/matchmaking/speaking`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                roomId: activeRoomId,
+                clientId: clientIdRef.current,
+                userId: user?.id || null,
+                speaking: speakingNow,
+                muted: isMicMuted,
+              }),
+            }).catch(() => {});
+          }
         }
 
         animFrameRef.current = requestAnimationFrame(checkVolume);
@@ -1385,7 +1541,96 @@ export default function UserHome() {
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [inMeetingRoom, isMicMuted, activeRoomId, user?.id]);
+  }, [inMeetingRoom, isClubChatRoomRoute, effectiveClubRoomId, isMicMuted, clubMicMuted, activeRoomId, user?.id, token]);
+
+  // Club Room Polling & Microphone Initialization when inside /chat-room
+  useEffect(() => {
+    if (!isClubChatRoomRoute || !effectiveClubRoomId) return;
+
+    const authToken = token || localStorage.getItem("ls_token");
+
+    // Request mic if not active
+    if (!mediaStreamRef.current && navigator.mediaDevices?.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        })
+        .then((stream) => {
+          mediaStreamRef.current = stream;
+          setClubMicMuted(false);
+        })
+        .catch(() => {
+          /* ignore */
+        });
+    }
+
+    const fetchClubRoomState = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/clubs/${effectiveClubRoomId}`, {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || data?.closed || !data?.room) {
+          stopMicStream();
+          setActiveClubRoom(null);
+          setActiveTab("club");
+          if (user?.slug) navigate(`/u/${user.slug}`, { replace: true });
+          return;
+        }
+        const room: ClubRoom = data.room;
+        if (
+          user?.id &&
+          Array.isArray(room.kickedUserIds) &&
+          room.kickedUserIds.includes(String(user.id))
+        ) {
+          stopMicStream();
+          setActiveClubRoom(null);
+          setActiveTab("club");
+          if (user?.slug) navigate(`/u/${user.slug}`, { replace: true });
+          return;
+        }
+
+        // Sync admin-enforced mute on current user
+        if (user?.id && Array.isArray(room.members)) {
+          const meInRoom = room.members.find((m) => String(m.id) === String(user.id));
+          if (meInRoom?.mutedByAdmin) {
+            setClubMicMuted(true);
+            if (mediaStreamRef.current) {
+              mediaStreamRef.current.getAudioTracks().forEach((t) => {
+                t.enabled = false;
+              });
+            }
+          }
+        }
+
+        // Track unread group chat messages
+        const msgList = Array.isArray(room.messages) ? room.messages : [];
+        if (msgList.length > prevClubMsgCountRef.current) {
+          const diff = msgList.length - prevClubMsgCountRef.current;
+          prevClubMsgCountRef.current = msgList.length;
+          if (!clubChatOpen) {
+            setClubUnreadChat((c) => c + diff);
+          }
+        } else {
+          prevClubMsgCountRef.current = msgList.length;
+        }
+
+        setActiveClubRoom(room);
+      } catch {
+        /* ignore */
+      }
+    };
+
+    void fetchClubRoomState();
+    const interval = window.setInterval(fetchClubRoomState, 1000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isClubChatRoomRoute, effectiveClubRoomId, token, user?.id, user?.slug, clubChatOpen, navigate]);
 
   // Scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -1394,10 +1639,15 @@ export default function UserHome() {
     }
   }, [chatMessages, chatOpen]);
 
-  if (user && slug !== user.slug) {
+  useEffect(() => {
+    if (clubChatOpen) {
+      clubChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [activeClubRoom?.messages?.length, clubChatOpen]);
+
+  if (user && !isCreateRoomRoute && !isClubChatRoomRoute && slug !== user.slug) {
     return <Navigate to={`/u/${user.slug}`} replace />;
   }
-
 
   const formatSeconds = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -1405,9 +1655,9 @@ export default function UserHome() {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-
   const handleConfirmEndMeeting = async () => {
     setEndMeetingModalOpen(false);
+    setIsSearchingInRoom(false);
     stopMicStream();
     setTransitionLoading(true);
 
@@ -1429,6 +1679,327 @@ export default function UserHome() {
       setComplaintDetails("");
       setComplaintSent(false);
     }, 1200);
+  };
+
+  // Skip current partner inside Meeting Chat Room ("O'tkazib yuborish")
+  const handleSkipPartnerInRoom = async () => {
+    if (isSearchingInRoom) return;
+    const prevPartnerId = matchedPartner?.id || null;
+
+    if (peerConnRef.current) {
+      peerConnRef.current.close();
+      peerConnRef.current = null;
+    }
+    if (remoteAudioRef.current) {
+      try {
+        remoteAudioRef.current.pause();
+        remoteAudioRef.current.srcObject = null;
+      } catch {
+        /* ignore */
+      }
+    }
+    processedSignalIdsRef.current.clear();
+    iceCandidatesQueueRef.current = [];
+
+    setActiveRoomId(null);
+    setChatMessages([]);
+    setChatOpen(false);
+    setUnreadChatCount(0);
+    setIsPartnerSpeaking(false);
+    setSearchSeconds(0);
+    setIsSearchingInRoom(true);
+
+    try {
+      if (!mediaStreamRef.current && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        mediaStreamRef.current = stream;
+      }
+
+      const res = await fetch(`${API_BASE}/api/matchmaking/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: clientIdRef.current,
+          userId: user?.id || null,
+          language: speakerOption.id,
+          name: displayName,
+          username: displayUsername,
+          skipPartnerId: prevPartnerId,
+        }),
+      });
+      const data = await res.json();
+      if (data?.status === "matched" && data.partner) {
+        myRoleRef.current = data.role || "caller";
+        setMatchedPartner(data.partner);
+        setActiveRoomId(data.roomId || null);
+        setIsSearchingInRoom(false);
+        setSearchSeconds(0);
+      }
+    } catch {
+      /* keep searching via poll */
+    }
+  };
+
+  // Cancel searching while inside Meeting Chat Room ("Bekor qilish")
+  const handleCancelInRoomSearch = async () => {
+    setIsSearchingInRoom(false);
+    setSearchSeconds(0);
+    stopMicStream();
+    await leaveMatchmakingServer();
+    setInMeetingRoom(false);
+    setMatchedPartner(null);
+    setActiveRoomId(null);
+  };
+
+  // ── Club ("Klub") Actions ──
+  const handleOpenCreateRoom = () => {
+    setClubFormName("");
+    setClubFormDesc("");
+    setClubFormMaxMembers(2);
+    setClubFormLang(CLUB_LANGUAGES[1]);
+    setClubError(null);
+    navigate("/create-room");
+  };
+
+  const handleCreateClubRoom = async (e: FormEvent) => {
+    e.preventDefault();
+    setClubError(null);
+    const trimmedName = clubFormName.trim();
+    if (!trimmedName) {
+      setClubError("Iltimos, xona nomini kiriting.");
+      return;
+    }
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+
+    setClubCreating(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/clubs`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          description: clubFormDesc.trim(),
+          maxMembers: clubFormMaxMembers,
+          language: clubFormLang.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data.room) {
+        setClubError(data?.message || "Xonani yaratishda xatolik yuz berdi.");
+        setClubCreating(false);
+        return;
+      }
+
+      const createdRoom: ClubRoom = data.room;
+      setActiveClubRoom(createdRoom);
+      prevClubMsgCountRef.current = 0;
+      setClubUnreadChat(0);
+      setClubCreating(false);
+      setTransitionLoading(true);
+      window.setTimeout(() => {
+        setTransitionLoading(false);
+        navigate(`/chat-room/${createdRoom.id}`);
+      }, 1150);
+    } catch {
+      setClubError("Server bilan bog'lanishda xatolik yuz berdi.");
+      setClubCreating(false);
+    }
+  };
+
+  const handleJoinOrEnterClubRoom = async (room: ClubRoom) => {
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+
+    const myId = String(user?.id || "");
+    const isAdmin = String(room.owner?.id) === myId;
+    const isMember = room.members?.some((m) => String(m.id) === myId);
+    const isPending = room.pendingRequests?.some((r) => String(r.id) === myId);
+
+    let updatedRoom = room;
+    if (!isAdmin && !isMember && !isPending) {
+      try {
+        const res = await fetch(`${API_BASE}/api/clubs/${room.id}/request-join`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+        });
+        const data = await res.json().catch(() => null);
+        if (data?.room) {
+          updatedRoom = data.room;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    setActiveClubRoom(updatedRoom);
+    prevClubMsgCountRef.current = updatedRoom.messages?.length || 0;
+    setClubUnreadChat(0);
+    setTransitionLoading(true);
+    window.setTimeout(() => {
+      setTransitionLoading(false);
+      navigate(`/chat-room/${room.id}`);
+    }, 1150);
+  };
+
+  const handleSendClubJoinRequest = async () => {
+    if (!activeClubRoom) return;
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/clubs/${activeClubRoom.id}/request-join`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      const data = await res.json();
+      if (data?.room) setActiveClubRoom(data.room);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleRespondClubRequest = async (
+    requestUserId: string,
+    action: "approve" | "reject"
+  ) => {
+    if (!activeClubRoom) return;
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/clubs/${activeClubRoom.id}/respond-request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ targetUserId: requestUserId, action }),
+      });
+      const data = await res.json();
+      if (data?.room) setActiveClubRoom(data.room);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleClubMemberAction = async (
+    targetUserId: string,
+    action: "toggle-mute" | "kick"
+  ) => {
+    if (!activeClubRoom) return;
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/clubs/${activeClubRoom.id}/member-action`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ targetUserId, action }),
+      });
+      const data = await res.json();
+      if (data?.room) setActiveClubRoom(data.room);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleToggleClubMic = async () => {
+    if (!activeClubRoom) return;
+    const meInRoom = activeClubRoom.members?.find(
+      (m) => String(m.id) === String(user?.id)
+    );
+    if (meInRoom?.mutedByAdmin) {
+      return; // Admin muted this user
+    }
+    const nextMuted = !clubMicMuted;
+    setClubMicMuted(nextMuted);
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getAudioTracks().forEach((t) => {
+        t.enabled = !nextMuted;
+      });
+    }
+    const authToken = token || localStorage.getItem("ls_token");
+    if (authToken) {
+      fetch(`${API_BASE}/api/clubs/${activeClubRoom.id}/speaking`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          speaking: !nextMuted && clubSpeakingNow,
+          muted: nextMuted,
+        }),
+      }).catch(() => {});
+    }
+  };
+
+  const handleSendClubMessage = async (e: FormEvent) => {
+    e.preventDefault();
+    const text = clubChatInput.trim();
+    if (!text || !activeClubRoom) return;
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    setClubChatInput("");
+    try {
+      const res = await fetch(`${API_BASE}/api/clubs/${activeClubRoom.id}/message`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (data?.room) setActiveClubRoom(data.room);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleLeaveClubRoom = async () => {
+    const roomIdToLeave = effectiveClubRoomId;
+    stopMicStream();
+    setClubChatOpen(false);
+    setTransitionLoading(true);
+    const authToken = token || localStorage.getItem("ls_token");
+    if (authToken && roomIdToLeave) {
+      try {
+        await fetch(`${API_BASE}/api/clubs/${roomIdToLeave}/leave`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    void fetchSocialData();
+    window.setTimeout(() => {
+      setTransitionLoading(false);
+      setActiveClubRoom(null);
+      setActiveTab("club");
+      if (user?.slug) {
+        navigate(`/u/${user.slug}`, { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
+    }, 1000);
   };
 
   const handleStartOrStop = async () => {
@@ -3786,6 +4357,834 @@ export default function UserHome() {
     );
   };
 
+  const renderClubListView = () => {
+    return (
+      <div className="w-full flex flex-col gap-6 animate-in fade-in duration-200 pb-12">
+        {/* Top bar with Xona yaratish button */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold text-violet-300 mb-2">
+              <Users className="h-3.5 w-3.5 text-violet-400" />
+              <span>Jamoaviy suhbat klublari</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Klublar va Suhbat Xonalari</h1>
+            <p className="text-xs text-zinc-400 mt-1">
+              O'zingiz xona yarating yoki boshqalar yaratgan ko'p kishilik suhbat xonalariga qo'shiling
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleOpenCreateRoom}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.45)] hover:brightness-110 active:scale-95 transition-all cursor-pointer shrink-0"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Xona yaratish</span>
+          </button>
+        </div>
+
+        {/* Rooms list */}
+        {clubRooms.length === 0 ? (
+          <div className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-12 text-center backdrop-blur-2xl flex flex-col items-center justify-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/15 text-violet-300 shadow-[0_0_25px_rgba(139,92,246,0.25)]">
+              <Users className="h-8 w-8" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Hozircha faol xonalar yo'q</h3>
+              <p className="text-xs text-zinc-400 mt-1 max-w-md">
+                Birinchi bo'lib o'z suhbat xonangizni yarating va boshqa foydalanuvchilar bilan jamoa bo'lib suhbatlashing!
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleOpenCreateRoom}
+              className="mt-1 inline-flex items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:brightness-110 transition-all cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Xona yaratish</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {clubRooms.map((room) => {
+              const langItem =
+                CLUB_LANGUAGES.find((l) => l.id === room.language) || CLUB_LANGUAGES[1];
+              const currentCount = room.memberCount || room.members?.length || 1;
+              const isFull = currentCount >= room.maxMembers;
+              const isMyRoom = String(room.owner?.id) === String(user?.id);
+              const isApprovedMember = room.members?.some(
+                (m) => String(m.id) === String(user?.id)
+              );
+
+              return (
+                <div
+                  key={room.id}
+                  className="rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-5 sm:p-6 shadow-[0_10px_35px_rgba(0,0,0,0.45)] backdrop-blur-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 hover:border-violet-500/35 transition-all"
+                >
+                  {/* Left: Admin Profile + Room Info */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 min-w-0 flex-1">
+                    {/* Admin Avatar + Name + Username */}
+                    <div className="flex items-center gap-3.5 shrink-0">
+                      <SpeakerAvatar
+                        size={54}
+                        src={room.owner?.avatarUrl}
+                        name={room.owner?.name}
+                        isPremium={Boolean(room.owner?.isPremium)}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-bold text-white truncate">
+                            {room.owner?.name}
+                          </span>
+                          {(room.owner?.isPremium || room.owner?.isVerified) && (
+                            <VerifiedBadge size={15} />
+                          )}
+                          <span className="rounded-md bg-violet-500/20 border border-violet-500/30 px-1.5 py-0.5 text-[10px] font-bold text-violet-300">
+                            Admin
+                          </span>
+                        </div>
+                        <p className="text-xs font-mono text-violet-300 truncate">
+                          @{room.owner?.username}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="hidden sm:block h-10 w-px bg-white/[0.08]" />
+
+                    {/* Room Name & Description */}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base font-bold text-white truncate">{room.name}</h3>
+                      {room.description ? (
+                        <p className="text-xs text-zinc-400 line-clamp-2 mt-0.5">
+                          {room.description}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          Jamoaviy jonli ovozli muloqot xonasi
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Room Language, Capacity & Join Button */}
+                  <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-white/[0.06]">
+                    {/* Room Language */}
+                    <div className="inline-flex items-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white">
+                      <CountryFlag
+                        code={langItem.flagCode}
+                        width={20}
+                        className="h-3.5 w-5 rounded-[2px]"
+                      />
+                      <span>{langItem.name}</span>
+                    </div>
+
+                    {/* Member Count / Capacity */}
+                    <div className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-bold text-violet-200 tabular-nums">
+                      <Users className="h-3.5 w-3.5 text-violet-400" />
+                      <span>
+                        {currentCount} / {room.maxMembers} kishi
+                      </span>
+                    </div>
+
+                    {/* Xonaga qo'shilish button */}
+                    <button
+                      type="button"
+                      disabled={isFull && !isMyRoom && !isApprovedMember}
+                      onClick={() => void handleJoinOrEnterClubRoom(room)}
+                      className={cn(
+                        "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer",
+                        isFull && !isMyRoom && !isApprovedMember
+                          ? "border border-white/10 bg-white/5 text-zinc-500 cursor-not-allowed"
+                          : "border border-emerald-400/40 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-[0_0_20px_rgba(16,185,129,0.35)] hover:brightness-110 active:scale-95"
+                      )}
+                    >
+                      <Play className="h-3.5 w-3.5 fill-white" />
+                      <span>
+                        {isMyRoom || isApprovedMember
+                          ? "Xonaga kirish"
+                          : isFull
+                          ? "Xona to'lgan"
+                          : "Xonaga qo'shilish"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Full-Screen /create-room Page (No menubar, no sidebar)
+  const renderCreateRoomPage = () => {
+    const otherUsersCount = Math.max(1, clubFormMaxMembers - 1);
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-10">
+        <div className="w-full max-w-2xl rounded-3xl border border-white/[0.1] bg-[#0b071b]/90 p-6 sm:p-9 shadow-[0_25px_70px_rgba(0,0,0,0.85)] backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-5 border-b border-white/[0.08]">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("club");
+                  if (user?.slug) navigate(`/u/${user.slug}`);
+                  else navigate(-1);
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+                title="Orqaga qaytish"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div>
+                <h1 className="text-lg sm:text-xl font-bold text-white">Yangi Xona Yaratish</h1>
+                <p className="text-xs text-zinc-400">
+                  Ko'pchilik jamoa bo'lib gaplashish uchun klub xonasini sozlang
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-1.5">
+              <SpeakerAvatar
+                size={32}
+                src={user?.avatarUrl}
+                name={displayName}
+                isPremium={Boolean(user?.isPremium)}
+              />
+              <div className="hidden sm:block text-left">
+                <p className="text-xs font-bold text-white leading-tight">{displayName}</p>
+                <p className="text-[10px] font-mono text-violet-300">@{displayUsername}</p>
+              </div>
+            </div>
+          </div>
+
+          {clubError && (
+            <div className="mt-5 rounded-2xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-xs font-semibold text-red-200 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+              <span>{clubError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleCreateClubRoom} className="mt-6 flex flex-col gap-5">
+            {/* 1. Xona nomini kiritish inputi */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-300 mb-2">
+                Xona nomi
+              </label>
+              <input
+                type="text"
+                required
+                maxLength={80}
+                value={clubFormName}
+                onChange={(e) => setClubFormName(e.target.value)}
+                placeholder="Masalan: IELTS Speaking Club 7.5+ yoki Kundalik Ingliz tili"
+                className="w-full rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              />
+            </div>
+
+            {/* 2. Xona haqida batafsil ma'lumot kiritish inputi */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-300 mb-2">
+                Xona haqida batafsil ma'lumot
+              </label>
+              <textarea
+                rows={3}
+                maxLength={300}
+                value={clubFormDesc}
+                onChange={(e) => setClubFormDesc(e.target.value)}
+                placeholder="Suhbat mavzusi, qoidalar yoki qatnashuvchilar uchun qisqacha ma'lumot yozing..."
+                className="w-full rounded-2xl border border-white/15 bg-white/[0.04] p-4 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 leading-relaxed"
+              />
+            </div>
+
+            {/* 3. Xonaga kiradigan foydalanuvchilar soni (2 kishilikdan 100 kishilikgacha) */}
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                  Foydalanuvchilar soni (2 kishilikdan — 100 kishilikgacha)
+                </label>
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/35 bg-violet-500/15 px-3 py-1 text-xs font-extrabold text-violet-200">
+                  <Users className="h-3.5 w-3.5 text-violet-400" />
+                  <span>{clubFormMaxMembers} kishilik xona</span>
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <input
+                  type="range"
+                  min={2}
+                  max={100}
+                  value={clubFormMaxMembers}
+                  onChange={(e) => setClubFormMaxMembers(Number(e.target.value))}
+                  className="w-full accent-violet-500 cursor-pointer"
+                />
+                <select
+                  value={clubFormMaxMembers}
+                  onChange={(e) => setClubFormMaxMembers(Number(e.target.value))}
+                  className="w-full sm:w-44 rounded-xl border border-white/15 bg-[#120c2b] px-3 py-2.5 text-xs font-bold text-white focus:border-violet-500 focus:outline-none cursor-pointer"
+                >
+                  {Array.from({ length: 99 }, (_, idx) => idx + 2).map((num) => (
+                    <option key={num} value={num} className="bg-[#120c2b] text-white">
+                      {num} kishilik ({num - 1} ta odam + Siz)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <p className="mt-3 text-xs text-violet-300 font-medium">
+                💡 <span className="font-bold text-white">{clubFormMaxMembers} kishilik</span>{" "}
+                tanlaganingizda: <span className="font-bold text-white">1 ta Siz (Admin)</span> va{" "}
+                <span className="font-bold text-emerald-300">
+                  {otherUsersCount} ta boshqa foydalanuvchi
+                </span>{" "}
+                qo'shila oladi (Jami {clubFormMaxMembers} kishi).
+              </p>
+            </div>
+
+            {/* 4. Xonaning tilini tanlash dropdowni (5 ta til) */}
+            <div className="relative">
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-300 mb-2">
+                Xonaning tili (5 ta tildan birini tanlang)
+              </label>
+              <button
+                type="button"
+                onClick={() => setClubLangDropdownOpen((o) => !o)}
+                className="w-full flex items-center justify-between rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3 text-left hover:bg-white/[0.07] transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <CountryFlag
+                    code={clubFormLang.flagCode}
+                    width={40}
+                    className="h-4 w-6 rounded-[2px]"
+                  />
+                  <span className="text-sm font-bold text-white">{clubFormLang.name}</span>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 text-zinc-400 transition-transform",
+                    clubLangDropdownOpen && "rotate-180 text-violet-300"
+                  )}
+                />
+              </button>
+
+              {clubLangDropdownOpen && (
+                <div className="absolute left-0 right-0 top-[76px] z-40 rounded-2xl border border-white/15 bg-[#120b2d]/95 p-1.5 shadow-2xl backdrop-blur-2xl flex flex-col gap-1">
+                  {CLUB_LANGUAGES.map((l) => {
+                    const active = l.id === clubFormLang.id;
+                    return (
+                      <button
+                        key={l.id}
+                        type="button"
+                        onClick={() => {
+                          setClubFormLang(l);
+                          setClubLangDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "flex items-center justify-between rounded-xl px-3.5 py-2.5 text-left transition-colors cursor-pointer",
+                          active
+                            ? "bg-violet-600/25 text-white font-bold"
+                            : "text-zinc-300 hover:bg-white/[0.06] hover:text-white"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <CountryFlag
+                            code={l.flagCode}
+                            width={40}
+                            className="h-4 w-6 rounded-[2px]"
+                          />
+                          <span className="text-xs sm:text-sm">{l.name}</span>
+                        </div>
+                        {active && <Check className="h-4 w-4 text-violet-400" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 5. Xonani yaratish tugmasi */}
+            <button
+              type="submit"
+              disabled={clubCreating || !clubFormName.trim()}
+              className="mt-2 w-full inline-flex items-center justify-center gap-2.5 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 py-3.5 px-6 text-sm font-extrabold text-white shadow-[0_0_30px_rgba(139,92,246,0.5)] hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer"
+            >
+              {clubCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Yaratilmoqda...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  <span>Xonani yaratish</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // Full-Screen /chat-room Page (No menubar, no sidebar)
+  const renderClubChatRoomPage = () => {
+    if (!activeClubRoom) {
+      return (
+        <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 text-center">
+          <AiLoader showText={false} />
+          <p className="mt-4 text-xs text-zinc-400">Xona ma'lumotlari yuklanmoqda...</p>
+        </div>
+      );
+    }
+
+    const myId = String(user?.id || "");
+    const isRoomAdmin = String(activeClubRoom.owner?.id) === myId;
+    const isApprovedMember = activeClubRoom.members?.some(
+      (m) => String(m.id) === myId
+    );
+    const isPendingRequest = activeClubRoom.pendingRequests?.some(
+      (r) => String(r.id) === myId
+    );
+    const meMemberObj = activeClubRoom.members?.find(
+      (m) => String(m.id) === myId
+    );
+    const langObj =
+      CLUB_LANGUAGES.find((l) => l.id === activeClubRoom.language) || CLUB_LANGUAGES[1];
+
+    return (
+      <div className="min-h-screen w-full flex flex-col justify-between p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto gap-6">
+        {/* ── 1. TEPADA: Xonani yaratgan Adminning Avatar rasmi, Ismi, Usernamesi va Xona ma'lumotlari ── */}
+        <div className="rounded-3xl border border-white/[0.1] bg-[#0b071b]/90 p-5 sm:p-6 shadow-[0_15px_45px_rgba(0,0,0,0.65)] backdrop-blur-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <SpeakerAvatar
+                size={64}
+                src={activeClubRoom.owner?.avatarUrl}
+                name={activeClubRoom.owner?.name}
+                isPremium={Boolean(activeClubRoom.owner?.isPremium)}
+              />
+              <span className="absolute -bottom-1 -right-1 rounded-md bg-gradient-to-r from-amber-500 to-yellow-500 px-1.5 py-0.5 text-[9px] font-black uppercase text-black shadow">
+                Admin
+              </span>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-base sm:text-lg font-extrabold text-white">
+                  {activeClubRoom.owner?.name}
+                </h2>
+                {(activeClubRoom.owner?.isPremium || activeClubRoom.owner?.isVerified) && (
+                  <VerifiedBadge size={16} />
+                )}
+              </div>
+              <p className="text-xs font-mono text-violet-300">
+                @{activeClubRoom.owner?.username}
+              </p>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                Xona yaratuvchisi (Klub rahbari)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center md:items-end text-center md:text-right gap-1.5">
+            <h1 className="text-base sm:text-xl font-bold text-white">
+              {activeClubRoom.name}
+            </h1>
+            {activeClubRoom.description && (
+              <p className="text-xs text-zinc-400 max-w-md">{activeClubRoom.description}</p>
+            )}
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-white">
+                <CountryFlag
+                  code={langObj.flagCode}
+                  width={20}
+                  className="h-3.5 w-5 rounded-[2px]"
+                />
+                <span>{langObj.name}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-500/15 px-3 py-1 text-xs font-bold text-violet-200 tabular-nums">
+                <Users className="h-3.5 w-3.5 text-violet-400" />
+                <span>
+                  {activeClubRoom.members?.length || 1} / {activeClubRoom.maxMembers} kishi
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 2. O'RTADA: Desktopda 2 ustunli (Chapda So'rovnomalar, O'ngda Ruxsat olgan foydalanuvchilar) ── */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+          {/* CHAP TOMONDA: Xonaga qo'shilishga so'rovnoma tashlagan foydalanuvchilar */}
+          <div className="md:col-span-5 rounded-3xl border border-white/[0.1] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-white">
+                  Qo'shilish so'rovnomalari
+                </h3>
+                <p className="text-[11px] text-zinc-400">
+                  Xonaga kirish uchun ruxsat so'ragan foydalanuvchilar
+                </p>
+              </div>
+              <span className="rounded-full bg-amber-500/15 border border-amber-500/35 px-2.5 py-0.5 text-xs font-bold text-amber-300 tabular-nums">
+                {activeClubRoom.pendingRequests?.length || 0}
+              </span>
+            </div>
+
+            {!isApprovedMember && !isRoomAdmin && (
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200 flex flex-col gap-2.5">
+                {isPendingRequest ? (
+                  <p className="font-semibold">
+                    ⏳ Sizning so'rovnomangiz yuborilgan. Xona admini qabul qilishini kuting...
+                  </p>
+                ) : (
+                  <>
+                    <p>Xonada gaplashish uchun adminga so'rovnoma yuboring:</p>
+                    <button
+                      type="button"
+                      onClick={() => void handleSendClubJoinRequest()}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-black hover:brightness-110 transition-all cursor-pointer"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      <span>Qo'shilish so'rovnomasini yuborish</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {(!activeClubRoom.pendingRequests ||
+              activeClubRoom.pendingRequests.length === 0) ? (
+              <div className="py-12 text-center text-xs text-zinc-500">
+                Hozircha yangi so'rovnomalar yo'q
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 max-h-[460px] overflow-y-auto pr-1">
+                {activeClubRoom.pendingRequests.map((req) => (
+                  <div
+                    key={req.id}
+                    className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3.5 flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <SpeakerAvatar
+                        size={44}
+                        src={req.avatarUrl}
+                        name={req.name}
+                        isPremium={Boolean(req.isPremium)}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs sm:text-sm font-bold text-white truncate">
+                            {req.name}
+                          </p>
+                          {(req.isPremium || req.isVerified) && <VerifiedBadge size={14} />}
+                        </div>
+                        <p className="text-[11px] font-mono text-violet-300 truncate">
+                          @{req.username}
+                        </p>
+                      </div>
+                    </div>
+
+                    {isRoomAdmin ? (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => void handleRespondClubRequest(req.id, "approve")}
+                          className="rounded-xl border border-emerald-500/40 bg-emerald-500/20 hover:bg-emerald-500/30 px-3 py-1.5 text-[11px] font-bold text-emerald-300 transition-colors cursor-pointer"
+                        >
+                          Qabul qilish
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleRespondClubRequest(req.id, "reject")}
+                          className="rounded-xl border border-red-500/40 bg-red-500/20 hover:bg-red-500/30 px-3 py-1.5 text-[11px] font-bold text-red-300 transition-colors cursor-pointer"
+                        >
+                          Rad etish
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-lg px-2 py-1 shrink-0">
+                        Kutilmoqda
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* O'NG TOMONDA: Xonaga qo'shilishga ruxsat olgan foydalanuvchilar */}
+          <div className="md:col-span-7 rounded-3xl border border-white/[0.1] bg-[#0b071b]/85 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-white">
+                  Xonadagi ishtirokchilar (Ruxsat olganlar)
+                </h3>
+                <p className="text-[11px] text-zinc-400">
+                  Xonaga qabul qilingan va jonli suhbatda qatnashayotgan foydalanuvchilar
+                </p>
+              </div>
+              <span className="rounded-full bg-emerald-500/15 border border-emerald-500/35 px-3 py-0.5 text-xs font-bold text-emerald-300 tabular-nums">
+                {activeClubRoom.members?.length || 1} / {activeClubRoom.maxMembers}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[480px] overflow-y-auto pr-1">
+              {(activeClubRoom.members || []).map((member) => {
+                const isCreator =
+                  String(member.id) === String(activeClubRoom.owner?.id);
+                const isMuted = Boolean(member.muted || member.mutedByAdmin);
+                const isSpeaking = Boolean(member.speaking && !isMuted);
+
+                return (
+                  <div
+                    key={member.id}
+                    className={cn(
+                      "rounded-2xl border p-4 flex flex-col gap-3 transition-all",
+                      isSpeaking
+                        ? "border-emerald-400/50 bg-emerald-500/10 shadow-[0_0_25px_rgba(16,185,129,0.2)]"
+                        : "border-white/[0.08] bg-white/[0.03]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="relative shrink-0">
+                        <SpeakerAvatar
+                          size={52}
+                          src={member.avatarUrl}
+                          name={member.name}
+                          isPremium={Boolean(member.isPremium)}
+                        />
+                        <span
+                          className={cn(
+                            "absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border border-black/40",
+                            isMuted
+                              ? "bg-red-600 text-white"
+                              : isSpeaking
+                              ? "bg-emerald-500 text-white animate-pulse"
+                              : "bg-violet-600 text-white"
+                          )}
+                        >
+                          {isMuted ? (
+                            <MicOff className="h-3 w-3" />
+                          ) : (
+                            <Mic className="h-3 w-3" />
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-bold text-white truncate">
+                            {member.name}
+                          </p>
+                          {(member.isPremium || member.isVerified) && (
+                            <VerifiedBadge size={14} />
+                          )}
+                          {isCreator && (
+                            <span className="rounded bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
+                              Admin
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-mono text-violet-300 truncate">
+                          @{member.username}
+                        </p>
+                        {member.mutedByAdmin && (
+                          <p className="text-[10px] font-semibold text-red-300 mt-0.5">
+                            Admin tomonidan mikrofoni yopilgan
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Usernamesini pasidan: Mikrofonini yopib qo'yish va Xonadan chiqarib yuborish tugmalari (Faqat xonani yaratgan adminga ko'rinadi) */}
+                    {isRoomAdmin && !isCreator && (
+                      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/[0.06]">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleClubMemberAction(member.id, "toggle-mute")
+                          }
+                          className={cn(
+                            "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-bold transition-colors cursor-pointer",
+                            member.mutedByAdmin
+                              ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                              : "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
+                          )}
+                        >
+                          {member.mutedByAdmin ? (
+                            <>
+                              <Mic className="h-3.5 w-3.5" />
+                              <span>Mikrofonini yoqish</span>
+                            </>
+                          ) : (
+                            <>
+                              <MicOff className="h-3.5 w-3.5" />
+                              <span>Mikrofonini yopib qo'yish</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleClubMemberAction(member.id, "kick")
+                          }
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-500/40 bg-red-500/15 hover:bg-red-500/25 px-2.5 py-1.5 text-[11px] font-bold text-red-300 transition-colors cursor-pointer"
+                        >
+                          <UserX className="h-3.5 w-3.5" />
+                          <span>Xonadan chiqarib yuborish</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── 3. ENG PASDA: Mikrofon tugmasi, Chat tugmasi va Chatni tugatish tugmasi (Adminga ham, qo'shilgan foydalanuvchilarga ham ko'rinadi) ── */}
+        <div className="rounded-3xl border border-white/[0.1] bg-[#0b071b]/90 p-4 sm:p-5 shadow-[0_10px_40px_rgba(0,0,0,0.75)] backdrop-blur-2xl flex items-center justify-center gap-4 relative">
+          {/* 1. Mikrofon tugmasi */}
+          <button
+            type="button"
+            disabled={Boolean(meMemberObj?.mutedByAdmin)}
+            onClick={() => void handleToggleClubMic()}
+            className={cn(
+              "flex h-14 px-5 items-center justify-center gap-2 rounded-2xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-lg disabled:opacity-50 disabled:cursor-not-allowed",
+              clubMicMuted || meMemberObj?.mutedByAdmin
+                ? "border-red-500/40 bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                : "border-violet-400/40 bg-gradient-to-b from-violet-600 to-indigo-600 text-white shadow-[0_0_25px_rgba(139,92,246,0.5)]"
+            )}
+          >
+            {clubMicMuted || meMemberObj?.mutedByAdmin ? (
+              <>
+                <MicOff className="h-5 w-5" />
+                <span>{meMemberObj?.mutedByAdmin ? "Admin yopgan" : "Mikrofon yopiq"}</span>
+              </>
+            ) : (
+              <>
+                <Mic className="h-5 w-5" />
+                <span>Mikrofon</span>
+              </>
+            )}
+          </button>
+
+          {/* 2. Chat tugmasi */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setClubChatOpen((o) => {
+                  const next = !o;
+                  if (next) setClubUnreadChat(0);
+                  return next;
+                });
+              }}
+              className={cn(
+                "relative flex h-14 px-5 items-center justify-center gap-2 rounded-2xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-lg",
+                clubChatOpen
+                  ? "border-violet-400 bg-white/15 text-white"
+                  : "border-white/10 bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08] hover:text-white"
+              )}
+            >
+              <MessageSquare className="h-5 w-5" />
+              <span>Chat</span>
+              {clubUnreadChat > 0 && (
+                <span className="absolute -top-2 -right-2 flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-[11px] font-black text-white shadow-lg ring-2 ring-[#0b071b] animate-bounce">
+                  {clubUnreadChat > 99 ? "99+" : clubUnreadChat}
+                </span>
+              )}
+            </button>
+
+            {clubChatOpen && (
+              <div className="absolute bottom-[68px] left-1/2 -translate-x-1/2 z-50 w-[320px] sm:w-[380px] rounded-2xl border border-white/[0.12] bg-[#0e0924]/95 shadow-[0_10px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.03] px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-violet-400" />
+                    <span className="text-xs font-bold text-white">
+                      Xona chati ({activeClubRoom.name})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setClubChatOpen(false)}
+                    className="text-zinc-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="flex-1 max-h-[260px] min-h-[180px] overflow-y-auto p-3.5 space-y-2.5 text-xs">
+                  {!activeClubRoom.messages || activeClubRoom.messages.length === 0 ? (
+                    <p className="text-center text-[11px] text-zinc-500 py-6">
+                      Hali xabarlar yo'q. Birinchi bo'lib yozing!
+                    </p>
+                  ) : (
+                    activeClubRoom.messages.map((msg) => {
+                      const isMine = String(msg.senderId) === myId;
+                      return (
+                        <div
+                          key={msg.id}
+                          className={cn(
+                            "flex flex-col max-w-[85%] rounded-2xl px-3 py-2 leading-relaxed",
+                            isMine
+                              ? "ml-auto bg-violet-600 text-white rounded-br-none"
+                              : "mr-auto bg-white/10 text-zinc-100 rounded-bl-none"
+                          )}
+                        >
+                          <span className="text-[10px] font-semibold opacity-75 mb-0.5">
+                            {isMine ? "Siz" : `${msg.senderName} (@${msg.senderUsername})`}
+                          </span>
+                          <span className="break-words">{msg.text}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={clubChatEndRef} />
+                </div>
+
+                <form
+                  onSubmit={handleSendClubMessage}
+                  className="flex items-center gap-2 border-t border-white/[0.08] p-2 bg-white/[0.02]"
+                >
+                  <input
+                    type="text"
+                    maxLength={300}
+                    placeholder="Xabar yozing..."
+                    value={clubChatInput}
+                    onChange={(e) => setClubChatInput(e.target.value)}
+                    className="flex-1 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!clubChatInput.trim()}
+                    className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 transition-colors cursor-pointer"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+
+          {/* 3. Chatni tugatish tugmasi */}
+          <button
+            type="button"
+            onClick={() => void handleLeaveClubRoom()}
+            className="flex h-14 items-center gap-2 rounded-2xl border border-red-500/40 bg-gradient-to-r from-red-600 to-rose-700 px-5 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(239,68,68,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+          >
+            <PhoneOff className="h-5 w-5" />
+            <span>Chatni tugatish</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const hideChrome = inMeetingRoom || isCreateRoomRoute || isClubChatRoomRoute;
+
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-[#06040f] text-foreground font-sans antialiased">
       {/* ── Fixed offscreen audio element for WebRTC voice playback (desktop browser compatible) ── */}
@@ -3808,8 +5207,8 @@ export default function UserHome() {
       {/* ── Website Neon Backdrop ── */}
       <div className="neon-backdrop" aria-hidden />
 
-      {/* ── 1. Left Sidebar (hidden in full meeting mode for immersion, and hidden on mobile) ── */}
-      {!inMeetingRoom && (
+      {/* ── 1. Left Sidebar (hidden in full meeting, create-room, and chat-room modes) ── */}
+      {!hideChrome && (
         <UserSidebar
           activeTab={activeTab}
           onSelectTab={setActiveTab}
@@ -3822,7 +5221,7 @@ export default function UserHome() {
       {/* ── 2. Viewport ── */}
       <div className="relative flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-transparent pb-20 md:pb-0">
         {/* iOS 26 Liquid Glass Translucent Sticky Navbar (Only on dashboard) */}
-        {!inMeetingRoom && (
+        {!hideChrome && (
           <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/[0.1] bg-white/[0.025] px-4 sm:px-8 backdrop-blur-2xl backdrop-saturate-[190%] shadow-[0_8px_32px_rgba(0,0,0,0.28),inset_0_1px_0_0_rgba(255,255,255,0.16)]">
             <div className="flex items-center gap-2.5 sm:gap-3.5">
               <button
@@ -3889,13 +5288,17 @@ export default function UserHome() {
           </header>
         )}
 
-        {/* ── 3. Content Body (Switches between Dashboard, Tab Views and Meeting Chat Room) ── */}
+        {/* ── 3. Content Body (Switches between Full-Screen Create/Chat Room, Meeting Room, and Tabs) ── */}
         <main className="flex-1 p-3.5 sm:p-6 lg:p-8 bg-transparent max-w-full overflow-x-hidden">
           <div className="w-full">
-            {/* ════════════════════════════════════════════════════════════════
-                A. MEETING CHAT ROOM (To'liq Meeting Chat Saxifasi)
-               ════════════════════════════════════════════════════════════════ */}
-            {inMeetingRoom && matchedPartner ? (
+            {isCreateRoomRoute ? (
+              renderCreateRoomPage()
+            ) : isClubChatRoomRoute ? (
+              renderClubChatRoomPage()
+            ) : inMeetingRoom && (matchedPartner || isSearchingInRoom) ? (
+              /* ════════════════════════════════════════════════════════════════
+                  A. MEETING CHAT ROOM (To'liq Meeting Chat Saxifasi + O'tkazib yuborish)
+                 ════════════════════════════════════════════════════════════════ */
               <div className="flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-300">
                 {/* ── Top Header Row: Mening profilim (chapda) va Speaker sherigim profili (o'ngda) ── */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -3911,15 +5314,19 @@ export default function UserHome() {
                   />
 
                   {/* O'ng tomonda tepada: Speaker sherigim profili */}
-                  <VipUserCard
-                    name={matchedPartner.name}
-                    username={matchedPartner.username}
-                    avatarUrl={matchedPartner.avatarUrl}
-                    isPremium={Boolean(matchedPartner.isPremium)}
-                    isVerified={Boolean(matchedPartner.isVerified || matchedPartner.isPremium)}
-                    roleBadge="Sherik"
-                    isPartner
-                    rightExtra={
+                  {isSearchingInRoom ? (
+                    <div className="flex items-center justify-between rounded-2xl border border-violet-500/30 bg-[#0b071b]/85 p-4 backdrop-blur-xl">
+                      <div className="flex items-center gap-3.5">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-violet-400/50 bg-violet-500/10 text-violet-300 animate-pulse">
+                          <Radio className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-white">Yangi suhbatdosh qidirilmoqda...</p>
+                          <p className="text-xs font-mono text-violet-300">
+                            {formatSeconds(searchSeconds)} / 01:00
+                          </p>
+                        </div>
+                      </div>
                       <div className="shrink-0 flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-1.5">
                         <CountryFlag
                           code={speakerOption.flagCode}
@@ -3930,227 +5337,307 @@ export default function UserHome() {
                           {speakerOption.name}
                         </span>
                       </div>
-                    }
-                  />
+                    </div>
+                  ) : matchedPartner ? (
+                    <VipUserCard
+                      name={matchedPartner.name}
+                      username={matchedPartner.username}
+                      avatarUrl={matchedPartner.avatarUrl}
+                      isPremium={Boolean(matchedPartner.isPremium)}
+                      isVerified={Boolean(matchedPartner.isVerified || matchedPartner.isPremium)}
+                      roleBadge="Sherik"
+                      isPartner
+                      rightExtra={
+                        <div className="shrink-0 flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-1.5">
+                          <CountryFlag
+                            code={speakerOption.flagCode}
+                            width={20}
+                            className="h-3.5 w-5 rounded-[2px]"
+                          />
+                          <span className="text-xs font-semibold text-white">
+                            {speakerOption.name}
+                          </span>
+                        </div>
+                      }
+                    />
+                  ) : null}
                 </div>
 
-                {/* ── Main Meeting Area: Tagma-tag Katta Avatarlar + Boshqaruv Tugmalari (Markazda) ── */}
+                {/* ── Main Meeting Area: Tagma-tag Katta Avatarlar Yoki Searching Dumaloq Tugmasi ── */}
                 <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center rounded-3xl border border-white/[0.08] bg-[#0b071b]/85 p-6 sm:p-10 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.7),inset_0_1px_0_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
-                  {/* Tagma-tag Katta Avatarlar (Top: My Avatar, Bottom: Speaker Partner Avatar) */}
-                  <div className="flex flex-col items-center gap-8 my-4">
-                    {/* 1. Mening Katta Avatarim (Gapirganda animated light gradient border bilan yonadi) */}
-                    <div className="flex flex-col items-center gap-2">
-                      <div
-                        className={cn(
-                          "relative rounded-full transition-all duration-300",
-                          user?.isPremium
-                            ? isMySpeaking
-                              ? "p-[4px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_45px_rgba(245,158,11,0.95)] scale-105 animate-pulse"
-                              : "p-[3.5px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_30px_rgba(245,158,11,0.65)] ring-2 ring-amber-400/80"
-                            : isMySpeaking
-                            ? "p-[4px] bg-gradient-to-tr from-violet-400 via-fuchsia-400 to-indigo-400 shadow-[0_0_40px_rgba(168,85,247,0.85)] scale-105 animate-pulse"
-                            : "p-[3px] bg-white/10"
-                        )}
-                      >
-                        <div className="overflow-hidden rounded-full h-28 w-28 sm:h-32 sm:w-32 bg-[#120b2d]">
-                          <SpeakerAvatar size={128} src={user?.avatarUrl} />
-                        </div>
-                        {isMySpeaking && (
-                          <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-violet-500 shadow-glow">
-                            <AudioWaveform className="h-3.5 w-3.5 text-white animate-pulse" />
+                  {isSearchingInRoom ? (
+                    /* O'tkazib yuborish bosilganda o'rtada chiqadigan dumaloq Searching tugmasi va pasida Bekor qilish tugmasi */
+                    <div className="flex flex-col items-center justify-center py-10">
+                      <div className="relative flex items-center justify-center">
+                        <div
+                          aria-hidden
+                          className="absolute -inset-4 rounded-full border border-violet-400/50 scale-110 animate-pulse pointer-events-none"
+                        />
+                        <span
+                          aria-hidden
+                          className="absolute -inset-2 rounded-full border border-violet-400/60 animate-ping opacity-25 pointer-events-none"
+                        />
+                        <div className="relative flex flex-col items-center justify-center rounded-full h-32 w-32 sm:h-36 sm:w-36 border border-violet-300/30 bg-gradient-to-b from-violet-500 via-violet-600 to-indigo-700 text-white shadow-[0_0_45px_rgba(139,92,246,0.55),inset_0_2px_0_rgba(255,255,255,0.25)]">
+                          <Radio className="h-7 w-7 text-white animate-pulse" />
+                          <span className="mt-1.5 text-[11px] font-bold uppercase tracking-wider text-violet-100">
+                            {dt.start.searching}
                           </span>
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <p className="text-sm font-bold text-white">{displayName}</p>
-                          {user?.isPremium && <VerifiedBadge size={16} />}
-                        </div>
-                        <p className="text-xs font-mono text-violet-300">@{displayUsername}</p>
-                      </div>
-                    </div>
-
-                    {/* O'rtada Jonli Ovozli Aloqa Statusi */}
-                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-xs font-bold text-emerald-300">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                      <span>Jonli ovozli suhbat faol</span>
-                    </div>
-
-                    {/* 2. Speaker Sherigimning Katta Avatari (Gapirganda animated light gradient border bilan yonadi) */}
-                    <div className="flex flex-col items-center gap-2">
-                      <div
-                        className={cn(
-                          "relative rounded-full transition-all duration-300",
-                          matchedPartner?.isPremium
-                            ? isPartnerSpeaking
-                              ? "p-[4px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_45px_rgba(245,158,11,0.95)] scale-105 animate-pulse"
-                              : "p-[3.5px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_30px_rgba(245,158,11,0.65)] ring-2 ring-amber-400/80"
-                            : isPartnerSpeaking
-                            ? "p-[4px] bg-gradient-to-tr from-cyan-400 via-violet-400 to-fuchsia-400 shadow-[0_0_40px_rgba(56,189,248,0.85)] scale-105 animate-pulse"
-                            : "p-[3px] bg-white/10"
-                        )}
-                      >
-                        <div className="overflow-hidden rounded-full h-28 w-28 sm:h-32 sm:w-32 bg-[#120b2d]">
-                          <SpeakerAvatar size={128} src={matchedPartner.avatarUrl} />
-                        </div>
-                        {isPartnerSpeaking && (
-                          <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 shadow-glow">
-                            <AudioWaveform className="h-3.5 w-3.5 text-white animate-pulse" />
+                          <span className="mt-0.5 text-xs font-mono font-bold text-white tabular-nums">
+                            {formatSeconds(searchSeconds)} / 01:00
                           </span>
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <p className="text-sm font-bold text-white">{matchedPartner.name}</p>
-                          {matchedPartner?.isPremium && <VerifiedBadge size={16} />}
                         </div>
-                        <p className="text-xs font-mono text-violet-300">@{matchedPartner.username}</p>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* ── Boshqaruv Paneli: Mikrofon, Chat (Dropdown), Suhbatni tugatish (Qizil) ── */}
-                  <div className="mt-8 flex flex-col items-center gap-4 w-full">
-                    <div className="flex flex-wrap items-center justify-center gap-4 relative">
-                      {/* 1. Mikrofon Tugmasi */}
+                      <p className="mt-5 text-xs text-zinc-400 text-center max-w-xs">
+                        1 daqiqa ichida tanlangan tilda suhbatdosh topilmasa, boshqa tillardagi speakerlardan biri avtomatik ulanadi.
+                      </p>
+
                       <button
                         type="button"
-                        onClick={handleToggleMic}
-                        className={cn(
-                          "flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-200 cursor-pointer shadow-lg",
-                          isMicMuted
-                            ? "border-red-500/40 bg-red-500/20 text-red-300 hover:bg-red-500/30"
-                            : "border-violet-400/40 bg-gradient-to-b from-violet-600 to-indigo-600 text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105"
-                        )}
-                        title={isMicMuted ? "Mikrofonni yoqish" : "Mikrofonni o'chirish"}
+                        onClick={() => void handleCancelInRoomSearch()}
+                        className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-red-500/35 bg-red-500/15 px-4 py-2 text-xs font-bold text-red-300 hover:bg-red-500/25 transition-colors cursor-pointer"
                       >
-                        {isMicMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                        <X className="h-4 w-4" />
+                        <span>Bekor qilish</span>
                       </button>
-
-                      {/* 2. Chat Tugmasi */}
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setChatOpen((o) => {
-                              const next = !o;
-                              if (next) setUnreadChatCount(0);
-                              return next;
-                            });
-                          }}
-                          className={cn(
-                            "relative flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-200 cursor-pointer shadow-lg",
-                            chatOpen
-                              ? "border-violet-400 bg-white/15 text-white"
-                              : "border-white/10 bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08] hover:text-white"
-                          )}
-                          title="Yozishmalar (Chat)"
-                        >
-                          <MessageSquare className="h-6 w-6" />
-                          {unreadChatCount > 0 && (
-                            <span className="absolute -top-2 -right-2 flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-[11px] font-black text-white shadow-lg shadow-red-500/60 ring-2 ring-[#0b071b] animate-bounce">
-                              {unreadChatCount > 99 ? "99+" : unreadChatCount}
-                            </span>
-                          )}
-                        </button>
-
-                        {/* Dropdown Real-Time Chat Popover */}
-                        {chatOpen && (
-                          <div className="absolute bottom-[68px] left-1/2 -translate-x-1/2 z-40 w-[320px] sm:w-[360px] rounded-2xl border border-white/[0.12] bg-[#0e0924]/95 shadow-[0_10px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                            {/* Chat Header */}
-                            <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.03] px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <MessageSquare className="h-4 w-4 text-violet-400" />
-                                <span className="text-xs font-bold text-white">
-                                  Jonli yozishma (@{matchedPartner.username})
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => setChatOpen(false)}
-                                className="text-zinc-400 hover:text-white"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
+                    </div>
+                  ) : matchedPartner ? (
+                    <>
+                      {/* Tagma-tag Katta Avatarlar (Top: My Avatar, Bottom: Speaker Partner Avatar) */}
+                      <div className="flex flex-col items-center gap-8 my-4">
+                        {/* 1. Mening Katta Avatarim */}
+                        <div className="flex flex-col items-center gap-2">
+                          <div
+                            className={cn(
+                              "relative rounded-full transition-all duration-300",
+                              user?.isPremium
+                                ? isMySpeaking
+                                  ? "p-[4px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_45px_rgba(245,158,11,0.95)] scale-105 animate-pulse"
+                                  : "p-[3.5px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_30px_rgba(245,158,11,0.65)] ring-2 ring-amber-400/80"
+                                : isMySpeaking
+                                ? "p-[4px] bg-gradient-to-tr from-violet-400 via-fuchsia-400 to-indigo-400 shadow-[0_0_40px_rgba(168,85,247,0.85)] scale-105 animate-pulse"
+                                : "p-[3px] bg-white/10"
+                            )}
+                          >
+                            <div className="overflow-hidden rounded-full h-28 w-28 sm:h-32 sm:w-32 bg-[#120b2d]">
+                              <SpeakerAvatar size={128} src={user?.avatarUrl} />
                             </div>
-
-                            {/* Chat Message List */}
-                            <div className="flex-1 max-h-[260px] min-h-[180px] overflow-y-auto p-3.5 space-y-2.5 text-xs">
-                              {chatMessages.length === 0 ? (
-                                <p className="text-center text-[11px] text-zinc-500 py-6">
-                                  Hali xabarlar yo'q. Birinchi bo'lib yozing!
-                                </p>
-                              ) : (
-                                chatMessages.map((msg) => (
-                                  <div
-                                    key={msg.id}
-                                    className={cn(
-                                      "flex flex-col max-w-[85%] rounded-2xl px-3 py-2 leading-relaxed",
-                                      msg.isMe
-                                        ? "ml-auto bg-violet-600 text-white rounded-br-none"
-                                        : "mr-auto bg-white/10 text-zinc-100 rounded-bl-none"
-                                    )}
-                                  >
-                                    <span className="text-[10px] font-semibold opacity-70 mb-0.5">
-                                      {msg.isMe ? "Siz" : msg.senderName}
-                                    </span>
-                                    <span className="break-words">{msg.text}</span>
-                                  </div>
-                                ))
-                              )}
-                              <div ref={chatMessagesEndRef} />
-                            </div>
-
-                            {/* Chat Input & Send Button */}
-                            <form
-                              onSubmit={handleSendMessage}
-                              className="flex items-center gap-2 border-t border-white/[0.08] p-2 bg-white/[0.02]"
-                            >
-                              <input
-                                type="text"
-                                maxLength={300}
-                                placeholder="Xabar yozing..."
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                className="flex-1 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none"
-                              />
-                              <button
-                                type="submit"
-                                disabled={!chatInput.trim()}
-                                className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 transition-colors"
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                              </button>
-                            </form>
+                            {isMySpeaking && (
+                              <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-violet-500 shadow-glow">
+                                <AudioWaveform className="h-3.5 w-3.5 text-white animate-pulse" />
+                              </span>
+                            )}
                           </div>
-                        )}
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <p className="text-sm font-bold text-white">{displayName}</p>
+                              {user?.isPremium && <VerifiedBadge size={16} />}
+                            </div>
+                            <p className="text-xs font-mono text-violet-300">@{displayUsername}</p>
+                          </div>
+                        </div>
+
+                        {/* O'rtada Jonli Ovozli Aloqa Statusi */}
+                        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-xs font-bold text-emerald-300">
+                          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                          <span>Jonli ovozli suhbat faol</span>
+                        </div>
+
+                        {/* 2. Speaker Sherigimning Katta Avatari */}
+                        <div className="flex flex-col items-center gap-2">
+                          <div
+                            className={cn(
+                              "relative rounded-full transition-all duration-300",
+                              matchedPartner?.isPremium
+                                ? isPartnerSpeaking
+                                  ? "p-[4px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_45px_rgba(245,158,11,0.95)] scale-105 animate-pulse"
+                                  : "p-[3.5px] bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-600 shadow-[0_0_30px_rgba(245,158,11,0.65)] ring-2 ring-amber-400/80"
+                                : isPartnerSpeaking
+                                ? "p-[4px] bg-gradient-to-tr from-cyan-400 via-violet-400 to-fuchsia-400 shadow-[0_0_40px_rgba(56,189,248,0.85)] scale-105 animate-pulse"
+                                : "p-[3px] bg-white/10"
+                            )}
+                          >
+                            <div className="overflow-hidden rounded-full h-28 w-28 sm:h-32 sm:w-32 bg-[#120b2d]">
+                              <SpeakerAvatar size={128} src={matchedPartner.avatarUrl} />
+                            </div>
+                            {isPartnerSpeaking && (
+                              <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 shadow-glow">
+                                <AudioWaveform className="h-3.5 w-3.5 text-white animate-pulse" />
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <p className="text-sm font-bold text-white">{matchedPartner.name}</p>
+                              {matchedPartner?.isPremium && <VerifiedBadge size={16} />}
+                            </div>
+                            <p className="text-xs font-mono text-violet-300">
+                              @{matchedPartner.username}
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
-                      {/* 3. Suhbatni Tugatish Qizil Tugmasi */}
-                      <button
-                        type="button"
-                        onClick={() => setEndMeetingModalOpen(true)}
-                        className="flex h-14 items-center gap-2 rounded-2xl border border-red-500/40 bg-gradient-to-r from-red-600 to-rose-700 px-5 text-sm font-bold text-white shadow-[0_0_25px_rgba(239,68,68,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                      >
-                        <PhoneOff className="h-5 w-5" />
-                        <span>{dt.meeting.endCall}</span>
-                      </button>
-                    </div>
+                      {/* ── Boshqaruv Paneli: Mikrofon, Chat, O'tkazib yuborish, Suhbatni tugatish ── */}
+                      <div className="mt-8 flex flex-col items-center gap-4 w-full">
+                        <div className="flex flex-wrap items-center justify-center gap-3.5 relative">
+                          {/* 1. Mikrofon Tugmasi */}
+                          <button
+                            type="button"
+                            onClick={handleToggleMic}
+                            className={cn(
+                              "flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-200 cursor-pointer shadow-lg",
+                              isMicMuted
+                                ? "border-red-500/40 bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                                : "border-violet-400/40 bg-gradient-to-b from-violet-600 to-indigo-600 text-white shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105"
+                            )}
+                            title={isMicMuted ? "Mikrofonni yoqish" : "Mikrofonni o'chirish"}
+                          >
+                            {isMicMuted ? (
+                              <MicOff className="h-6 w-6" />
+                            ) : (
+                              <Mic className="h-6 w-6" />
+                            )}
+                          </button>
 
-                    {/* 4. Shikoyat bildirish tugmasi - Suhbatni tugatish tugmasining tagida */}
-                    <div className="w-full flex justify-center pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setComplaintModalOpen(true)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2 text-xs font-semibold text-amber-300 transition-all cursor-pointer shadow-sm"
-                      >
-                        <Flag className="h-3.5 w-3.5" />
-                        <span>Shikoyat bildirish</span>
-                      </button>
-                    </div>
-                  </div>
+                          {/* 2. Chat Tugmasi */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setChatOpen((o) => {
+                                  const next = !o;
+                                  if (next) setUnreadChatCount(0);
+                                  return next;
+                                });
+                              }}
+                              className={cn(
+                                "relative flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-200 cursor-pointer shadow-lg",
+                                chatOpen
+                                  ? "border-violet-400 bg-white/15 text-white"
+                                  : "border-white/10 bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08] hover:text-white"
+                              )}
+                              title="Yozishmalar (Chat)"
+                            >
+                              <MessageSquare className="h-6 w-6" />
+                              {unreadChatCount > 0 && (
+                                <span className="absolute -top-2 -right-2 flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-[11px] font-black text-white shadow-lg shadow-red-500/60 ring-2 ring-[#0b071b] animate-bounce">
+                                  {unreadChatCount > 99 ? "99+" : unreadChatCount}
+                                </span>
+                              )}
+                            </button>
+
+                            {/* Dropdown Real-Time Chat Popover */}
+                            {chatOpen && (
+                              <div className="absolute bottom-[68px] left-1/2 -translate-x-1/2 z-40 w-[320px] sm:w-[360px] rounded-2xl border border-white/[0.12] bg-[#0e0924]/95 shadow-[0_10px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                {/* Chat Header */}
+                                <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.03] px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <MessageSquare className="h-4 w-4 text-violet-400" />
+                                    <span className="text-xs font-bold text-white">
+                                      Jonli yozishma (@{matchedPartner.username})
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setChatOpen(false)}
+                                    className="text-zinc-400 hover:text-white"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+
+                                {/* Chat Message List */}
+                                <div className="flex-1 max-h-[260px] min-h-[180px] overflow-y-auto p-3.5 space-y-2.5 text-xs">
+                                  {chatMessages.length === 0 ? (
+                                    <p className="text-center text-[11px] text-zinc-500 py-6">
+                                      Hali xabarlar yo'q. Birinchi bo'lib yozing!
+                                    </p>
+                                  ) : (
+                                    chatMessages.map((msg) => (
+                                      <div
+                                        key={msg.id}
+                                        className={cn(
+                                          "flex flex-col max-w-[85%] rounded-2xl px-3 py-2 leading-relaxed",
+                                          msg.isMe
+                                            ? "ml-auto bg-violet-600 text-white rounded-br-none"
+                                            : "mr-auto bg-white/10 text-zinc-100 rounded-bl-none"
+                                        )}
+                                      >
+                                        <span className="text-[10px] font-semibold opacity-70 mb-0.5">
+                                          {msg.isMe ? "Siz" : msg.senderName}
+                                        </span>
+                                        <span className="break-words">{msg.text}</span>
+                                      </div>
+                                    ))
+                                  )}
+                                  <div ref={chatMessagesEndRef} />
+                                </div>
+
+                                {/* Chat Input & Send Button */}
+                                <form
+                                  onSubmit={handleSendMessage}
+                                  className="flex items-center gap-2 border-t border-white/[0.08] p-2 bg-white/[0.02]"
+                                >
+                                  <input
+                                    type="text"
+                                    maxLength={300}
+                                    placeholder="Xabar yozing..."
+                                    value={chatInput}
+                                    onChange={(e) => setChatInput(e.target.value)}
+                                    className="flex-1 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none"
+                                  />
+                                  <button
+                                    type="submit"
+                                    disabled={!chatInput.trim()}
+                                    className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 transition-colors"
+                                  >
+                                    <Send className="h-3.5 w-3.5" />
+                                  </button>
+                                </form>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. O'tkazib yuborish (Keyingi suhbatdoshni qidirish) Tugmasi */}
+                          <button
+                            type="button"
+                            onClick={() => void handleSkipPartnerInRoom()}
+                            className="flex h-14 items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-5 text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                          >
+                            <SkipForward className="h-5 w-5" />
+                            <span>O'tkazib yuborish</span>
+                          </button>
+
+                          {/* 4. Suhbatni Tugatish Qizil Tugmasi */}
+                          <button
+                            type="button"
+                            onClick={() => setEndMeetingModalOpen(true)}
+                            className="flex h-14 items-center gap-2 rounded-2xl border border-red-500/40 bg-gradient-to-r from-red-600 to-rose-700 px-5 text-sm font-bold text-white shadow-[0_0_25px_rgba(239,68,68,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                          >
+                            <PhoneOff className="h-5 w-5" />
+                            <span>{dt.meeting.endCall}</span>
+                          </button>
+                        </div>
+
+                        {/* 5. Shikoyat bildirish tugmasi - Suhbatni tugatish tugmasining tagida */}
+                        <div className="w-full flex justify-center pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setComplaintModalOpen(true)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2 text-xs font-semibold text-amber-300 transition-all cursor-pointer shadow-sm"
+                          >
+                            <Flag className="h-3.5 w-3.5" />
+                            <span>Shikoyat bildirish</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </div>
+            ) : activeTab === "club" ? (
+              renderClubListView()
             ) : activeTab === "profile" ? (
               renderProfileView()
             ) : activeTab === "history" ? (
@@ -4435,7 +5922,7 @@ export default function UserHome() {
                                     {dt.start.searching}
                                   </span>
                                   <span className="mt-0.5 text-xs font-mono font-bold text-white tabular-nums">
-                                    {formatSeconds(searchSeconds)} / 02:00
+                                    {formatSeconds(searchSeconds)} / 01:00
                                   </span>
                                 </div>
                               ) : (
@@ -4622,12 +6109,12 @@ export default function UserHome() {
       </div>
 
       {/* ── 4. Mobile Bottom Navigation Bar (md:hidden) ── */}
-      {!inMeetingRoom && (
+      {!hideChrome && (
         <nav
           aria-label="Pastki mobil navigatsiya"
           className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-white/[0.1] bg-[#090518]/95 px-2 backdrop-blur-2xl backdrop-saturate-[180%] md:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.5)]"
         >
-          {/* 1. Bosh sahifa */}
+          {/* 1. Speaking */}
           <button
             type="button"
             onClick={() => setActiveTab("home")}
@@ -4647,7 +6134,27 @@ export default function UserHome() {
             <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.home}</span>
           </button>
 
-          {/* 2. Mening tarixim */}
+          {/* 2. Klub */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("club")}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
+              activeTab === "club" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
+            )}
+          >
+            <div
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
+                activeTab === "club" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+              )}
+            >
+              <Radio className="h-4 w-4" />
+            </div>
+            <span className="text-[10px] font-medium tracking-tight">Klub</span>
+          </button>
+
+          {/* 3. Mening tarixim */}
           <button
             type="button"
             onClick={() => setActiveTab("history")}
@@ -4667,7 +6174,7 @@ export default function UserHome() {
             <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.history}</span>
           </button>
 
-          {/* 3. Do'stlar */}
+          {/* 4. Do'stlar */}
           <button
             type="button"
             onClick={() => setActiveTab("friends")}
@@ -4687,7 +6194,7 @@ export default function UserHome() {
             <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.friends}</span>
           </button>
 
-          {/* 4. Profil (faqat avatar) */}
+          {/* 5. Profil (faqat avatar) */}
           <button
             type="button"
             onClick={() => setActiveTab("profile")}

@@ -9,6 +9,7 @@ const onboardingRoutes = require("./routes/onboarding");
 const presenceRoutes = require("./routes/presence");
 const matchmakingRoutes = require("./routes/matchmaking");
 const socialRoutes = require("./routes/social");
+const clubsRoutes = require("./routes/clubs");
 const supabase = require("./lib/supabase");
 
 const app = express();
@@ -42,6 +43,7 @@ app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/presence", presenceRoutes);
 app.use("/api/matchmaking", matchmakingRoutes);
 app.use("/api/social", socialRoutes);
+app.use("/api/clubs", clubsRoutes);
 
 // Redirect /admin on port 5000 directly to React Admin Panel on 5173
 app.get("/admin", (req, res) => {

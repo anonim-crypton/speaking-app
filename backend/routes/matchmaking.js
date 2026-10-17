@@ -21,19 +21,28 @@ function saveComplaint(record) {
 
 const router = express.Router();
 
-const SUPPORTED_LANGUAGES = new Set(["uz", "en", "ru", "tr", "ko"]);
-const MAX_WAIT_MS = 120 * 1000; 
-const STALE_HEARTBEAT_MS = 18 * 1000; 
-
+const SUPPORTED_LANGUAGES = new Set(["uz", "en", "ru", "ar", "tr", "ko"]);
+const CROSS_LANG_FALLBACK_MS = 60 * 1000; // 1 daqiqa (60s) kutish vaqti
+const MAX_WAIT_MS = 180 * 1000;
+const STALE_HEARTBEAT_MS = 18 * 1000;
 
 const LANGUAGE_POOLS = {
   uz: new Map(),
   en: new Map(),
   ru: new Map(),
+  ar: new Map(),
   tr: new Map(),
   ko: new Map(),
 };
 
+const FALLBACK_RANDOM_SPEAKERS = [
+  { id: "spk_en_1", name: "Alex Carter", username: "alex_speaks", language: "en", isPremium: true, isVerified: true },
+  { id: "spk_ru_1", name: "Dmitriy Volkov", username: "dmitriy_ru", language: "ru", isPremium: false, isVerified: false },
+  { id: "spk_tr_1", name: "Emre Yılmaz", username: "emre_istanbul", language: "tr", isPremium: true, isVerified: true },
+  { id: "spk_ar_1", name: "Omar Al-Farsi", username: "omar_arabic", language: "ar", isPremium: false, isVerified: false },
+  { id: "spk_uz_1", name: "Sardorbek Karimov", username: "sardor_uz", language: "uz", isPremium: true, isVerified: true },
+  { id: "spk_ko_1", name: "Min-jun Kim", username: "minjun_kr", language: "ko", isPremium: false, isVerified: false },
+];
 
 const activeRooms = new Map();
 
@@ -103,7 +112,7 @@ function recordTalkHistory(pA, pB, language, durationSec = 0) {
         avatarUrl: partnerP.avatarUrl || null,
         isPremium: Boolean(partnerP.isPremium),
         isVerified: Boolean(partnerP.isVerified),
-        language: language || "en",
+        language: partnerP.language || language || "en",
         durationSeconds: prevDuration + Math.max(0, Math.round(durationSec)),
         talkedAt: nowIso,
       };
@@ -188,6 +197,7 @@ function purgeStaleEntries() {
 
   for (const [roomId, room] of activeRooms.entries()) {
     for (const p of room.participants.values()) {
+      if (p.isVirtualFallback) continue;
       if (now - p.lastSeen >= STALE_HEARTBEAT_MS * 2) {
         destroyRoom(roomId, "timeout");
         break;
@@ -203,12 +213,76 @@ function getPartnerForKey(room, key) {
   return null;
 }
 
-function tryMatchInPool(language, key) {
+function buildMatchedRoom(selfKey, selfEntry, candidateKey, candidate, roomLang) {
+  const roomId = `room_${roomLang}_${crypto.randomUUID().slice(0, 8)}`;
+  const now = Date.now();
+
+  const p1 = {
+    key: candidateKey,
+    id: candidate.userId || candidate.clientId || candidate.id,
+    userId: candidate.userId || null,
+    clientId: candidate.clientId || null,
+    name: candidate.name,
+    username: candidate.username,
+    avatarUrl: candidate.avatarUrl || null,
+    isPremium: Boolean(candidate.isPremium),
+    isVerified: Boolean(candidate.isVerified),
+    language: candidate.language || roomLang,
+    speaking: false,
+    muted: false,
+    lastSeen: now,
+    isVirtualFallback: Boolean(candidate.isVirtualFallback),
+    role: "caller",
+  };
+
+  const p2 = {
+    key: selfKey,
+    id: selfEntry.userId || selfEntry.clientId,
+    userId: selfEntry.userId,
+    clientId: selfEntry.clientId,
+    name: selfEntry.name,
+    username: selfEntry.username,
+    avatarUrl: selfEntry.avatarUrl,
+    isPremium: Boolean(selfEntry.isPremium),
+    isVerified: Boolean(selfEntry.isVerified),
+    language: selfEntry.language || roomLang,
+    speaking: false,
+    muted: false,
+    lastSeen: now,
+    role: "callee",
+  };
+
+  const participants = new Map();
+  participants.set(candidateKey, p1);
+  participants.set(selfKey, p2);
+
+  const room = {
+    roomId,
+    language: p1.language || roomLang,
+    createdAt: now,
+    participants,
+    messages: [],
+    signals: [],
+    sseClients: new Set(),
+  };
+
+  activeRooms.set(roomId, room);
+  if (!candidate.isVirtualFallback) {
+    keyToRoomId.set(candidateKey, roomId);
+  }
+  keyToRoomId.set(selfKey, roomId);
+
+  recordTalkHistory(p1, p2, room.language, 0);
+  return room;
+}
+
+function tryMatchInPool(language, key, allowCrossLanguage = false) {
   const pool = LANGUAGE_POOLS[language];
   if (!pool) return null;
   const selfEntry = pool.get(key);
   if (!selfEntry) return null;
 
+  // 1. Try matching in the selected language pool first
   for (const [candidateKey, candidate] of pool.entries()) {
     if (candidateKey === key) continue;
     if (
@@ -219,69 +293,98 @@ function tryMatchInPool(language, key) {
     ) {
       continue;
     }
+    if (
+      selfEntry.skipPartnerId &&
+      String(candidate.userId || candidate.clientId) === String(selfEntry.skipPartnerId) &&
+      pool.size > 2
+    ) {
+      continue;
+    }
 
     pool.delete(key);
     pool.delete(candidateKey);
+    return buildMatchedRoom(key, selfEntry, candidateKey, candidate, language);
+  }
 
-    const roomId = `room_${language}_${crypto.randomUUID().slice(0, 8)}`;
-    const now = Date.now();
+  // 2. Also check if any user in OTHER language pools has already waited >= 60s (or if allowCrossLanguage is true)
+  const now = Date.now();
+  const otherLangs = Object.keys(LANGUAGE_POOLS)
+    .filter((l) => l !== language)
+    .sort(() => Math.random() - 0.5);
 
-    const p1 = {
-      key: candidateKey,
-      id: candidate.userId || candidate.clientId,
-      userId: candidate.userId,
-      clientId: candidate.clientId,
-      name: candidate.name,
-      username: candidate.username,
-      avatarUrl: candidate.avatarUrl,
-      isPremium: Boolean(candidate.isPremium),
-      isVerified: Boolean(candidate.isVerified),
-      language,
-      speaking: false,
-      muted: false,
-      lastSeen: now,
-      role: "caller", 
-    };
+  for (const otherLang of otherLangs) {
+    const otherPool = LANGUAGE_POOLS[otherLang];
+    if (!otherPool) continue;
+    for (const [candidateKey, candidate] of otherPool.entries()) {
+      if (candidateKey === key) continue;
+      if (
+        selfEntry.userId &&
+        candidate.userId &&
+        selfEntry.userId === candidate.userId &&
+        selfEntry.clientId === candidate.clientId
+      ) {
+        continue;
+      }
+      const candidateWaited60s = now - (candidate.joinedAt || now) >= CROSS_LANG_FALLBACK_MS;
+      if (allowCrossLanguage || candidateWaited60s) {
+        pool.delete(key);
+        otherPool.delete(candidateKey);
+        return buildMatchedRoom(key, selfEntry, candidateKey, candidate, otherLang);
+      }
+    }
+  }
 
-    const p2 = {
-      key,
-      id: selfEntry.userId || selfEntry.clientId,
-      userId: selfEntry.userId,
-      clientId: selfEntry.clientId,
-      name: selfEntry.name,
-      username: selfEntry.username,
-      avatarUrl: selfEntry.avatarUrl,
-      isPremium: Boolean(selfEntry.isPremium),
-      isVerified: Boolean(selfEntry.isVerified),
-      language,
-      speaking: false,
-      muted: false,
-      lastSeen: now,
-      role: "callee",
-    };
+  // 3. If 1 minute (60s) has elapsed and no live user was in any pool, assign a random speaker from another language
+  if (allowCrossLanguage) {
+    pool.delete(key);
+    const otherLangPool = ["uz", "en", "ru", "tr", "ko"].filter((l) => l !== language);
+    const randomLang =
+      otherLangPool[Math.floor(Math.random() * otherLangPool.length)] || "en";
 
-    const participants = new Map();
-    participants.set(candidateKey, p1);
-    participants.set(key, p2);
+    const dbUsers = store
+      .readUsers()
+      .filter(
+        (u) =>
+          u &&
+          !u.isBanned &&
+          String(u.id) !== String(selfEntry.userId) &&
+          String(u.id) !== String(selfEntry.skipPartnerId)
+      );
 
-    const room = {
-      roomId,
-      language,
-      createdAt: now,
-      participants,
-      messages: [],
-      signals: [],
-      sseClients: new Set(),
-    };
+    let chosenCandidate = null;
+    if (dbUsers.length > 0) {
+      const randUser = dbUsers[Math.floor(Math.random() * dbUsers.length)];
+      chosenCandidate = {
+        userId: randUser.id,
+        id: randUser.id,
+        name:
+          randUser.name ||
+          (randUser.email ? randUser.email.split("@")[0] : "Speaker"),
+        username:
+          randUser.username ||
+          (randUser.email ? randUser.email.split("@")[0].toLowerCase() : "speaker"),
+        avatarUrl: randUser.avatarUrl || randUser.onboarding?.avatarUrl || null,
+        isPremium: Boolean(randUser.isPremium),
+        isVerified: Boolean(randUser.isVerified || randUser.isPremium),
+        language: randomLang,
+        isVirtualFallback: true,
+      };
+    } else {
+      const candidates = FALLBACK_RANDOM_SPEAKERS.filter(
+        (s) => s.language !== language && s.id !== selfEntry.skipPartnerId
+      );
+      const pick =
+        candidates[Math.floor(Math.random() * candidates.length)] ||
+        FALLBACK_RANDOM_SPEAKERS[0];
+      chosenCandidate = {
+        ...pick,
+        userId: null,
+        isVirtualFallback: true,
+      };
+    }
 
-    activeRooms.set(roomId, room);
-    keyToRoomId.set(candidateKey, roomId);
-    keyToRoomId.set(key, roomId);
-
-    // Record immediately in both users' talkHistory so it shows up even while or right after speaking
-    recordTalkHistory(p1, p2, language, 0);
-
-    return room;
+    const vKey = `virtual_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    return buildMatchedRoom(key, selfEntry, vKey, chosenCandidate, randomLang);
   }
 
   return null;
@@ -295,7 +398,16 @@ if (typeof sweepTimer.unref === "function") {
 
 router.post("/join", (req, res) => {
   purgeStaleEntries();
-  const { clientId, userId, language, name, username, avatarUrl } = req.body || {};
+  const {
+    clientId,
+    userId,
+    language,
+    name,
+    username,
+    avatarUrl,
+    skipPartnerId,
+    allowAnyLanguage,
+  } = req.body || {};
   const lang = String(language || "").trim().toLowerCase();
 
   if (!SUPPORTED_LANGUAGES.has(lang)) {
@@ -324,18 +436,19 @@ router.post("/join", (req, res) => {
     key,
     ...info,
     language: lang,
+    skipPartnerId: skipPartnerId || null,
     joinedAt: now,
     lastSeen: now,
   });
 
-  const room = tryMatchInPool(lang, key);
+  const room = tryMatchInPool(lang, key, Boolean(allowAnyLanguage));
   if (room) {
     const selfP = room.participants.get(key);
     const partnerP = getPartnerForKey(room, key);
     return res.json({
       success: true,
       status: "matched",
-      language: lang,
+      language: room.language || lang,
       roomId: room.roomId,
       role: selfP?.role || "callee",
       partner: partnerP
@@ -365,8 +478,14 @@ router.post("/join", (req, res) => {
 
 router.post("/status", (req, res) => {
   purgeStaleEntries();
-  const { clientId, userId, language, sinceMessageCount = 0, sinceSignalIndex = 0 } =
-    req.body || {};
+  const {
+    clientId,
+    userId,
+    language,
+    allowAnyLanguage,
+    sinceMessageCount = 0,
+    sinceSignalIndex = 0,
+  } = req.body || {};
   if (!clientId && !userId) {
     return res.status(400).json({ success: false, status: "idle" });
   }
@@ -384,6 +503,9 @@ router.post("/status", (req, res) => {
     const selfP = room.participants.get(key);
     if (selfP) selfP.lastSeen = now;
     const partnerP = getPartnerForKey(room, key);
+    if (partnerP && partnerP.isVirtualFallback) {
+      partnerP.lastSeen = now;
+    }
 
     const pendingSignals = room.signals
       .slice(Number(sinceSignalIndex) || 0)
@@ -425,26 +547,23 @@ router.post("/status", (req, res) => {
   }
 
   const entry = pool.get(key);
-  if (now - entry.joinedAt >= MAX_WAIT_MS) {
-    pool.delete(key);
-    return res.json({
-      success: true,
-      status: "timeout",
-    });
-  }
-
   entry.lastSeen = now;
 
-  const room = tryMatchInPool(lang, key);
+  const elapsedMs = now - entry.joinedAt;
+  const shouldFallbackRandomLang =
+    Boolean(allowAnyLanguage) || elapsedMs >= CROSS_LANG_FALLBACK_MS;
+
+  const room = tryMatchInPool(lang, key, shouldFallbackRandomLang);
   if (room) {
     const selfP = room.participants.get(key);
     const partnerP = getPartnerForKey(room, key);
     return res.json({
       success: true,
       status: "matched",
-      language: lang,
+      language: room.language || lang,
       roomId: room.roomId,
       role: selfP?.role || "callee",
+      fallbackMatched: shouldFallbackRandomLang,
       partner: partnerP
         ? {
             id: partnerP.id,
@@ -468,7 +587,7 @@ router.post("/status", (req, res) => {
     success: true,
     status: "searching",
     language: lang,
-    elapsedSeconds: Math.floor((now - entry.joinedAt) / 1000),
+    elapsedSeconds: Math.floor(elapsedMs / 1000),
     waitingInLanguagePool: pool.size,
   });
 });

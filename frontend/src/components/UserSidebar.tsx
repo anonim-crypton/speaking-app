@@ -1,5 +1,6 @@
 import {
   Home,
+  Radio,
   History,
   CheckSquare,
   Gamepad2,
@@ -21,6 +22,7 @@ import { DASHBOARD_TRANSLATIONS } from "@/i18n/dashboardTranslations";
 
 export type UserNavTab =
   | "home"
+  | "club"
   | "history"
   | "daily_tasks"
   | "task_game"
@@ -57,7 +59,8 @@ export default function UserSidebar({
     icon: any;
     isPremiumBadge?: boolean;
   }> = [
-    { id: "home", label: t.sidebar.home, icon: Home },
+    { id: "home", label: "Speaking", icon: AudioWaveform },
+    { id: "club", label: "Klub", icon: Radio },
     { id: "history", label: t.sidebar.history, icon: History },
     { id: "daily_tasks", label: "Kunlik topshiriqlar", icon: CheckSquare },
     { id: "task_game", label: "Topshiriqli o'yin", icon: Gamepad2 },

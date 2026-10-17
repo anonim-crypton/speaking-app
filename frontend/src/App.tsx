@@ -53,7 +53,10 @@ function HomeGate() {
 export default function App() {
   const location = useLocation();
   const isOnboardingRoute = location.pathname === "/onboarding";
-  const isUserDashboard = location.pathname.startsWith("/u/");
+  const isUserDashboard =
+    location.pathname.startsWith("/u/") ||
+    location.pathname.startsWith("/create-room") ||
+    location.pathname.startsWith("/chat-room");
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   /* ── First visit ────────────────────────────────────────────────────────
@@ -102,6 +105,15 @@ export default function App() {
       return;
     }
 
+    // Skip global route loader when transitioning between /create-room and /chat-room (UserHome handles its own ai-loader transition)
+    if (
+      location.pathname.startsWith("/create-room") ||
+      location.pathname.startsWith("/chat-room")
+    ) {
+      setRouteLoading(false);
+      return;
+    }
+
     setRouteLoading(true);
     const timer = window.setTimeout(() => setRouteLoading(false), routeLoadDuration());
     return () => window.clearTimeout(timer);
@@ -131,6 +143,30 @@ export default function App() {
             element={
               <Protected>
                 <Dashboard />
+              </Protected>
+            }
+          />
+          <Route
+            path="/create-room"
+            element={
+              <Protected>
+                <UserHome />
+              </Protected>
+            }
+          />
+          <Route
+            path="/chat-room"
+            element={
+              <Protected>
+                <UserHome />
+              </Protected>
+            }
+          />
+          <Route
+            path="/chat-room/:clubRoomId"
+            element={
+              <Protected>
+                <UserHome />
               </Protected>
             }
           />

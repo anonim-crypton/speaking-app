@@ -166,7 +166,7 @@ export interface DashboardTranslation {
 export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
   uz: {
     sidebar: {
-      home: "Bosh sahifa",
+      home: "Speaking",
       exercises: "Mening tarixim",
       history: "Mening tarixim",
       friends: "Do'stlar",
