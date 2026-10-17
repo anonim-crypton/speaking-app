@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { API_BASE } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +19,7 @@ export function resolveAvatarUrl(raw?: string | null): string | null {
  * Renders the user's uploaded profile photo (from onboarding / question step).
  * Default cartoon SVG avatar has been removed so the uploaded image is always displayed.
  */
-export default function SpeakerAvatar({
+function SpeakerAvatarComponent({
   className,
   size = 36,
   src,
@@ -47,16 +47,15 @@ export default function SpeakerAvatar({
       ? 64
       : 36;
 
-  const fallbackStoredAvatar = (() => {
-    if (src || avatarUrl) return null;
+  const imageSrc = useMemo(() => {
+    if (src || avatarUrl) return resolveAvatarUrl(src || avatarUrl);
     try {
-      return localStorage.getItem("ls_user_avatar") || null;
+      const fallback = localStorage.getItem("ls_user_avatar");
+      return resolveAvatarUrl(fallback);
     } catch {
       return null;
     }
-  })();
-
-  const imageSrc = resolveAvatarUrl(src || avatarUrl || fallbackStoredAvatar);
+  }, [src, avatarUrl]);
 
   useEffect(() => {
     setImgFailed(false);
@@ -114,3 +113,7 @@ export default function SpeakerAvatar({
 
   return innerAvatar;
 }
+
+const SpeakerAvatar = memo(SpeakerAvatarComponent);
+export default SpeakerAvatar;
+

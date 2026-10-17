@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import {
   ChevronDown,
   Flag,
@@ -41,7 +42,7 @@ interface AccountMenuProps {
  * Olmoslar soni, XP Daraja, Profil, Do'stlar, Gaplashish tarixi, Yordam, Sozlamalar,
  * chiziq, Shikoyat bo'limi, Admin bilan bog'lanish, chiziq, Hisobdan chiqish.
  */
-export default function AccountMenu({ onSelectTab, diamondsOverride }: AccountMenuProps = {}) {
+function AccountMenuComponent({ onSelectTab, diamondsOverride }: AccountMenuProps = {}) {
   const { t } = useLanguage();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -54,21 +55,26 @@ export default function AccountMenu({ onSelectTab, diamondsOverride }: AccountMe
     }
   };
 
-  const displayName =
-    user?.name ||
-    (user?.email ? user.email.split("@")[0] : null) ||
-    user?.phone ||
-    "Foydalanuvchi";
+  const displayName = useMemo(
+    () =>
+      user?.name ||
+      (user?.email ? user.email.split("@")[0] : null) ||
+      user?.phone ||
+      "Foydalanuvchi",
+    [user?.name, user?.email, user?.phone]
+  );
 
-  const localSavedDiamonds = (() => {
+  const diamonds = useMemo(() => {
+    let localSaved = 0;
     try {
       const v = Number(localStorage.getItem(`ls_local_diamonds_${user?.id || "guest"}`) || 0);
-      return isNaN(v) ? 0 : v;
+      localSaved = isNaN(v) ? 0 : v;
     } catch {
-      return 0;
+      localSaved = 0;
     }
-  })();
-  const diamonds = Math.max(diamondsOverride ?? 0, user?.diamonds ?? 0, localSavedDiamonds);
+    return Math.max(diamondsOverride ?? 0, user?.diamonds ?? 0, localSaved);
+  }, [diamondsOverride, user?.diamonds, user?.id]);
+
   const xp = user?.xp ?? 0;
   const level = user?.level ?? Math.floor(xp / 100) + 1;
   const xpInLevel = xp % 100;
@@ -80,7 +86,7 @@ export default function AccountMenu({ onSelectTab, diamondsOverride }: AccountMe
         <button
           type="button"
           className={cn(
-            "inline-flex items-center gap-2 rounded-full border py-1 pl-1.5 pr-3 transition-all duration-200 cursor-pointer shadow-sm",
+            "inline-flex items-center gap-2 rounded-full border py-1 pl-1.5 pr-3 transition-colors duration-150 cursor-pointer shadow-sm",
             isPremium
               ? "border-amber-400/60 bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-600/15 shadow-[0_0_15px_rgba(245,158,11,0.25)] hover:border-amber-300"
               : "border-border/80 bg-white/[0.06] hover:border-brand-400/70 hover:bg-brand-500/15"
@@ -242,3 +248,7 @@ export default function AccountMenu({ onSelectTab, diamondsOverride }: AccountMe
     </DropdownMenu>
   );
 }
+
+const AccountMenu = memo(AccountMenuComponent);
+export default AccountMenu;
+
