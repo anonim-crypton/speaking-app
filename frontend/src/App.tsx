@@ -57,7 +57,9 @@ export default function App() {
     location.pathname.startsWith("/u/") ||
     location.pathname.startsWith("/create-room") ||
     location.pathname.startsWith("/chat-room");
-  const isAdminRoute = location.pathname.startsWith("/admin");
+  const isAdminRoute =
+    location.pathname.startsWith("/admin") ||
+    location.pathname.startsWith("/speak-admin");
 
   /* ── First visit ────────────────────────────────────────────────────────
      The loading animation runs while the real round-trip latency is measured,
@@ -105,10 +107,12 @@ export default function App() {
       return;
     }
 
-    // Skip global route loader when transitioning between /create-room and /chat-room (UserHome handles its own ai-loader transition)
+    // Skip global route loader when transitioning between /create-room, /chat-room, or admin routes
     if (
       location.pathname.startsWith("/create-room") ||
-      location.pathname.startsWith("/chat-room")
+      location.pathname.startsWith("/chat-room") ||
+      location.pathname.startsWith("/admin") ||
+      location.pathname.startsWith("/speak-admin")
     ) {
       setRouteLoading(false);
       return;
@@ -137,7 +141,10 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/speak-admin" element={<AdminDashboard />} />
+          <Route path="/speak-admin/*" element={<AdminDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/*" element={<AdminDashboard />} />
           <Route
             path="/dashboard"
             element={

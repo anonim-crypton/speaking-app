@@ -111,7 +111,7 @@ export async function apiPost<T>(
 
 export const DJANGO_BASE = import.meta.env.VITE_DJANGO_API_URL
   ? String(import.meta.env.VITE_DJANGO_API_URL).trim().replace(/\/+$/, "")
-  : (BASE ? `${BASE}/api/admin` : "http://localhost:8000/api/admin");
+  : `${BASE}/api/admin`;
 
 export async function adminApiGet<T>(endpoint: string, token?: string | null): Promise<T> {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
