@@ -35,35 +35,7 @@ import {
 import { adminApiGet, adminApiPost, API_BASE } from "@/lib/api";
 import { resolveAvatarUrl } from "@/components/SpeakerAvatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
-
-const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
-];
-
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "#2563eb",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "#60a5fa",
-  },
-} satisfies ChartConfig;
+import { ChartAreaInteractive } from "@/components/ChartAreaInteractive";
 
 interface AdminBookItem {
   id: string;
@@ -949,60 +921,7 @@ export default function AdminDashboard() {
           {/* ── 1. OVERVIEW (Umumiy Ko'rsatkichlar Diagrammasi) ──────────── */}
           {currentTab === "overview" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="rounded-3xl border border-white/10 bg-[#0d1527]/80 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-white/10 gap-4">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-2xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 flex items-center justify-center shrink-0">
-                        <LayoutDashboard className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h2 className="text-base sm:text-lg font-bold text-white tracking-wide">
-                          Umumiy Ko'rsatkichlar Diagrammasi
-                        </h2>
-                        <p className="text-xs text-zinc-400 mt-0.5">
-                          January - June • Desktop va Mobile foydalanuvchilar statistikasi
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-semibold text-emerald-400">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      O'sish: +5.2% bu oy
-                    </span>
-                  </div>
-                </div>
-
-                <div className="w-full">
-                  <ChartContainer config={chartConfig} className="h-[380px] w-full">
-                    <BarChart accessibilityLayer data={chartData}>
-                      <CartesianGrid vertical={false} />
-                      <XAxis
-                        dataKey="month"
-                        tickLine={false}
-                        tickMargin={10}
-                        axisLine={false}
-                        tickFormatter={(value) => value.slice(0, 3)}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <ChartLegend content={<ChartLegendContent />} />
-                      <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
-                      <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
-                    </BarChart>
-                  </ChartContainer>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-zinc-400">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-blue-500"></span>
-                    <span>Recharts v3 & Shadcn Chart komponenti asosida integratsiya qilingan</span>
-                  </div>
-                  <div className="font-mono text-zinc-500">
-                    Showing total visitors for the last 6 months
-                  </div>
-                </div>
-              </div>
+              <ChartAreaInteractive />
             </div>
           )}
 
