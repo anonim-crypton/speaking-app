@@ -567,16 +567,20 @@ router.get("/leaderboard", (req, res) => {
 /* ───────────────────────── 5. DAILY TASKS & GAME COMPLETION (+1 OLMO & +XP) ───────────────────────── */
 router.post("/tasks/complete", authRequired, async (req, res) => {
   try {
-    const { taskId, language, xpEarned = 20 } = req.body || {};
+    const { taskId, language, xpEarned = 20, isCorrect = true } = req.body || {};
     if (!taskId) {
       return res.status(400).json({ success: false, message: "Topshiriq ID kiritilmadi" });
     }
     const user = store.findById(req.user.id) || req.user;
     const todayStr = new Date().toISOString().slice(0, 10);
-    const taskKey = `${todayStr}:${language || "en"}:${taskId}`;
+    const baseKey = `${todayStr}:${language || "en"}:${taskId}`;
     const completedList = Array.isArray(user.completedDailyTasks) ? [...user.completedDailyTasks] : [];
 
-    if (completedList.includes(taskKey)) {
+    const alreadySubmitted = completedList.some(
+      (k) => k === baseKey || k === `${baseKey}:wrong` || k.endsWith(`:${taskId}`) && k.startsWith(`${todayStr}:`)
+    );
+
+    if (alreadySubmitted) {
       const curXp = Number(user.xp || 0);
       return res.json({
         success: true,
@@ -585,11 +589,29 @@ router.post("/tasks/complete", authRequired, async (req, res) => {
         xp: curXp,
         level: Math.floor(curXp / 100) + 1,
         completedDailyTasks: completedList,
-        message: "Ushbu kunlik topshiriq allaqachon bajarilgan",
+        message: "Ushbu kunlik topshiriq allaqachon topshirilgan",
       });
     }
 
-    completedList.push(taskKey);
+    if (isCorrect === false) {
+      completedList.push(`${baseKey}:wrong`);
+      const curXp = Number(user.xp || 0);
+      store.updateUser(user.id, {
+        completedDailyTasks: completedList.slice(-500),
+      });
+      return res.json({
+        success: true,
+        isCorrect: false,
+        diamonds: Number(user.diamonds || 0),
+        xp: curXp,
+        level: Math.floor(curXp / 100) + 1,
+        completedDailyTasks: completedList,
+        totalTasksCompleted: Number(user.totalTasksCompleted || 0),
+        message: "Javob noto'g'ri. Topshiriq yakunlandi.",
+      });
+    }
+
+    completedList.push(baseKey);
     const addedXp = Math.max(5, Math.min(100, Number(xpEarned) || 20));
     const newDiamonds = Number(user.diamonds || 0) + 1;
     const newXp = Number(user.xp || 0) + addedXp;
@@ -617,6 +639,7 @@ router.post("/tasks/complete", authRequired, async (req, res) => {
 
     return res.json({
       success: true,
+      isCorrect: true,
       diamonds: newDiamonds,
       xp: newXp,
       level: newLevel,

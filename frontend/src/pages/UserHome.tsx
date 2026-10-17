@@ -501,21 +501,63 @@ export default function UserHome() {
   const [ratingSort, setRatingSort] = useState<"all" | "diamonds" | "streak" | "talk" | "xp">("all");
 
   // XP, Level, Daily Tasks, Task Game & Books state
+  const todayIsoKey = new Date().toISOString().slice(0, 10);
+  const taskAnswersStorageKey = `ls_daily_task_answers_${user?.id || "guest"}_${todayIsoKey}`;
+  const taskResultsStorageKey = `ls_daily_task_results_${user?.id || "guest"}_${todayIsoKey}`;
+
+  const normalizeCompletedDailyTasks = (raw: unknown): Record<string, string[]> => {
+    if (!raw) return {};
+    if (Array.isArray(raw)) {
+      const map: Record<string, string[]> = {};
+      for (const item of raw) {
+        if (typeof item !== "string") continue;
+        const parts = item.split(":");
+        if (parts.length >= 3) {
+          const dKey = parts[0];
+          const tId = parts[2];
+          if (!map[dKey]) map[dKey] = [];
+          if (!map[dKey].includes(tId)) map[dKey].push(tId);
+        }
+      }
+      return map;
+    }
+    if (typeof raw === "object") {
+      return raw as Record<string, string[]>;
+    }
+    return {};
+  };
+
   const [userXp, setUserXp] = useState<number>(user?.xp ?? 0);
   const [userLevel, setUserLevel] = useState<number>(user?.level ?? 1);
-  const [completedDailyTasks, setCompletedDailyTasks] = useState<Record<string, string[]>>(
-    user?.completedDailyTasks && !Array.isArray(user.completedDailyTasks)
-      ? user.completedDailyTasks
-      : {}
+  const [completedDailyTasks, setCompletedDailyTasks] = useState<Record<string, string[]>>(() =>
+    normalizeCompletedDailyTasks(user?.completedDailyTasks)
   );
   const [totalTasksCompleted, setTotalTasksCompleted] = useState<number>(
     user?.totalTasksCompleted ?? 0
   );
   const [taskLang, setTaskLang] = useState<LanguageKey>("en");
-  const [taskSelectedAnswers, setTaskSelectedAnswers] = useState<Record<string, number>>({});
+  const [taskSelectedAnswers, setTaskSelectedAnswers] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem(
+        `ls_daily_task_answers_${user?.id || "guest"}_${new Date().toISOString().slice(0, 10)}`
+      );
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [taskSubmittedResult, setTaskSubmittedResult] = useState<
     Record<string, "correct" | "wrong">
-  >({});
+  >(() => {
+    try {
+      const saved = localStorage.getItem(
+        `ls_daily_task_results_${user?.id || "guest"}_${new Date().toISOString().slice(0, 10)}`
+      );
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [submittingTaskId, setSubmittingTaskId] = useState<string | null>(null);
   const [taskToastMsg, setTaskToastMsg] = useState<string | null>(null);
 
@@ -761,10 +803,18 @@ export default function UserHome() {
             setUserLevel(data.user.level);
           }
           if (data.user.completedDailyTasks && typeof data.user.completedDailyTasks === "object") {
-            setCompletedDailyTasks(data.user.completedDailyTasks);
+            const parsed = normalizeCompletedDailyTasks(data.user.completedDailyTasks);
+            setCompletedDailyTasks((prev) => {
+              const merged: Record<string, string[]> = { ...prev };
+              for (const [dKey, list] of Object.entries(parsed)) {
+                const existing = merged[dKey] || [];
+                merged[dKey] = Array.from(new Set([...existing, ...list]));
+              }
+              return merged;
+            });
           }
           if (typeof data.user.totalTasksCompleted === "number") {
-            setTotalTasksCompleted(data.user.totalTasksCompleted);
+            setTotalTasksCompleted((prev) => Math.max(prev, data.user.totalTasksCompleted));
           }
         }
       } catch {
@@ -876,17 +926,60 @@ export default function UserHome() {
     const selectedIdx = taskSelectedAnswers[task.id];
     if (selectedIdx === undefined) return;
     const todayKey = new Date().toISOString().slice(0, 10);
-    const alreadyDone = (completedDailyTasks[todayKey] || []).includes(task.id);
-    if (alreadyDone) return;
+    const alreadyDone =
+      Boolean(taskSubmittedResult[task.id]) ||
+      (completedDailyTasks[todayKey] || []).includes(task.id);
+    if (alreadyDone || submittingTaskId) return;
 
-    if (selectedIdx !== task.correctIndex) {
-      setTaskSubmittedResult((prev) => ({ ...prev, [task.id]: "wrong" }));
-      return;
+    const isCorrect = selectedIdx === task.correctIndex;
+    const resultState: "correct" | "wrong" = isCorrect ? "correct" : "wrong";
+
+    // 1. Immediately lock this question so no other options can be clicked or re-submitted
+    setTaskSubmittedResult((prev) => {
+      const next = { ...prev, [task.id]: resultState };
+      try {
+        localStorage.setItem(taskResultsStorageKey, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+    try {
+      localStorage.setItem(taskAnswersStorageKey, JSON.stringify(taskSelectedAnswers));
+    } catch {
+      /* ignore */
     }
 
-    setTaskSubmittedResult((prev) => ({ ...prev, [task.id]: "correct" }));
+    setCompletedDailyTasks((prev) => {
+      const existing = prev[todayKey] || [];
+      if (existing.includes(task.id)) return prev;
+      return {
+        ...prev,
+        [todayKey]: [...existing, task.id],
+      };
+    });
+
+    if (isCorrect) {
+      setDiamonds((prev) => {
+        const next = prev + 1;
+        try {
+          localStorage.setItem(dailyDiamondsStorageKey, String(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+      setUserXp((prev) => {
+        const nextXp = prev + task.xpReward;
+        setUserLevel(Math.floor(nextXp / 100) + 1);
+        return nextXp;
+      });
+      setTaskToastMsg(`Barakalla! To'g'ri javob uchun +1 ta olmos va +${task.xpReward} XP berildi!`);
+      setTimeout(() => setTaskToastMsg(null), 4000);
+    }
+
     const authToken = token || localStorage.getItem("ls_token");
-    if (!authToken || submittingTaskId) return;
+    if (!authToken) return;
 
     setSubmittingTaskId(task.id);
     try {
@@ -901,21 +994,38 @@ export default function UserHome() {
           language: task.language,
           difficultyTier: task.tier,
           xpEarned: task.xpReward,
+          isCorrect,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        if (typeof data.diamonds === "number") setDiamonds(data.diamonds);
-        if (typeof data.xp === "number") setUserXp(data.xp);
-        if (typeof data.level === "number") setUserLevel(data.level);
-        if (data.completedDailyTasks) setCompletedDailyTasks(data.completedDailyTasks);
-        if (typeof data.totalTasksCompleted === "number") {
-          setTotalTasksCompleted(data.totalTasksCompleted);
+        if (typeof data.diamonds === "number") {
+          setDiamonds((prev) => {
+            const synced = Math.max(prev, data.diamonds);
+            try {
+              localStorage.setItem(dailyDiamondsStorageKey, String(synced));
+            } catch {
+              /* ignore */
+            }
+            return synced;
+          });
         }
-        setTaskToastMsg(
-          data.message || `Barakalla! +1 ta olmos va +${task.xpReward} XP taqdim etildi!`
-        );
-        setTimeout(() => setTaskToastMsg(null), 4000);
+        if (typeof data.xp === "number") setUserXp((prev) => Math.max(prev, data.xp));
+        if (typeof data.level === "number") setUserLevel((prev) => Math.max(prev, data.level));
+        if (data.completedDailyTasks) {
+          const parsed = normalizeCompletedDailyTasks(data.completedDailyTasks);
+          setCompletedDailyTasks((prev) => {
+            const merged = { ...prev };
+            for (const [dKey, list] of Object.entries(parsed)) {
+              const existing = merged[dKey] || [];
+              merged[dKey] = Array.from(new Set([...existing, ...list]));
+            }
+            return merged;
+          });
+        }
+        if (typeof data.totalTasksCompleted === "number") {
+          setTotalTasksCompleted((prev) => Math.max(prev, data.totalTasksCompleted));
+        }
         await refreshUser();
         void fetchSocialData();
       }
@@ -3438,8 +3548,8 @@ export default function UserHome() {
       progressionDescription,
     } = getDailyTasksForUser(taskLang, todayStr, totalTasksCompleted);
 
-    const completedForLangCount = dailyTasks.filter((t) =>
-      todayCompletedIds.includes(t.id)
+    const completedForLangCount = dailyTasks.filter(
+      (t) => todayCompletedIds.includes(t.id) || Boolean(taskSubmittedResult[t.id])
     ).length;
 
     return (
@@ -3552,9 +3662,13 @@ export default function UserHome() {
         {/* Daily Task Cards List (Ordered Easy -> Harder) */}
         <div className="flex flex-col gap-4">
           {dailyTasks.map((task, idx) => {
-            const isCompleted = todayCompletedIds.includes(task.id);
+            const isCompletedOnServer = todayCompletedIds.includes(task.id);
             const selectedIdx = taskSelectedAnswers[task.id];
             const submitState = taskSubmittedResult[task.id];
+            const isLocked = Boolean(submitState) || isCompletedOnServer;
+            const isAnsweredWrong = submitState === "wrong";
+            const isAnsweredCorrect =
+              submitState === "correct" || (isCompletedOnServer && !isAnsweredWrong);
             const tierInfo = TIER_META[task.tier];
 
             return (
@@ -3562,8 +3676,10 @@ export default function UserHome() {
                 key={task.id}
                 className={cn(
                   "rounded-3xl border p-5 sm:p-6 backdrop-blur-2xl transition-all",
-                  isCompleted
+                  isAnsweredCorrect
                     ? "border-emerald-500/40 bg-emerald-500/[0.06] shadow-[0_0_25px_rgba(16,185,129,0.08)]"
+                    : isAnsweredWrong
+                    ? "border-red-500/40 bg-red-500/[0.05] shadow-[0_0_25px_rgba(239,68,68,0.08)]"
                     : "border-white/[0.08] bg-[#0b071b]/85 hover:border-violet-500/30"
                 )}
               >
@@ -3590,10 +3706,16 @@ export default function UserHome() {
                       <Zap className="h-3.5 w-3.5 text-cyan-300 fill-cyan-300" />
                       +{task.xpReward} XP
                     </span>
-                    {isCompleted && (
+                    {isAnsweredCorrect && (
                       <span className="inline-flex items-center gap-1 rounded-xl border border-emerald-500/45 bg-emerald-500/20 px-3 py-1 text-xs font-extrabold text-emerald-300">
                         <Check className="h-3.5 w-3.5" />
-                        Topshirildi
+                        To'g'ri topshirildi
+                      </span>
+                    )}
+                    {isAnsweredWrong && (
+                      <span className="inline-flex items-center gap-1 rounded-xl border border-red-500/45 bg-red-500/20 px-3 py-1 text-xs font-extrabold text-red-300">
+                        <X className="h-3.5 w-3.5" />
+                        Noto'g'ri topshirildi
                       </span>
                     )}
                   </div>
@@ -3611,41 +3733,58 @@ export default function UserHome() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-4">
                   {task.options.map((opt, optIdx) => {
                     const isPicked = selectedIdx === optIdx;
-                    const showCorrect = isCompleted && optIdx === task.correctIndex;
+                    const showCorrect = isLocked && optIdx === task.correctIndex;
                     const showWrong =
-                      !isCompleted && submitState === "wrong" && isPicked && optIdx !== task.correctIndex;
+                      isLocked && isAnsweredWrong && isPicked && optIdx !== task.correctIndex;
 
                     return (
                       <button
                         key={optIdx}
                         type="button"
-                        disabled={isCompleted}
+                        disabled={isLocked}
                         onClick={() => {
-                          setTaskSelectedAnswers((prev) => ({ ...prev, [task.id]: optIdx }));
-                          setTaskSubmittedResult((prev) => {
-                            const next = { ...prev };
-                            delete next[task.id];
+                          if (isLocked) return;
+                          setTaskSelectedAnswers((prev) => {
+                            const next = { ...prev, [task.id]: optIdx };
+                            try {
+                              localStorage.setItem(taskAnswersStorageKey, JSON.stringify(next));
+                            } catch {
+                              /* ignore */
+                            }
                             return next;
                           });
                         }}
                         className={cn(
-                          "flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-xs sm:text-sm font-semibold transition-all cursor-pointer",
+                          "flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-xs sm:text-sm font-semibold transition-all",
+                          isLocked ? "cursor-not-allowed" : "cursor-pointer",
                           showCorrect
-                            ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-100"
+                            ? "border-emerald-400/70 bg-emerald-500/25 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,0.2)]"
                             : showWrong
-                            ? "border-red-500/60 bg-red-500/20 text-red-200"
+                            ? "border-red-500/70 bg-red-500/25 text-red-200 shadow-[0_0_16px_rgba(239,68,68,0.2)]"
+                            : isLocked
+                            ? "border-white/[0.06] bg-white/[0.02] text-zinc-500 opacity-65"
                             : isPicked
                             ? "border-cyan-400/60 bg-cyan-500/20 text-white shadow-[0_0_15px_rgba(34,211,238,0.18)]"
                             : "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07] hover:text-white"
                         )}
                       >
                         <span>
-                          <strong className="mr-2 text-zinc-400">
+                          <strong
+                            className={cn(
+                              "mr-2",
+                              showCorrect
+                                ? "text-emerald-300"
+                                : showWrong
+                                ? "text-red-300"
+                                : "text-zinc-400"
+                            )}
+                          >
                             {String.fromCharCode(65 + optIdx)}.
                           </strong>
                           {opt}
                         </span>
                         {showCorrect && <Check className="h-4 w-4 text-emerald-300 shrink-0" />}
+                        {showWrong && <X className="h-4 w-4 text-red-300 shrink-0" />}
                       </button>
                     );
                   })}
@@ -3653,13 +3792,19 @@ export default function UserHome() {
 
                 {/* Explanation or Submit Bar */}
                 <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/[0.06]">
-                  {isCompleted ? (
+                  {isAnsweredCorrect ? (
                     <div className="text-xs text-emerald-300 leading-relaxed">
-                      <strong>Izoh:</strong> {task.explanation}
+                      <strong>✓ To'g'ri javob! (+1 💎 va +{task.xpReward} XP):</strong>{" "}
+                      {task.explanation}
                     </div>
-                  ) : submitState === "wrong" ? (
-                    <div className="text-xs text-red-300 font-semibold">
-                      Noto'g'ri javob tanlandi. Boshqa variantni tanlab qayta urinib ko'ring!
+                  ) : isAnsweredWrong ? (
+                    <div className="text-xs text-red-300 leading-relaxed">
+                      <strong>
+                        ✕ Noto'g'ri javob! To'g'ri javob —{" "}
+                        {String.fromCharCode(65 + task.correctIndex)}.{" "}
+                        {task.options[task.correctIndex]}:
+                      </strong>{" "}
+                      <span className="text-zinc-300">{task.explanation}</span>
                     </div>
                   ) : (
                     <div className="text-xs text-zinc-400">
@@ -3667,7 +3812,7 @@ export default function UserHome() {
                     </div>
                   )}
 
-                  {!isCompleted && (
+                  {!isLocked && (
                     <button
                       type="button"
                       disabled={selectedIdx === undefined || submittingTaskId === task.id}
