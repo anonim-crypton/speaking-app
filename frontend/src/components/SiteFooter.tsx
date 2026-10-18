@@ -72,16 +72,20 @@ export default function SiteFooter() {
   };
 
   return (
-    <footer id="contact" className="mt-8 border-t border-border/60 bg-night-950/40">
-      <div className="w-full px-4 sm:px-8 lg:px-12 py-14">
-        <div className="grid gap-10 lg:grid-cols-12">
+    <footer id="contact" className="mt-14 border-t border-white/10 bg-gradient-to-b from-[#080415]/90 via-[#0a051d] to-[#04020c] relative z-10">
+      <div className="w-full px-6 sm:px-10 lg:px-16 pt-16 sm:pt-20 pb-28 lg:pb-16">
+        <div className="grid gap-12 lg:grid-cols-12 lg:gap-14">
           {/* ── Brand ── */}
-          <div className="lg:col-span-4">
-            <Logo />
-            <p className="mt-4 max-w-[280px] text-[13px] leading-relaxed text-muted-foreground">
-              {t.footer.tagline}
-            </p>
-            <div className="mt-5 flex items-center gap-2">
+          <div className="lg:col-span-4 flex flex-col justify-between">
+            <div>
+              <div className="scale-105 origin-left">
+                <Logo />
+              </div>
+              <p className="mt-5 max-w-[340px] text-sm sm:text-[14.5px] leading-relaxed text-zinc-300">
+                {t.footer.tagline}
+              </p>
+            </div>
+            <div className="mt-6 flex items-center gap-2.5">
               {SOCIALS.map(({ icon: Icon, href, label }, i) => (
                 <a
                   key={i}
@@ -89,9 +93,9 @@ export default function SiteFooter() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="grid h-9 w-9 place-items-center rounded-full border border-border/70 bg-white/5 text-muted-foreground transition-all hover:scale-105 hover:border-brand-500/60 hover:bg-brand-500/10 hover:text-brand-200"
+                  className="grid h-10 w-10 sm:h-11 sm:w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-400 transition-all hover:scale-110 hover:border-violet-500/60 hover:bg-violet-500/15 hover:text-violet-200 hover:shadow-[0_0_20px_rgba(139,92,246,0.3)] cursor-pointer"
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-5 w-5" />
                 </a>
               ))}
             </div>
@@ -101,13 +105,15 @@ export default function SiteFooter() {
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-2 lg:col-span-4">
             {t.footer.columns.map((col) => (
               <div key={col.title}>
-                <h4 className="text-[13px] font-bold tracking-tight text-white">{col.title}</h4>
-                <ul className="mt-4 space-y-2.5">
+                <h4 className="text-sm sm:text-base font-extrabold tracking-wide text-white">
+                  {col.title}
+                </h4>
+                <ul className="mt-5 space-y-3.5">
                   {col.links.map((link) => (
                     <li key={link}>
                       <Link
                         to={getLinkTarget(link)}
-                        className="text-[12.5px] text-muted-foreground transition-colors hover:text-brand-300 hover:underline block py-0.5"
+                        className="text-sm sm:text-[14.5px] text-zinc-400 transition-colors hover:text-violet-300 hover:underline block py-0.5"
                       >
                         {link}
                       </Link>
@@ -120,20 +126,20 @@ export default function SiteFooter() {
 
           {/* ── Newsletter ── */}
           <div className="lg:col-span-4">
-            <h4 className="text-[13px] font-bold tracking-tight text-white">
+            <h4 className="text-sm sm:text-base font-extrabold tracking-wide text-white">
               {t.footer.newsletterTitle}
             </h4>
-            <p className="mt-3 text-[12.5px] leading-relaxed text-muted-foreground">
+            <p className="mt-4 text-sm sm:text-[14.5px] leading-relaxed text-zinc-400 max-w-sm">
               {t.footer.newsletterSub}
             </p>
             {subscribed ? (
-              <div className="mt-4 flex items-center gap-2 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold animate-in fade-in">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+              <div className="mt-5 flex items-center gap-2.5 p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-200 text-sm font-semibold animate-in fade-in shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
                 <span>Rahmat! Yangiliklarimizga muvaffaqiyatli obuna bo'ldingiz.</span>
               </div>
             ) : (
               <form
-                className="mt-4 flex items-center gap-2"
+                className="mt-5 flex items-center gap-2.5"
                 onSubmit={handleNewsletterSubmit}
               >
                 <Input
@@ -142,28 +148,34 @@ export default function SiteFooter() {
                   value={newsletterEmail}
                   onChange={(e) => setNewsletterEmail(e.target.value)}
                   placeholder={t.footer.newsletterPlaceholder}
-                  className="h-10 text-xs bg-white/5 border-white/10 placeholder:text-zinc-500"
+                  className="h-12 text-sm bg-white/[0.06] border-white/15 placeholder:text-zinc-500 rounded-xl px-4"
                   aria-label={t.footer.newsletterPlaceholder}
                 />
-                <Button type="submit" variant="glow" size="icon" aria-label="Subscribe" className="shrink-0">
-                  <Send className="w-4 h-4" />
+                <Button
+                  type="submit"
+                  variant="glow"
+                  size="icon"
+                  aria-label="Subscribe"
+                  className="h-12 w-12 rounded-xl shrink-0"
+                >
+                  <Send className="w-5 h-5" />
                 </Button>
               </form>
             )}
           </div>
         </div>
 
-        <Separator className="my-9 bg-white/10" />
+        <Separator className="my-12 bg-white/10" />
 
         {/* ── Bottom bar ── */}
-        <div className="flex flex-col items-center justify-between gap-3 text-[11.5px] text-muted-foreground sm:flex-row">
+        <div className="flex flex-col items-center justify-between gap-4 text-xs sm:text-sm text-zinc-400 sm:flex-row">
           <span>
             © {year} {BRAND}. {t.footer.copyright}
           </span>
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             <span>{t.footer.bottomTagline}</span>
-            <span className="flex items-center gap-1.5">
-              <Globe className="h-3.5 w-3.5" />
+            <span className="flex items-center gap-2">
+              <Globe className="h-4 w-4 text-violet-400" />
               {t.footer.bottomRight}
             </span>
           </div>

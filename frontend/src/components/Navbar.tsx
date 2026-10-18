@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Sparkles, Info, LogIn, UserPlus } from "lucide-react";
+import { Home, Mic, Users, LogIn, UserPlus } from "lucide-react";
 
 import Logo from "@/components/Logo";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -184,7 +184,7 @@ export default function Navbar() {
               active === "practice" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
             )}
           >
-            <Sparkles className="h-4 w-4" />
+            <Mic className="h-4 w-4" />
           </div>
           <span className="text-[10px] font-medium tracking-tight truncate max-w-[64px]">
             {t.nav.practice}
@@ -206,7 +206,7 @@ export default function Navbar() {
               active === "about" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
             )}
           >
-            <Info className="h-4 w-4" />
+            <Users className="h-4 w-4" />
           </div>
           <span className="text-[10px] font-medium tracking-tight truncate max-w-[64px]">
             {t.nav.about}
