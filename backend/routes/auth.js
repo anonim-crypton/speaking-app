@@ -20,7 +20,7 @@ function getPlatformSettings() {
     if (fs.existsSync(SETTINGS_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
       return {
-        defaultSignupDiamonds: Number(parsed.defaultSignupDiamonds) || 50,
+        defaultSignupDiamonds: Number(parsed.defaultSignupDiamonds) || 10,
         dailyRewardDiamonds: Number(parsed.dailyRewardDiamonds) || 5,
       };
     }
@@ -28,7 +28,7 @@ function getPlatformSettings() {
     console.warn("Failed to read settings.json:", e);
   }
   return {
-    defaultSignupDiamonds: 50,
+    defaultSignupDiamonds: 10,
     dailyRewardDiamonds: 5,
   };
 }

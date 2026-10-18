@@ -6382,9 +6382,9 @@ export default function UserHome() {
               >
                 <MessageSquare className="h-4 w-4" />
                 {unreadAdminCount > 0 && (
-                  <Badge className="absolute -top-2 left-full min-w-5 -translate-x-1/2 px-1 text-[10px] bg-rose-500 hover:bg-rose-600 text-white font-bold border-0 shadow-md">
+                  <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] px-1 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-md ring-2 ring-[#0c0824] leading-none pointer-events-none">
                     {unreadAdminCount > 99 ? "99+" : unreadAdminCount}
-                  </Badge>
+                  </span>
                 )}
               </Button>
 
@@ -6399,9 +6399,9 @@ export default function UserHome() {
               >
                 <Bell className="h-4 w-4" />
                 {unreadAnnouncementsCount > 0 && (
-                  <Badge className="absolute -top-2 left-full min-w-5 -translate-x-1/2 px-1 text-[10px] bg-rose-500 hover:bg-rose-600 text-white font-bold border-0 shadow-md">
+                  <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] px-1 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-md ring-2 ring-[#0c0824] leading-none pointer-events-none">
                     {unreadAnnouncementsCount > 99 ? "99+" : unreadAnnouncementsCount}
-                  </Badge>
+                  </span>
                 )}
               </Button>
 

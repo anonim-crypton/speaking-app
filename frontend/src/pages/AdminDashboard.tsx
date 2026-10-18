@@ -224,9 +224,9 @@ export default function AdminDashboard() {
   const [devices, setDevices] = useState<DeviceItem[]>([]);
   const [settingsData, setSettingsData] = useState<PlatformSettings>({
     maintenanceMode: false,
-    defaultSignupDiamonds: 50,
+    defaultSignupDiamonds: 10,
     matchCostDiamonds: 0,
-    dailyRewardDiamonds: 20,
+    dailyRewardDiamonds: 5,
     allowGuestMatch: true,
     chatMessageFilter: true,
     platformNotice: "",
@@ -2620,11 +2620,11 @@ export default function AdminDashboard() {
                         onClick={() =>
                           handleUpdateDiamondSetting(
                             "defaultSignupDiamonds",
-                            Math.max(0, (Number(settingsData.defaultSignupDiamonds) || 0) - 5)
+                            Math.max(0, (Number(settingsData.defaultSignupDiamonds) || 0) - 1)
                           )
                         }
                         className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-all cursor-pointer font-bold"
-                        title="5 taga kamaytirish"
+                        title="1 taga kamaytirish"
                       >
                         <Minus className="w-4 h-4" />
                       </button>
@@ -2633,7 +2633,7 @@ export default function AdminDashboard() {
                         type="number"
                         min="0"
                         max="100000"
-                        value={settingsData.defaultSignupDiamonds ?? 50}
+                        value={settingsData.defaultSignupDiamonds ?? 10}
                         onChange={(e) => {
                           const v = parseInt(e.target.value, 10);
                           setSettingsData((prev) => ({
@@ -2644,7 +2644,7 @@ export default function AdminDashboard() {
                         onBlur={() =>
                           handleUpdateDiamondSetting(
                             "defaultSignupDiamonds",
-                            settingsData.defaultSignupDiamonds ?? 50
+                            settingsData.defaultSignupDiamonds ?? 10
                           )
                         }
                         className="w-16 h-9 rounded-xl border border-violet-500/30 bg-[#070b14] px-2 text-center text-sm font-bold text-violet-300 focus:border-violet-500 focus:outline-none"
@@ -2655,11 +2655,11 @@ export default function AdminDashboard() {
                         onClick={() =>
                           handleUpdateDiamondSetting(
                             "defaultSignupDiamonds",
-                            (Number(settingsData.defaultSignupDiamonds) || 0) + 5
+                            (Number(settingsData.defaultSignupDiamonds) || 0) + 1
                           )
                         }
                         className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-all cursor-pointer font-bold"
-                        title="5 taga ko'paytirish"
+                        title="1 taga ko'paytirish"
                       >
                         <Plus className="w-4 h-4" />
                       </button>

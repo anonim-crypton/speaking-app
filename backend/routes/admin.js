@@ -20,7 +20,7 @@ const store = require("../utils/store");
 
 const DEFAULT_SETTINGS = {
   maintenanceMode: false,
-  defaultSignupDiamonds: 50,
+  defaultSignupDiamonds: 10,
   matchCostDiamonds: 0,
   dailyRewardDiamonds: 5,
   allowGuestMatch: true,
