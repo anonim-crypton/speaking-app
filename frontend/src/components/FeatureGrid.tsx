@@ -25,7 +25,7 @@ export default function FeatureGrid() {
   const { t } = useLanguage();
 
   return (
-    <section id="practice" className="py-14 lg:py-16">
+    <section id="practice" className="py-14 lg:py-16 scroll-mt-24">
       <div className="container">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {t.features.items.map((item, i) => {

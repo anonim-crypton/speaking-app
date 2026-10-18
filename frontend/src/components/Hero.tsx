@@ -23,7 +23,7 @@ export default function Hero() {
   const { t } = useLanguage();
 
   return (
-    <section id="home" className="relative overflow-x-clip pb-14 pt-10 lg:pb-20 lg:pt-14">
+    <section id="home" className="relative overflow-x-clip pb-14 pt-10 lg:pb-20 lg:pt-14 scroll-mt-24">
       <div className="container">
         <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-10 xl:gap-14">
           {/* ── Copy ── */}

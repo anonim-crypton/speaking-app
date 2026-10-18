@@ -30,10 +30,17 @@ export default function Navbar() {
   const [active, setActive] = useState<string>("home");
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => {
+      const top = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      setScrolled(top > 8);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    document.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("scroll", onScroll);
+    };
   }, []);
 
   /* Scroll-spy: last section whose top edge passed the probe line. */
@@ -68,39 +75,53 @@ export default function Navbar() {
       navigate("/", { state: { scrollTo: id } });
       return;
     }
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const el = document.getElementById(id);
+    if (el) {
+      const topOffset = 85;
+      const elementPosition = el.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0);
+      const offsetPosition = elementPosition - topOffset;
+      window.scrollTo({
+        top: Math.max(0, offsetPosition),
+        behavior: "smooth"
+      });
+    }
   }
 
   if (isAuthed) {
     return (
-      <header
-        className={cn(
-          "sticky top-0 z-50 w-full transition-all duration-300 ease-out pointer-events-none",
-          scrolled ? "pt-2.5 sm:pt-3 px-3 sm:px-6 md:px-8" : "pt-0 px-0"
-        )}
-      >
-        <div
+      <>
+        {/* Spacer so page content begins right below the full-width navbar */}
+        <div className="h-16 w-full shrink-0" aria-hidden="true" />
+
+        <header
           className={cn(
-            "pointer-events-auto transition-all duration-300 ease-out",
-            scrolled
-              ? "mx-auto max-w-6xl rounded-2xl border border-white/15 bg-[#090518]/65 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.65)] px-4 sm:px-6"
-              : "w-full border-b border-white/[0.06] bg-[#070414]/90 backdrop-blur-md px-4 sm:px-8"
+            "fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ease-out pointer-events-none",
+            scrolled ? "pt-2.5 sm:pt-3 px-3 sm:px-6 md:px-8" : "pt-0 px-0"
           )}
         >
-          <div className="flex h-16 items-center justify-between">
-            <Link to="/" className="shrink-0 flex items-center" aria-label="Lingo Speek home">
-              <Logo />
-            </Link>
+          <div
+            className={cn(
+              "pointer-events-auto transition-all duration-300 ease-out",
+              scrolled
+                ? "mx-auto max-w-6xl rounded-2xl border border-white/15 bg-[#090518]/65 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.65)] px-4 sm:px-6"
+                : "w-full border-b border-white/[0.06] bg-[#070414]/90 backdrop-blur-md px-4 sm:px-8"
+            )}
+          >
+            <div className="flex h-16 items-center justify-between">
+              <Link to="/" className="shrink-0 flex items-center" aria-label="Lingo Speek home">
+                <Logo />
+              </Link>
 
-            <div className="flex items-center gap-2">
-              <div className="hidden md:block">
-                <LanguageSwitcher />
+              <div className="flex items-center gap-2">
+                <div className="hidden md:block">
+                  <LanguageSwitcher />
+                </div>
+                <AccountMenu />
               </div>
-              <AccountMenu />
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      </>
     );
   }
 
@@ -111,9 +132,12 @@ export default function Navbar() {
 
   return (
     <>
+      {/* Spacer so page content begins right below the full-width navbar */}
+      <div className="h-16 w-full shrink-0" aria-hidden="true" />
+
       <header
         className={cn(
-          "sticky top-0 z-50 w-full transition-all duration-300 ease-out pointer-events-none",
+          "fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ease-out pointer-events-none",
           scrolled ? "pt-2.5 sm:pt-3 px-3 sm:px-6 md:px-8" : "pt-0 px-0"
         )}
       >

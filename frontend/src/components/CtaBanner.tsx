@@ -33,7 +33,7 @@ export default function CtaBanner() {
   const script = [t.cta.scriptA, t.cta.scriptB, t.cta.scriptC, t.cta.scriptD];
 
   return (
-    <section id="about" className="py-10 lg:py-12">
+    <section id="about" className="py-10 lg:py-12 scroll-mt-24">
       <div className="container">
         <Reveal direction="zoom">
           <div className="relative overflow-hidden rounded-[26px] border border-brand-500/30 bg-gradient-to-r from-violet-700/35 via-purple-700/25 to-fuchsia-700/20 p-5 sm:p-7">
