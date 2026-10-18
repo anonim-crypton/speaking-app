@@ -99,6 +99,11 @@ export default function Navbar() {
     );
   }
 
+  const isHomeActive = active === "home" && location.pathname === "/";
+  const isPracticeActive = active === "practice" && location.pathname === "/";
+  const isAboutActive = active === "about" && location.pathname === "/";
+  const isHelpActive = location.pathname.startsWith("/help");
+
   return (
     <>
       <header
@@ -172,9 +177,9 @@ export default function Navbar() {
       {/* ── Mobile Landing Floating Bottom Navigation Bar (lg:hidden) ── */}
       <nav
         aria-label="Mobil pastki navigatsiya"
-        className="fixed bottom-4 left-0 right-0 z-40 flex items-center justify-center gap-2.5 px-3 pointer-events-none lg:hidden"
+        className="fixed bottom-4 left-0 right-0 z-40 flex items-center justify-center gap-2 px-3 pointer-events-none lg:hidden"
       >
-        {/* Connected capsule with border: Bosh sahifa, Amaliyot, Biz haqimizda */}
+        {/* Connected capsule with border: Bosh sahifa, Amaliyot, Biz haqimizda, Yordam */}
         <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/15 bg-[#0e0924]/90 p-1.5 shadow-[0_12px_35px_rgba(0,0,0,0.6)] backdrop-blur-2xl backdrop-saturate-[180%]">
           {/* 1. Bosh sahifa */}
           <button
@@ -183,12 +188,23 @@ export default function Navbar() {
             title={t.nav.home}
             aria-label={t.nav.home}
             className={cn(
-              "flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer",
-              active === "home" && location.pathname === "/"
+              "relative group flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+              isHomeActive
                 ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
                 : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
             )}
           >
+            <span
+              className={cn(
+                "pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 z-50",
+                isHomeActive
+                  ? "opacity-100 scale-100 translate-y-0"
+                  : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
+              )}
+            >
+              {t.nav.home}
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+            </span>
             <Home className="h-5 w-5" />
           </button>
 
@@ -199,12 +215,23 @@ export default function Navbar() {
             title={t.nav.practice}
             aria-label={t.nav.practice}
             className={cn(
-              "flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer",
-              active === "practice" && location.pathname === "/"
+              "relative group flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+              isPracticeActive
                 ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
                 : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
             )}
           >
+            <span
+              className={cn(
+                "pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 z-50",
+                isPracticeActive
+                  ? "opacity-100 scale-100 translate-y-0"
+                  : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
+              )}
+            >
+              {t.nav.practice}
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+            </span>
             <Mic className="h-5 w-5" />
           </button>
 
@@ -215,14 +242,51 @@ export default function Navbar() {
             title={t.nav.about}
             aria-label={t.nav.about}
             className={cn(
-              "flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer",
-              active === "about" && location.pathname === "/"
+              "relative group flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+              isAboutActive
                 ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
                 : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
             )}
           >
+            <span
+              className={cn(
+                "pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 z-50",
+                isAboutActive
+                  ? "opacity-100 scale-100 translate-y-0"
+                  : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
+              )}
+            >
+              {t.nav.about}
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+            </span>
             <Users className="h-5 w-5" />
           </button>
+
+          {/* 4. Yordam (Biz haqimizda yonida) */}
+          <Link
+            to="/help"
+            title={t.account?.help || "Yordam"}
+            aria-label={t.account?.help || "Yordam"}
+            className={cn(
+              "relative group flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+              isHelpActive
+                ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
+                : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
+            )}
+          >
+            <span
+              className={cn(
+                "pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 z-50",
+                isHelpActive
+                  ? "opacity-100 scale-100 translate-y-0"
+                  : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
+              )}
+            >
+              {t.account?.help || "Yordam"}
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+            </span>
+            <HelpCircle className="h-5 w-5" />
+          </Link>
         </div>
 
         {/* Oxirgi qism: Login va Register alohida dumaloq tugmalar */}
@@ -230,8 +294,12 @@ export default function Navbar() {
           to="/login"
           title={t.nav.login}
           aria-label={t.nav.login}
-          className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[#0e0924]/90 text-zinc-300 shadow-[0_12px_30px_rgba(0,0,0,0.55)] backdrop-blur-2xl backdrop-saturate-[180%] transition-all hover:scale-105 hover:border-violet-500/50 hover:bg-violet-500/20 hover:text-white active:scale-95 cursor-pointer"
+          className="pointer-events-auto relative group flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[#0e0924]/90 text-zinc-300 shadow-[0_12px_30px_rgba(0,0,0,0.55)] backdrop-blur-2xl backdrop-saturate-[180%] transition-all hover:scale-105 hover:border-violet-500/50 hover:bg-violet-500/20 hover:text-white active:scale-95 cursor-pointer"
         >
+          <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 z-50">
+            {t.nav.login}
+            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+          </span>
           <LogIn className="h-5 w-5" />
         </Link>
 
@@ -239,8 +307,12 @@ export default function Navbar() {
           to="/register"
           title={t.nav.register}
           aria-label={t.nav.register}
-          className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-violet-400/50 bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.45)] backdrop-blur-xl transition-all hover:scale-105 hover:brightness-110 active:scale-95 cursor-pointer"
+          className="pointer-events-auto relative group flex h-12 w-12 items-center justify-center rounded-full border border-violet-400/50 bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.45)] backdrop-blur-xl transition-all hover:scale-105 hover:brightness-110 active:scale-95 cursor-pointer"
         >
+          <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 z-50">
+            {t.nav.register}
+            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+          </span>
           <UserPlus className="h-5 w-5" />
         </Link>
       </nav>
