@@ -661,6 +661,7 @@ export default function UserHome() {
       createdAt: string;
     }>
   >([]);
+  const [booksPremiumRequired, setBooksPremiumRequired] = useState<boolean>(true);
 
   // Direct Message (User-to-User) Modal state
   const [dmPartner, setDmPartner] = useState<{
@@ -1146,8 +1147,13 @@ export default function UserHome() {
       if (lbData?.success && Array.isArray(lbData.leaderboard)) {
         setLeaderboard(lbData.leaderboard);
       }
-      if (booksData?.success && Array.isArray(booksData.books)) {
-        setBooksList(booksData.books);
+      if (booksData?.success) {
+        if (Array.isArray(booksData.books)) {
+          setBooksList(booksData.books);
+        }
+        if (typeof booksData.isPremiumRequired === "boolean") {
+          setBooksPremiumRequired(booksData.isPremiumRequired);
+        }
       }
       if (clubsData?.success && Array.isArray(clubsData.rooms)) {
         setClubRooms(clubsData.rooms);
@@ -3184,12 +3190,20 @@ export default function UserHome() {
             <div className="text-left">
               <div className="flex items-center gap-1.5">
                 <p className="text-sm font-semibold text-white">{dt.sidebar.books || "Foydali kitoblar"}</p>
-                <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-400/45 bg-gradient-to-r from-amber-500/25 to-yellow-500/25 px-1.5 py-0.5 text-[9px] font-black text-amber-300">
-                  <Crown className="h-2.5 w-2.5 text-amber-300" />
-                  PRO
-                </span>
+                {booksPremiumRequired && !user?.isPremium && (
+                  <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-400/45 bg-gradient-to-r from-amber-500/25 to-yellow-500/25 px-1.5 py-0.5 text-[9px] font-black text-amber-300">
+                    <Crown className="h-2.5 w-2.5 text-amber-300" />
+                    PRO
+                  </span>
+                )}
               </div>
-              <p className="text-[11px] text-zinc-400">Premium foydalanuvchilar uchun elektron kitoblar</p>
+              <p className="text-[11px] text-zinc-400">
+                {!booksPremiumRequired
+                  ? (lang === "ru" ? "Бесплатные электронные книги" : lang === "en" ? "Free ebooks for everyone" : lang === "tr" ? "Herkes için ücretsiz e-kitaplar" : lang === "ko" ? "모두를 위한 무료 전자책" : "Barcha uchun bepul elektron kitoblar")
+                  : user?.isPremium
+                  ? (lang === "ru" ? "Все книги открыты для вас" : lang === "en" ? "All ebooks unlocked for you" : lang === "tr" ? "Tüm kitaplar sizin için açık" : lang === "ko" ? "모든 도서 이용 가능" : "Siz uchun barcha kitoblar ochiq")
+                  : (lang === "ru" ? "Электронные книги для Премиум" : lang === "en" ? "Ebooks for Premium users" : lang === "tr" ? "Premium kullanıcılar için e-kitaplar" : lang === "ko" ? "프리미엄 회원을 위한 전자책" : "Premium foydalanuvchilar uchun elektron kitoblar")}
+              </p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
@@ -4812,6 +4826,7 @@ export default function UserHome() {
      ══════════════════════════════════════════════════════════════════ */
   const renderBooksView = () => {
     const isVip = Boolean(user?.isPremium);
+    const canAccessBooks = isVip || !booksPremiumRequired;
 
     const resolveMediaUrl = (url: string | null | undefined) => {
       if (!url) return "";
@@ -4819,6 +4834,25 @@ export default function UserHome() {
         return url;
       }
       return `${API_BASE}${url.startsWith("/") ? "" : "/"}${url}`;
+    };
+
+    const handleDownloadBook = async (e: React.MouseEvent, fileUrl: string, fileName: string) => {
+      e.preventDefault();
+      try {
+        const res = await fetch(fileUrl);
+        if (!res.ok) throw new Error("Faylni yuklab bo'lmadi");
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = fileName || "kitob";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      } catch {
+        window.open(fileUrl, "_blank");
+      }
     };
 
     return (
@@ -4834,10 +4868,17 @@ export default function UserHome() {
                 <h1 className="text-lg sm:text-xl font-bold text-white">
                   {dt.sidebar.books || "Foydali kitoblar"}
                 </h1>
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/45 bg-gradient-to-r from-amber-500/25 to-yellow-500/25 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-300">
-                  <Crown className="h-3 w-3 text-amber-300" />
-                  Premium
-                </span>
+                {booksPremiumRequired ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/45 bg-gradient-to-r from-amber-500/25 to-yellow-500/25 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-300">
+                    <Crown className="h-3 w-3 text-amber-300" />
+                    Premium
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/45 bg-gradient-to-r from-emerald-500/25 to-teal-500/25 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                    <Sparkles className="h-3 w-3 text-emerald-300" />
+                    Bepul / Ochiq
+                  </span>
+                )}
               </div>
               <p className="text-xs text-zinc-400 mt-0.5">
                 Til o'rganish va speaking mahoratini oshirish uchun saralangan elektron kitoblar va qo'llanmalar
@@ -4845,7 +4886,7 @@ export default function UserHome() {
             </div>
           </div>
 
-          {!isVip ? (
+          {!canAccessBooks ? (
             <button
               type="button"
               onClick={() => setPremiumModalOpen(true)}
@@ -4854,6 +4895,11 @@ export default function UserHome() {
               <Crown className="h-4 w-4" />
               <span>{dt.sidebar.premium || "Premium olish"}</span>
             </button>
+          ) : !booksPremiumRequired ? (
+            <span className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 px-3.5 py-2 text-xs font-extrabold text-emerald-300">
+              <Sparkles className="h-4 w-4 text-emerald-300" />
+              <span>{lang === "ru" ? "Бесплатный доступ — Все книги открыты" : lang === "en" ? "Free access — All books unlocked" : lang === "tr" ? "Ücretsiz erişim — Tüm kitaplar açık" : lang === "ko" ? "무료 이용 — 모든 도서 개방" : "Bepul kirish — Barcha kitoblar ochiq"}</span>
+            </span>
           ) : (
             <span className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 px-3.5 py-2 text-xs font-extrabold text-emerald-300">
               <Crown className="h-4 w-4 text-amber-300" />
@@ -4863,7 +4909,7 @@ export default function UserHome() {
         </div>
 
         {/* Non-Premium Warning Banner */}
-        {!isVip && (
+        {!canAccessBooks && (
           <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <Lock className="h-5 w-5 text-amber-300 shrink-0" />
@@ -4915,10 +4961,17 @@ export default function UserHome() {
                     ) : (
                       <BookOpen className="h-14 w-14 text-amber-300/50" />
                     )}
-                    <div className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full border border-amber-300/50 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 text-[10px] font-black text-amber-300">
-                      <Crown className="h-3 w-3 text-amber-300" />
-                      <span>PRO</span>
-                    </div>
+                    {!booksPremiumRequired ? (
+                      <div className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full border border-emerald-400/50 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 text-[10px] font-black text-emerald-300">
+                        <Sparkles className="h-3 w-3 text-emerald-300" />
+                        <span>BEPUL</span>
+                      </div>
+                    ) : !isVip ? (
+                      <div className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full border border-amber-300/50 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 text-[10px] font-black text-amber-300">
+                        <Crown className="h-3 w-3 text-amber-300" />
+                        <span>PRO</span>
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Book Content */}
@@ -4937,17 +4990,15 @@ export default function UserHome() {
                         📄 {book.fileName || "Kitob fayli"}
                       </span>
 
-                      {isVip ? (
-                        <a
-                          href={fileHref}
-                          download={book.fileName || book.title}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-2 text-xs font-extrabold text-slate-950 shadow-[0_0_18px_rgba(245,158,11,0.35)] hover:brightness-110 transition-all"
+                      {canAccessBooks ? (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDownloadBook(e, fileHref, book.fileName || book.title)}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-2 text-xs font-extrabold text-slate-950 shadow-[0_0_18px_rgba(245,158,11,0.35)] hover:brightness-110 transition-all cursor-pointer"
                         >
                           <Download className="h-3.5 w-3.5" />
                           <span>Yuklab olish</span>
-                        </a>
+                        </button>
                       ) : (
                         <button
                           type="button"
@@ -5606,14 +5657,6 @@ export default function UserHome() {
                 onChange={(val) => setClubFormMaxMembers(val)}
               />
 
-              <p className="mt-3 text-xs text-violet-300 font-medium">
-                💡 <span className="font-bold text-white">{clubFormMaxMembers} kishilik</span>{" "}
-                tanlaganingizda: <span className="font-bold text-white">1 ta Siz (Admin)</span> va{" "}
-                <span className="font-bold text-emerald-300">
-                  {otherUsersCount} ta boshqa foydalanuvchi
-                </span>{" "}
-                qo'shila oladi (Jami {clubFormMaxMembers} kishi).
-              </p>
             </div>
 
             {/* 4. Xonaning tilini tanlash dropdowni (5 ta til) */}

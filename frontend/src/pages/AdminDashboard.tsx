@@ -35,6 +35,7 @@ import {
   Mail,
   Laptop,
   Globe,
+  Sparkles,
 } from "lucide-react";
 import { adminApiGet, adminApiPost, API_BASE } from "@/lib/api";
 import { resolveAvatarUrl } from "@/components/SpeakerAvatar";
@@ -239,6 +240,8 @@ export default function AdminDashboard() {
 
   // Books management state
   const [books, setBooks] = useState<AdminBookItem[]>([]);
+  const [booksPremiumRequired, setBooksPremiumRequired] = useState<boolean>(true);
+  const [togglingBooksPremium, setTogglingBooksPremium] = useState<boolean>(false);
   const [bookTitle, setBookTitle] = useState("");
   const [bookBio, setBookBio] = useState("");
   const [bookCoverDataUrl, setBookCoverDataUrl] = useState<string | null>(null);
@@ -289,13 +292,62 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(`${API_BASE}/api/social/books`);
       const data = await res.json();
-      if (data.success && Array.isArray(data.books)) {
-        setBooks(data.books);
+      if (data.success) {
+        if (Array.isArray(data.books)) {
+          setBooks(data.books);
+        }
+        if (typeof data.isPremiumRequired === "boolean") {
+          setBooksPremiumRequired(data.isPremiumRequired);
+        }
       }
     } catch {
       /* ignore */
     }
   }, []);
+
+  const handleToggleBooksPremium = async () => {
+    if (togglingBooksPremium) return;
+    const nextVal = !booksPremiumRequired;
+    setTogglingBooksPremium(true);
+    try {
+      const res = await adminApiPost<{ success: boolean; isPremiumRequired: boolean; message: string }>(
+        "/books/config/",
+        { isPremiumRequired: nextVal },
+        adminToken
+      );
+      if (res.success) {
+        setBooksPremiumRequired(res.isPremiumRequired);
+        notify(
+          res.isPremiumRequired
+            ? "Kitoblar faqat Premium foydalanuvchilar uchun yopildi (Premium talab qilinadi)"
+            : "Kitoblar barcha foydalanuvchilar uchun bepul va ochiq qilindi!"
+        );
+      } else {
+        notify("Sozlamani o'zgartirishda xatolik", "error");
+      }
+    } catch {
+      try {
+        const fallbackRes = await fetch(`${API_BASE}/api/social/books/config`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPremiumRequired: nextVal }),
+        });
+        const fbData = await fallbackRes.json();
+        if (fbData.success) {
+          setBooksPremiumRequired(fbData.isPremiumRequired);
+          notify(
+            fbData.isPremiumRequired
+              ? "Kitoblar faqat Premium foydalanuvchilar uchun yopildi (Premium talab qilinadi)"
+              : "Kitoblar barcha foydalanuvchilar uchun bepul va ochiq qilindi!"
+          );
+        }
+      } catch {
+        notify("Server bilan bog'lanishda xatolik", "error");
+      }
+    } finally {
+      setTogglingBooksPremium(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     if (!adminToken) return;
@@ -1622,28 +1674,69 @@ export default function AdminDashboard() {
           {/* ── KITOBLAR (BOOKS) TAB ─────────────────────────────────── */}
           {currentTab === "books" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Top Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-white/10 bg-[#0d1527]/85 p-5 shadow-xl backdrop-blur-2xl">
+              {/* Top Header with Books Premium Switch */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-3xl border border-white/10 bg-[#0d1527]/85 p-5 shadow-xl backdrop-blur-2xl">
                 <div className="flex items-center gap-3.5">
                   <div className="h-11 w-11 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0">
                     <BookOpen className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
-                      <span>Kitoblar boshqaruvi</span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">
-                        <Crown className="w-3 h-3" />
-                        PRO Foydalanuvchilar uchun
-                      </span>
-                    </h2>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-base sm:text-lg font-extrabold text-white">
+                        Kitoblar boshqaruvi
+                      </h2>
+                      {booksPremiumRequired ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">
+                          <Crown className="w-3 h-3" />
+                          Faqat Premium (Yopiq)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                          <Sparkles className="w-3 h-3" />
+                          Hamma uchun bepul (Ochiq)
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-zinc-400 mt-0.5">
-                      Yangi kitob yuklang — u darhol foydalanuvchilarning "Foydali kitoblar" sahifasida ko'rinadi
+                      {booksPremiumRequired
+                        ? "Kitoblarni faqat Premium foydalanuvchilar yuklay oladi (oddiy foydalanuvchilarga yopiq)"
+                        : "Kitoblar barcha foydalanuvchilar uchun bepul va ochiq qilingan"}
                     </p>
                   </div>
                 </div>
-                <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 px-3.5 py-1 text-xs font-mono font-bold self-start sm:self-center">
-                  Jami yuklangan: {books.length} ta kitob
-                </span>
+
+                <div className="flex items-center gap-4 flex-wrap">
+                  {/* Premium Mode Toggle Button */}
+                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#070d1a] px-4 py-2.5">
+                    <div className="flex flex-col text-right">
+                      <span className="text-xs font-bold text-white">
+                        {booksPremiumRequired ? "Premium talab qilinadi" : "Hamma uchun bepul"}
+                      </span>
+                      <span className="text-[10px] text-zinc-400">
+                        {booksPremiumRequired ? "O'chirish (bepul qilish)" : "Yoqish (premium qilish)"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleToggleBooksPremium}
+                      disabled={togglingBooksPremium}
+                      title={booksPremiumRequired ? "Kitoblarni hamma uchun bepul qilish" : "Kitoblarni faqat Premium qilish"}
+                      className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        booksPremiumRequired ? "bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]" : "bg-zinc-700"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          booksPremiumRequired ? "translate-x-6" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 px-3.5 py-2 text-xs font-mono font-bold self-start md:self-center">
+                    Jami: {books.length} ta kitob
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

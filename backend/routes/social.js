@@ -10,6 +10,7 @@ const router = express.Router();
 const DATA_DIR = path.join(__dirname, "..", "data");
 const DM_FILE = path.join(DATA_DIR, "direct_messages.json");
 const BOOKS_FILE = path.join(DATA_DIR, "books.json");
+const BOOKS_CONFIG_FILE = path.join(DATA_DIR, "books_config.json");
 const BOOKS_MEDIA_DIR = path.join(__dirname, "..", "media", "books");
 
 if (!fs.existsSync(DATA_DIR)) {
@@ -23,6 +24,31 @@ if (!fs.existsSync(DM_FILE)) {
 }
 if (!fs.existsSync(BOOKS_FILE)) {
   fs.writeFileSync(BOOKS_FILE, JSON.stringify([], null, 2), "utf8");
+}
+if (!fs.existsSync(BOOKS_CONFIG_FILE)) {
+  fs.writeFileSync(BOOKS_CONFIG_FILE, JSON.stringify({ isPremiumRequired: true }, null, 2), "utf8");
+}
+
+function readBooksConfig() {
+  try {
+    if (fs.existsSync(BOOKS_CONFIG_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(BOOKS_CONFIG_FILE, "utf8"));
+      return {
+        isPremiumRequired: raw.isPremiumRequired !== false,
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { isPremiumRequired: true };
+}
+
+function writeBooksConfig(cfg) {
+  try {
+    fs.writeFileSync(BOOKS_CONFIG_FILE, JSON.stringify(cfg, null, 2), "utf8");
+  } catch (e) {
+    console.warn("Failed to write books_config:", e);
+  }
 }
 
 function readDMs() {
@@ -911,13 +937,51 @@ router.post("/game/complete", authRequired, async (req, res) => {
 router.get("/books", (req, res) => {
   try {
     const books = readBooks();
+    const config = readBooksConfig();
     return res.json({
       success: true,
       books,
+      isPremiumRequired: Boolean(config.isPremiumRequired),
+      config,
     });
   } catch (err) {
     console.error("Get books error:", err);
     return res.status(500).json({ success: false, message: "Kitoblarni yuklashda xatolik" });
+  }
+});
+
+router.get("/books/config", (req, res) => {
+  try {
+    const config = readBooksConfig();
+    return res.json({
+      success: true,
+      config,
+      isPremiumRequired: Boolean(config.isPremiumRequired),
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: "Sozlamani o'qishda xatolik" });
+  }
+});
+
+router.post("/books/config", (req, res) => {
+  try {
+    const { isPremiumRequired } = req.body || {};
+    const newCfg = {
+      isPremiumRequired: Boolean(isPremiumRequired),
+      updatedAt: new Date().toISOString(),
+    };
+    writeBooksConfig(newCfg);
+    return res.json({
+      success: true,
+      config: newCfg,
+      isPremiumRequired: newCfg.isPremiumRequired,
+      message: newCfg.isPremiumRequired
+        ? "Kitoblar faqat Premium foydalanuvchilar uchun sozlandi"
+        : "Kitoblar barcha foydalanuvchilar uchun bepul va ochiq qilindi",
+    });
+  } catch (err) {
+    console.error("Update books config error:", err);
+    return res.status(500).json({ success: false, message: "Sozlamani saqlashda xatolik" });
   }
 });
 

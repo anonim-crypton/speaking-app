@@ -226,9 +226,7 @@ export default function CalendarCapacityPicker({
               Qismlar: {currentChunkIndex + 1}
               {currentChunkIndex + 1 < totalChunks ? ` - ${currentChunkIndex + 2}` : ""} / {totalChunks}
             </span>
-            <span className="text-[11px] text-zinc-500 font-normal">
-              (Har bir o'tishda 2 ta qism)
-            </span>
+          
           </div>
 
           <Pagination className="mx-0 w-auto justify-end">

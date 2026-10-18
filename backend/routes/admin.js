@@ -15,6 +15,8 @@ const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 const ANNOUNCEMENTS_FILE = path.join(DATA_DIR, "announcements.json");
 const AUDIT_LOGS_FILE = path.join(DATA_DIR, "audit_logs.json");
 const SECURITY_ALERTS_FILE = path.join(DATA_DIR, "security_alerts.json");
+const BOOKS_CONFIG_FILE = path.join(DATA_DIR, "books_config.json");
+const store = require("../utils/store");
 
 const DEFAULT_SETTINGS = {
   maintenanceMode: false,
@@ -39,6 +41,7 @@ for (const [filePath, defVal] of [
   [ANNOUNCEMENTS_FILE, []],
   [AUDIT_LOGS_FILE, []],
   [SECURITY_ALERTS_FILE, []],
+  [BOOKS_CONFIG_FILE, { isPremiumRequired: true }],
   [SETTINGS_FILE, DEFAULT_SETTINGS],
 ]) {
   if (!fs.existsSync(filePath)) {
@@ -68,6 +71,17 @@ function writeJson(filePath, data) {
     console.error(`Failed to write ${filePath}:`, e.message);
     return false;
   }
+}
+
+function readBooksConfig() {
+  const cfg = readJson(BOOKS_CONFIG_FILE, { isPremiumRequired: true });
+  return {
+    isPremiumRequired: cfg.isPremiumRequired !== false,
+  };
+}
+
+function writeBooksConfig(cfg) {
+  writeJson(BOOKS_CONFIG_FILE, cfg);
 }
 
 function logAdminAction(action, details, targetId = null) {
@@ -689,6 +703,8 @@ router.post(["/users/:userId/action", "/users/:userId/action/"], async (req, res
   } else if (action === "toggle_premium") {
     target.isPremium = !Boolean(target.isPremium);
     void supabase.updateRow("profiles", "id", userId, { is_premium: target.isPremium });
+    store.updateUser(userId, { isPremium: target.isPremium });
+    cachedAdminUsers = null;
     logAdminAction("premium_toggled", `Premium maqomi ${target.isPremium ? "yoqildi" : "bekor qilindi"}`, userId);
   } else if (action === "toggle_verified") {
     target.isVerified = !Boolean(target.isVerified);
@@ -876,6 +892,32 @@ router.post(["/settings/add-current-ip", "/settings/add-current-ip/"], (req, res
     success: true,
     message: `IP ${ip} muvaffaqiyatli ishonchli kompyuterlar ro'yxatiga qo'shildi`,
     trustedIps: s.adminTrustedIps,
+  });
+});
+
+router.get(["/books/config", "/books/config/"], (req, res) => {
+  const cfg = readBooksConfig();
+  return res.json({ success: true, config: cfg, isPremiumRequired: Boolean(cfg.isPremiumRequired) });
+});
+
+router.post(["/books/config", "/books/config/"], (req, res) => {
+  const { isPremiumRequired } = req.body || {};
+  const newCfg = {
+    isPremiumRequired: Boolean(isPremiumRequired),
+    updatedAt: new Date().toISOString(),
+  };
+  writeBooksConfig(newCfg);
+  logAdminAction(
+    "books_config_updated",
+    `Kitoblar kirish tartibi o'zgartirildi: ${newCfg.isPremiumRequired ? "Faqat Premium (Yopiq)" : "Hamma uchun bepul (Ochiq)"}`
+  );
+  return res.json({
+    success: true,
+    config: newCfg,
+    isPremiumRequired: newCfg.isPremiumRequired,
+    message: newCfg.isPremiumRequired
+      ? "Kitoblar faqat Premium foydalanuvchilar uchun sozlandi"
+      : "Kitoblar barcha foydalanuvchilar uchun bepul va ochiq qilindi",
   });
 });
 
