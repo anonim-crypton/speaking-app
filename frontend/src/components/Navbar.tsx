@@ -122,8 +122,8 @@ export default function Navbar() {
                   key={item.id}
                   onClick={() => goToSection(item.id)}
                   className={cn(
-                    "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
-                    active === item.id
+                    "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors cursor-pointer",
+                    active === item.id && location.pathname === "/"
                       ? "bg-white/10 text-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   )}
@@ -131,6 +131,18 @@ export default function Navbar() {
                   {t.nav[item.key]}
                 </button>
               ))}
+
+              <Link
+                to="/help"
+                className={cn(
+                  "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors cursor-pointer",
+                  location.pathname === "/help"
+                    ? "bg-white/10 text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t.account?.help || "Yordam"}
+              </Link>
             </nav>
 
             {/* ── Right actions: Language Switcher and Desktop Auth ── */}
