@@ -142,6 +142,7 @@ export function DonutChart({
               dataKey="_value"
               nameKey="_category"
               strokeWidth={0}
+              isAnimationActive={false}
               onMouseEnter={(_, index) => setActiveIndex(index)}
               onMouseLeave={() => setActiveIndex(null)}
             >

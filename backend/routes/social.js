@@ -923,21 +923,19 @@ router.get("/books", (req, res) => {
 
 router.post("/books", (req, res) => {
   try {
-    const {
-      title,
-      bio,
-      coverImageBase64,
-      coverImageName,
-      bookFileBase64,
-      bookFileName,
-      bookFileSize,
-    } = req.body || {};
+    const body = req.body || {};
+    const title = body.title;
+    const bio = body.bio;
+    const coverImageBase64 = body.coverImageBase64 || body.coverDataUrl || body.coverBase64;
+    const bookFileBase64 = body.bookFileBase64 || body.fileDataUrl || body.fileBase64;
+    const bookFileName = body.bookFileName || body.fileName || "kitob_hujjat.pdf";
+    const bookFileSize = body.bookFileSize || body.fileSize || 0;
 
     if (!title || !String(title).trim()) {
-      return res.status(400).json({ success: false, message: "Kitob nomi kiritilishi shart" });
+      return res.status(400).json({ success: false, message: "Kitob yoki hujjat nomi kiritilishi shart" });
     }
     if (!bookFileBase64) {
-      return res.status(400).json({ success: false, message: "Kitob fayli yuklanishi shart" });
+      return res.status(400).json({ success: false, message: "Fayl (PDF, Word, Rasm va h.k.) yuklanishi shart" });
     }
 
     let coverUrl = null;

@@ -748,9 +748,13 @@ export default function AdminDashboard() {
           title: bookTitle.trim(),
           bio: bookBio.trim(),
           coverDataUrl: bookCoverDataUrl,
+          coverImageBase64: bookCoverDataUrl,
           fileDataUrl: bookFileDataUrl,
+          bookFileBase64: bookFileDataUrl,
           fileName: bookFileName || `${bookTitle.trim()}.pdf`,
+          bookFileName: bookFileName || `${bookTitle.trim()}.pdf`,
           fileSize: bookFileSize,
+          bookFileSize: bookFileSize,
         }),
       });
       const data = await res.json();
@@ -800,35 +804,28 @@ export default function AdminDashboard() {
         <div className="fixed -bottom-48 -right-48 w-[500px] h-[500px] bg-purple-600/25 rounded-full blur-[150px] pointer-events-none z-0"></div>
         <div className="fixed -top-40 right-1/3 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[140px] pointer-events-none z-0"></div>
 
-        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1527]/85 p-8 shadow-2xl backdrop-blur-2xl relative z-10 animate-in fade-in duration-300">
-          <div className="flex flex-col items-center text-center mb-8">
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1527]/90 p-8 shadow-2xl backdrop-blur-2xl relative z-10 animate-in fade-in duration-300">
+          <div className="flex flex-col items-center text-center mb-7">
             <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 p-3 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 mb-4">
               <Shield className="w-8 h-8" />
             </div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black tracking-tight text-white">Lingo Speeck</h1>
-              <span className="rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-xs font-bold">ADMIN</span>
-            </div>
-            <div className="mt-3 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-mono text-zinc-400">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>CSRF: {(csrfData.token || "a4fbddc25e89").slice(0, 10)}...</span>
-            </div>
+            <h1 className="text-2xl font-black tracking-tight text-white">Admin Panel</h1>
           </div>
 
           {loginError && (
-            <div className="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/15 p-4 text-xs text-rose-300 flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+            <div className="mb-5 rounded-2xl border border-rose-500/30 bg-rose-500/15 p-3.5 text-xs text-rose-300 flex items-center gap-3">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{loginError}</span>
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-2">Admin Foydalanuvchi</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-2">Username</label>
               <input
                 type="text"
                 required
-                placeholder="admin"
+                placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full rounded-2xl border border-white/10 bg-[#070d1a] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none"
@@ -850,7 +847,7 @@ export default function AdminDashboard() {
               disabled={loggingIn}
               className="w-full mt-2 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 py-3.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/25 transition-all hover:opacity-95"
             >
-              {loggingIn ? "Tekshirilmoqda..." : "Tizimga Kirish"}
+              {loggingIn ? "Tekshirilmoqda..." : "Kirish"}
             </button>
           </form>
         </div>
@@ -1736,7 +1733,7 @@ export default function AdminDashboard() {
                   {/* D. Kitob faylini yuklash tugmasi */}
                   <div>
                     <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-                      4. Kitob fayli (PDF, EPUB, DOCX) *
+                      4. Kitob yoki hujjat fayli (PDF, Word, Rasm, EPUB, TXT va h.k.) *
                     </label>
                     <label className="flex items-center justify-between gap-3 rounded-2xl border border-cyan-500/35 bg-cyan-500/10 hover:bg-cyan-500/15 px-4 py-3 text-xs font-bold text-cyan-200 transition-all cursor-pointer">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -1744,7 +1741,7 @@ export default function AdminDashboard() {
                         <span className="truncate">
                           {bookFileName
                             ? `Tanlandi: ${bookFileName}`
-                            : "Kitob faylini yuklash (Faylni tanlang)"}
+                            : "Kitob yoki hujjat faylini tanlang (PDF, Word, Rasm, EPUB...)"}
                         </span>
                       </div>
                       <span className="shrink-0 rounded-xl bg-cyan-500/25 border border-cyan-400/40 px-2.5 py-1 text-[11px] text-white">
@@ -1752,7 +1749,7 @@ export default function AdminDashboard() {
                       </span>
                       <input
                         type="file"
-                        accept=".pdf,.epub,.doc,.docx,.txt"
+                        accept="*/*"
                         onChange={handleSelectBookFile}
                         className="hidden"
                       />

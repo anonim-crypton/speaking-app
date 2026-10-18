@@ -358,6 +358,39 @@ function requireAdminAuth(req, res, next) {
   next();
 }
 
+// In-memory brute force protection tracking
+const failedLoginAttempts = new Map();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes lockout
+
+function constantTimeCompare(a, b) {
+  try {
+    const bufA = Buffer.from(String(a));
+    const bufB = Buffer.from(String(b));
+    if (bufA.length !== bufB.length) {
+      crypto.timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+// Cached users to make /stats respond in 0ms without network lag
+let lastUsersSyncTime = 0;
+let cachedAdminUsers = null;
+
+async function getAdminUsersCached(force = false) {
+  const now = Date.now();
+  if (!force && cachedAdminUsers && now - lastUsersSyncTime < 15000) {
+    return cachedAdminUsers;
+  }
+  cachedAdminUsers = await syncUsersFromSupabase();
+  lastUsersSyncTime = now;
+  return cachedAdminUsers;
+}
+
 router.get(["/csrf", "/csrf/"], (req, res) => {
   const sub = req.query.scope || "guest";
   return res.json({
@@ -390,8 +423,27 @@ router.post(["/login", "/login/"], async (req, res) => {
     });
   }
 
-  // 2. Verify admin credentials
-  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+  // 2. Brute-Force Rate Limiting & Lockout Check
+  const attemptRecord = failedLoginAttempts.get(clientIp) || { count: 0, lockedUntil: 0 };
+  const now = Date.now();
+
+  if (attemptRecord.lockedUntil > now) {
+    const remainingMins = Math.ceil((attemptRecord.lockedUntil - now) / 60000);
+    return res.status(429).json({
+      success: false,
+      code: "TOO_MANY_ATTEMPTS",
+      message: `Xavfsizlik: Ko'p marta xato parol kiritildi! Hisob ${remainingMins} daqiqaga vaqtincha bloklandi.`,
+    });
+  }
+
+  // 3. Verify admin credentials using constant-time comparison to prevent timing leaks
+  const isUsernameMatch = constantTimeCompare(username, ADMIN_USERNAME);
+  const isPasswordMatch = constantTimeCompare(password, ADMIN_PASSWORD);
+
+  if (isUsernameMatch && isPasswordMatch) {
+    // Reset failed login counter on success
+    failedLoginAttempts.delete(clientIp);
+
     const sec = generateCsrfAndSignature("session");
     const sessionToken = `adm_${sec.csrfToken}`;
     const expiresAt = Date.now() + ADMIN_SESSION_DURATION;
@@ -421,9 +473,37 @@ router.post(["/login", "/login/"], async (req, res) => {
     });
   }
 
+  // 4. Failed login: Increment attempts and apply security delay
+  attemptRecord.count = (attemptRecord.count || 0) + 1;
+  attemptRecord.lastAttempt = now;
+
+  // Artificial delay against high-speed automated brute force dictionary attacks
+  await new Promise((r) => setTimeout(r, 600 + Math.random() * 300));
+
+  if (attemptRecord.count >= MAX_LOGIN_ATTEMPTS) {
+    attemptRecord.lockedUntil = now + LOCKOUT_DURATION_MS;
+    failedLoginAttempts.set(clientIp, attemptRecord);
+
+    await sendAdminSecurityAlert({
+      ip: clientIp,
+      userAgent,
+      time: new Date().toISOString(),
+      details: `🚨 BRUTE-FORCE HUJUMI: Admin loginiga ketma-ket ${attemptRecord.count} marta noto'g'ri parol kiritildi va 15 daqiqaga bloklandi.`,
+    });
+
+    return res.status(429).json({
+      success: false,
+      code: "TOO_MANY_ATTEMPTS",
+      message: "Ketma-ket 5 marta xato parol kiritildi! Xavfsizlik choralari tufayli admin panel 15 daqiqaga bloklandi.",
+    });
+  }
+
+  failedLoginAttempts.set(clientIp, attemptRecord);
+  const triesLeft = MAX_LOGIN_ATTEMPTS - attemptRecord.count;
+
   return res.status(401).json({
     success: false,
-    message: "Noto'g'ri login yoki parol",
+    message: `Noto'g'ri login yoki parol! (Qolgan urinishlar: ${triesLeft} ta)`,
   });
 });
 
@@ -431,7 +511,7 @@ router.post(["/login", "/login/"], async (req, res) => {
 router.use(requireAdminAuth);
 
 router.get(["/stats", "/stats/"], async (req, res) => {
-  const users = await syncUsersFromSupabase();
+  const users = await getAdminUsersCached();
   const sessions = readJson(SESSIONS_FILE, []);
   const complaints = readJson(COMPLAINTS_FILE, []);
   const settingsData = readJson(SETTINGS_FILE, DEFAULT_SETTINGS);
