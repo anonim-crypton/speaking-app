@@ -20,6 +20,9 @@ frontend/.flow-check/
 dist/
 build/
 frontend/dist/
+video/out/
+video/.remotion/
+video/node_modules/
 
 # Logs & caches
 npm-debug.log*
