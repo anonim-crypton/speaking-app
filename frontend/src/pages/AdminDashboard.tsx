@@ -1674,69 +1674,27 @@ export default function AdminDashboard() {
           {/* ── KITOBLAR (BOOKS) TAB ─────────────────────────────────── */}
           {currentTab === "books" && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Top Header with Books Premium Switch */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-3xl border border-white/10 bg-[#0d1527]/85 p-5 shadow-xl backdrop-blur-2xl">
+              {/* Top Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-white/10 bg-[#0d1527]/85 p-5 shadow-xl backdrop-blur-2xl">
                 <div className="flex items-center gap-3.5">
                   <div className="h-11 w-11 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0">
                     <BookOpen className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-base sm:text-lg font-extrabold text-white">
-                        Kitoblar boshqaruvi
-                      </h2>
-                      {booksPremiumRequired ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">
-                          <Crown className="w-3 h-3" />
-                          Faqat Premium (Yopiq)
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2.5 py-0.5 text-[10px] font-bold text-emerald-300">
-                          <Sparkles className="w-3 h-3" />
-                          Hamma uchun bepul (Ochiq)
-                        </span>
-                      )}
-                    </div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                      <span>Kitoblar boshqaruvi</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-cyan-500/20 border border-cyan-400/40 px-2.5 py-0.5 text-[10px] font-bold text-cyan-300">
+                        Foydali kitoblar
+                      </span>
+                    </h2>
                     <p className="text-xs text-zinc-400 mt-0.5">
-                      {booksPremiumRequired
-                        ? "Kitoblarni faqat Premium foydalanuvchilar yuklay oladi (oddiy foydalanuvchilarga yopiq)"
-                        : "Kitoblar barcha foydalanuvchilar uchun bepul va ochiq qilingan"}
+                      Yangi kitob yuklang — u darhol foydalanuvchilarning "Foydali kitoblar" sahifasida ko'rinadi
                     </p>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-4 flex-wrap">
-                  {/* Premium Mode Toggle Button */}
-                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#070d1a] px-4 py-2.5">
-                    <div className="flex flex-col text-right">
-                      <span className="text-xs font-bold text-white">
-                        {booksPremiumRequired ? "Premium talab qilinadi" : "Hamma uchun bepul"}
-                      </span>
-                      <span className="text-[10px] text-zinc-400">
-                        {booksPremiumRequired ? "O'chirish (bepul qilish)" : "Yoqish (premium qilish)"}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleToggleBooksPremium}
-                      disabled={togglingBooksPremium}
-                      title={booksPremiumRequired ? "Kitoblarni hamma uchun bepul qilish" : "Kitoblarni faqat Premium qilish"}
-                      className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        booksPremiumRequired ? "bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]" : "bg-zinc-700"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                          booksPremiumRequired ? "translate-x-6" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 px-3.5 py-2 text-xs font-mono font-bold self-start md:self-center">
-                    Jami: {books.length} ta kitob
-                  </span>
-                </div>
+                <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 px-3.5 py-1 text-xs font-mono font-bold self-start sm:self-center">
+                  Jami yuklangan: {books.length} ta kitob
+                </span>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -2485,99 +2443,58 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* SETTINGS TAB */}
+          {/* TIZIM SOZLAMALARI TAB */}
           {currentTab === "settings" && (
             <div className="space-y-6 animate-in fade-in duration-200 max-w-2xl">
-              <div className="border-b border-zinc-800 pb-4">
-                <h2 className="text-base font-bold text-white flex items-center gap-2.5">
-                  <Settings className="h-5 w-5 text-cyan-400" />
-                  <span>Platforma Sozlamalari</span>
-                </h2>
-                <p className="text-sm text-zinc-400 mt-1">
-                  Foydalanuvchilar qoidalari, olmoslar narxi va sayt holati
-                </p>
-              </div>
-
-              <form onSubmit={handleSaveSettings} className="space-y-5">
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-bold text-white">Texnik Tanaffus Rejimi (Maintenance Mode)</div>
-                    <div className="text-xs text-zinc-400 mt-0.5">
-                      Yoqilganda oddiy foydalanuvchilar audio matchmaking qila olmaydi
-                    </div>
+              <div className="rounded-3xl border border-white/10 bg-[#0d1527]/90 p-6 md:p-8 shadow-2xl backdrop-blur-2xl">
+                {/* Header */}
+                <div className="flex items-center gap-3 pb-5 mb-6 border-b border-white/10">
+                  <div className="h-10 w-10 rounded-2xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-400 flex items-center justify-center shrink-0">
+                    <Settings className="w-5 h-5" />
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settingsData.maintenanceMode}
-                      onChange={(e) => setSettingsData({ ...settingsData, maintenanceMode: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-12 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                  </label>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-white">
+                      Tizim Sozlamalari
+                    </h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Platforma va premium funksiyalarini boshqarish
+                    </p>
+                  </div>
                 </div>
 
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-2">
-                  <label className="block text-sm font-semibold text-white">
-                    Ro'yxatdan o'tganda beriladigan olmoslar (boshlang'ich bonus)
-                  </label>
-                  <input
-                    type="number"
-                    value={settingsData.defaultSignupDiamonds}
-                    onChange={(e) =>
-                      setSettingsData({ ...settingsData, defaultSignupDiamonds: parseInt(e.target.value) || 0 })
-                    }
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-sm text-white focus:border-brand-500 focus:outline-none"
-                  />
-                </div>
+                {/* iOS Style Row matching screenshot */}
+                <div className="border-b border-white/10 pb-4">
+                  <div className="flex items-center justify-between py-2">
+                    <div className="flex flex-col">
+                      <span className="text-base font-medium text-white">
+                        Premuimni yoqish o'chirish
+                      </span>
+                      <span className="text-xs text-zinc-400 mt-0.5">
+                        {booksPremiumRequired
+                          ? "Hozirda Premium rejim yoqilgan (premiumi yo'qlarga yopiq)"
+                          : "Hozirda Premium rejim o'chirilgan (hamma uchun bepul va ochiq)"}
+                      </span>
+                    </div>
 
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-2">
-                  <label className="block text-sm font-semibold text-white">
-                    Har bir suhbat uchun olinadigan olmos narxi (0 = bepul)
-                  </label>
-                  <input
-                    type="number"
-                    value={settingsData.matchCostDiamonds}
-                    onChange={(e) =>
-                      setSettingsData({ ...settingsData, matchCostDiamonds: parseInt(e.target.value) || 0 })
-                    }
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-sm text-white focus:border-brand-500 focus:outline-none"
-                  />
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={booksPremiumRequired}
+                      onClick={handleToggleBooksPremium}
+                      disabled={togglingBooksPremium}
+                      className={`relative inline-flex h-[31px] w-[51px] shrink-0 cursor-pointer rounded-full p-[2px] transition-colors duration-300 ease-in-out focus:outline-none ${
+                        booksPremiumRequired ? "bg-[#34c759]" : "bg-zinc-700"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-[27px] w-[27px] transform rounded-full bg-white shadow-md ring-0 transition-transform duration-300 ease-in-out ${
+                          booksPremiumRequired ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
-
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-2">
-                  <label className="block text-sm font-semibold text-white">
-                    Kunlik kirish uchun mukofot (Daily reward diamonds)
-                  </label>
-                  <input
-                    type="number"
-                    value={settingsData.dailyRewardDiamonds}
-                    onChange={(e) =>
-                      setSettingsData({ ...settingsData, dailyRewardDiamonds: parseInt(e.target.value) || 0 })
-                    }
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-sm text-white focus:border-brand-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-2">
-                  <label className="block text-sm font-semibold text-white">
-                    Bosh sahifada ko'rinadigan global bildirishnoma matni
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={settingsData.platformNotice}
-                    onChange={(e) => setSettingsData({ ...settingsData, platformNotice: e.target.value })}
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-sm text-white focus:border-brand-500 focus:outline-none"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="rounded-xl bg-zinc-100 px-6 py-3 text-sm font-bold text-zinc-950 shadow hover:bg-zinc-200 transition-all active:scale-95"
-                >
-                  Sozlamalarni Saqlash
-                </button>
-              </form>
+              </div>
             </div>
           )}
 
