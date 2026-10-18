@@ -4,6 +4,7 @@ export interface DashboardTranslation {
     exercises: string;
     history: string;
     friends: string;
+    messages?: string;
     rating: string;
     achievements: string;
     settings: string;
@@ -170,6 +171,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       exercises: "Mening tarixim",
       history: "Mening tarixim",
       friends: "Do'stlar",
+      messages: "Xabarlar",
       rating: "Reyting",
       achievements: "Yutuqlar",
       settings: "Sozlamalar",
@@ -352,6 +354,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       exercises: "Моя история",
       history: "Моя история",
       friends: "Друзья",
+      messages: "Сообщения",
       rating: "Рейтинг",
       achievements: "Достижения",
       settings: "Настройки",
@@ -534,6 +537,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       exercises: "My History",
       history: "My History",
       friends: "Friends",
+      messages: "Messages",
       rating: "Leaderboard",
       achievements: "Achievements",
       settings: "Settings",
@@ -716,6 +720,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       exercises: "Geçmişim",
       history: "Geçmişim",
       friends: "Arkadaşlar",
+      messages: "Mesajlar",
       rating: "Sıralama",
       achievements: "Başarılar",
       settings: "Ayarlar",
@@ -898,6 +903,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       exercises: "내 기록",
       history: "내 기록",
       friends: "친구",
+      messages: "메시지",
       rating: "랭킹",
       achievements: "업적",
       settings: "설정",

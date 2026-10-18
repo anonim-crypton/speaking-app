@@ -152,21 +152,6 @@ export default function Navbar() {
 
             {/* ── Right actions: Language Switcher and Desktop Auth ── */}
             <div className="flex items-center gap-2">
-              {/* Mobile Help Button in front of LanguageSwitcher */}
-              <Link
-                to="/help"
-                className={cn(
-                  "flex lg:hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] hover:bg-white/[0.12] px-3 py-1.5 text-xs font-bold text-zinc-200 transition-all cursor-pointer backdrop-blur-xl shadow-sm active:scale-95",
-                  location.pathname === "/help"
-                    ? "border-violet-500/50 bg-violet-500/25 text-white shadow-[0_0_12px_rgba(139,92,246,0.35)]"
-                    : "text-zinc-300"
-                )}
-                aria-label="Yordam markazi"
-              >
-                <HelpCircle className="h-3.5 w-3.5 text-violet-400" />
-                <span>{t.account?.help || "Yordam"}</span>
-              </Link>
-
               <LanguageSwitcher />
               <AuthToggle className="hidden lg:grid" />
             </div>

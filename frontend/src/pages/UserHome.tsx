@@ -6124,7 +6124,7 @@ export default function UserHome() {
       )}
 
       {/* ── 2. Viewport ── */}
-      <div className="relative flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-transparent pb-20 md:pb-0">
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-transparent pb-24 md:pb-0">
         {/* iOS 26 Liquid Glass Translucent Sticky Navbar (Only on dashboard) */}
         {!hideChrome && (
           <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/[0.1] bg-white/[0.025] px-4 sm:px-8 backdrop-blur-2xl backdrop-saturate-[190%] shadow-[0_8px_32px_rgba(0,0,0,0.28),inset_0_1px_0_0_rgba(255,255,255,0.16)]">
@@ -7039,131 +7039,183 @@ export default function UserHome() {
       {!hideChrome && (
         <nav
           aria-label="Pastki mobil navigatsiya"
-          className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-white/[0.1] bg-[#090518]/95 px-2 backdrop-blur-2xl backdrop-saturate-[180%] md:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.5)]"
+          className="fixed bottom-4 left-0 right-0 z-40 flex items-center justify-center gap-2 px-2 pointer-events-none md:hidden"
         >
-          {/* 1. Speaking */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("home")}
-            className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
-              activeTab === "home" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
-            )}
-          >
-            <div
+          {/* Connected capsule with border: Speaking, Klub, Mening tarixim, Do'stlar, Xabarlar */}
+          <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/15 bg-[#0e0924]/90 p-1.5 shadow-[0_12px_35px_rgba(0,0,0,0.6)] backdrop-blur-2xl backdrop-saturate-[180%]">
+            {/* 1. Speaking */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("home")}
+              title={dt.sidebar.home}
+              aria-label={dt.sidebar.home}
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
-                activeTab === "home" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+                "relative group flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+                activeTab === "home"
+                  ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
+                  : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
               )}
             >
-              <Home className="h-4 w-4" />
-            </div>
-            <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.home}</span>
-          </button>
+              <span
+                className={cn(
+                  "pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 z-50",
+                  activeTab === "home"
+                    ? "opacity-100 scale-100 translate-y-0"
+                    : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
+                )}
+              >
+                {dt.sidebar.home}
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
+              </span>
+              <AudioWaveform className="h-5 w-5" />
+            </button>
 
-          {/* 2. Klub */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("club")}
-            className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
-              activeTab === "club" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
-            )}
-          >
-            <div
+            {/* 2. Klub */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("club")}
+              title="Klub"
+              aria-label="Klub"
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
-                activeTab === "club" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+                "relative group flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+                activeTab === "club"
+                  ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
+                  : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
               )}
             >
-              <Radio className="h-4 w-4" />
-            </div>
-            <span className="text-[10px] font-medium tracking-tight">Klub</span>
-          </button>
+              <span
+                className={cn(
+                  "pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 z-50",
+                  activeTab === "club"
+                    ? "opacity-100 scale-100 translate-y-0"
+                    : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
+                )}
+              >
+                Klub
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
+              </span>
+              <Radio className="h-5 w-5" />
+            </button>
 
-          {/* 3. Mening tarixim */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("history")}
-            className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
-              activeTab === "history" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
-            )}
-          >
-            <div
+            {/* 3. Mening tarixim */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("history")}
+              title={dt.sidebar.history}
+              aria-label={dt.sidebar.history}
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
-                activeTab === "history" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+                "relative group flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+                activeTab === "history"
+                  ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
+                  : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
               )}
             >
-              <History className="h-4 w-4" />
-            </div>
-            <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.history}</span>
-          </button>
+              <span
+                className={cn(
+                  "pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 z-50",
+                  activeTab === "history"
+                    ? "opacity-100 scale-100 translate-y-0"
+                    : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
+                )}
+              >
+                {dt.sidebar.history}
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
+              </span>
+              <History className="h-5 w-5" />
+            </button>
 
-          {/* 4. Do'stlar */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("friends")}
-            className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
-              activeTab === "friends" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
-            )}
-          >
-            <div
+            {/* 4. Do'stlar */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("friends")}
+              title={dt.sidebar.friends}
+              aria-label={dt.sidebar.friends}
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
-                activeTab === "friends" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+                "relative group flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+                activeTab === "friends"
+                  ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
+                  : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
               )}
             >
-              <Users className="h-4 w-4" />
-            </div>
-            <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.friends}</span>
-          </button>
+              <span
+                className={cn(
+                  "pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 z-50",
+                  activeTab === "friends"
+                    ? "opacity-100 scale-100 translate-y-0"
+                    : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
+                )}
+              >
+                {dt.sidebar.friends}
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
+              </span>
+              <Users className="h-5 w-5" />
+            </button>
 
-          {/* 4.1 Xabarlar */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("messages")}
-            className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer relative",
-              activeTab === "messages" ? "text-blue-400" : "text-zinc-400 hover:text-zinc-200"
-            )}
-          >
-            <div
+            {/* 5. Xabarlar */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("messages")}
+              title={dt.sidebar.messages || "Xabarlar"}
+              aria-label={dt.sidebar.messages || "Xabarlar"}
               className={cn(
-                "relative flex h-8 w-8 items-center justify-center rounded-xl transition-all",
-                activeTab === "messages" ? "bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.4)]" : ""
+                "relative group flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+                activeTab === "messages"
+                  ? "bg-white/15 text-blue-400 shadow-[0_0_14px_rgba(59,130,246,0.3)]"
+                  : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
               )}
             >
-              <MessageCircle className="h-4 w-4" />
+              <span
+                className={cn(
+                  "pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-blue-900/30 backdrop-blur-2xl transition-all duration-200 z-50",
+                  activeTab === "messages"
+                    ? "opacity-100 scale-100 translate-y-0"
+                    : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
+                )}
+              >
+                {dt.sidebar.messages || "Xabarlar"}
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
+              </span>
+              <MessageCircle className="h-5 w-5" />
               {totalUnreadMessages > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white shadow-md">
-                  {totalUnreadMessages}
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-extrabold text-white shadow-md ring-2 ring-[#0e0924]">
+                  {totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}
                 </span>
               )}
-            </div>
-            <span className="text-[10px] font-medium tracking-tight">Xabarlar</span>
-          </button>
+            </button>
+          </div>
 
-          {/* 5. Profil (faqat avatar) */}
+          {/* 6. Profil (alohida avatar tugmasi) */}
           <button
             type="button"
             onClick={() => setActiveTab("profile")}
-            className="flex flex-1 flex-col items-center justify-center py-1 transition-all cursor-pointer"
             title={dt.sidebar.profile}
+            aria-label={dt.sidebar.profile}
+            className={cn(
+              "pointer-events-auto relative group flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-white/15 bg-[#0e0924]/90 text-zinc-300 shadow-[0_12px_30px_rgba(0,0,0,0.55)] backdrop-blur-2xl backdrop-saturate-[180%] transition-all hover:scale-105 active:scale-95 cursor-pointer",
+              activeTab === "profile" && "border-violet-500/50 shadow-[0_0_20px_rgba(139,92,246,0.35)]"
+            )}
           >
-            <div
+            <span
               className={cn(
-                "relative flex h-9 w-9 items-center justify-center rounded-full transition-all overflow-hidden p-0.5",
+                "pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 z-50",
                 activeTab === "profile"
-                  ? "ring-2 ring-violet-400 ring-offset-2 ring-offset-[#090518] shadow-[0_0_14px_rgba(139,92,246,0.7)] scale-105"
-                  : "ring-1 ring-white/25 hover:ring-white/50 opacity-80 hover:opacity-100"
+                  ? "opacity-100 scale-100 translate-y-0"
+                  : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
               )}
             >
-              <SpeakerAvatar size={32} src={user?.avatarUrl} name={displayName} />
+              {dt.sidebar.profile}
+              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
+            </span>
+            <div
+              className={cn(
+                "relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full transition-all overflow-hidden p-0.5",
+                activeTab === "profile"
+                  ? "ring-2 ring-violet-400 ring-offset-2 ring-offset-[#0e0924] shadow-[0_0_12px_rgba(139,92,246,0.6)]"
+                  : "ring-1 ring-white/20 hover:ring-white/40"
+              )}
+            >
+              <SpeakerAvatar size={36} src={user?.avatarUrl} name={displayName} />
             </div>
-            <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.profile}</span>
           </button>
         </nav>
       )}

@@ -68,7 +68,7 @@ export default function UserSidebar({
     { id: "task_game", label: "Topshiriqli o'yin", icon: Gamepad2 },
     { id: "books", label: "Foydali kitoblar", icon: BookOpen, isPremiumBadge: true },
     { id: "friends", label: t.sidebar.friends, icon: Users },
-    { id: "messages", label: "Xabarlar", icon: MessageCircle },
+    { id: "messages", label: t.sidebar.messages || "Xabarlar", icon: MessageCircle },
     { id: "rating", label: t.sidebar.rating, icon: Trophy },
     { id: "achievements", label: t.sidebar.achievements, icon: Award },
     { id: "help", label: t.sidebar.help, icon: HelpCircle },
