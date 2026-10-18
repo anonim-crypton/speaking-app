@@ -247,6 +247,8 @@ const ko: Translation = {
     history: "말하기 기록",
     help: "도움말",
     settings: "설정",
+    devices: "내 기기",
+    level: "레벨",
     complaints: "불만 신고",
     contactAdmin: "관리자에게 문의",
     logout: "로그아웃",

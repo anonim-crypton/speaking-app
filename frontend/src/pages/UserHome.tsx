@@ -191,6 +191,73 @@ const CLUB_LANGUAGES: ClubLanguageItem[] = [
   { id: "tr", name: "Turk tili", country: "Turkiya", flagCode: "TR" },
 ];
 
+const LOCALIZED_LANG_NAMES: Record<string, Record<string, string>> = {
+  uz: {
+    uz: "O'zbek tili",
+    en: "Ingliz tili",
+    ru: "Rus tili",
+    tr: "Turk tili",
+    ko: "Koreys tili",
+    ar: "Arab tili",
+  },
+  ru: {
+    uz: "Узбекский язык",
+    en: "Английский язык",
+    ru: "Русский язык",
+    tr: "Турецкий язык",
+    ko: "Корейский язык",
+    ar: "Арабский язык",
+  },
+  en: {
+    uz: "Uzbek language",
+    en: "English language",
+    ru: "Russian language",
+    tr: "Turkish language",
+    ko: "Korean language",
+    ar: "Arabic language",
+  },
+  tr: {
+    uz: "Özbek dili",
+    en: "İngiliz dili",
+    ru: "Rus dili",
+    tr: "Türk dili",
+    ko: "Kore dili",
+    ar: "Arap dili",
+  },
+  ko: {
+    uz: "우즈베크어",
+    en: "영어",
+    ru: "러시아어",
+    tr: "튀르키예어",
+    ko: "한국어",
+    ar: "아랍어",
+  },
+};
+
+function getLocalizedLangName(langId: string, currentLang: string, fallback: string): string {
+  return LOCALIZED_LANG_NAMES[currentLang]?.[langId] || fallback;
+}
+
+function formatLevel(lvl: number, currentLang: string): string {
+  switch (currentLang) {
+    case "ru": return `${lvl}-й уровень`;
+    case "en": return `Level ${lvl}`;
+    case "tr": return `${lvl}. Seviye`;
+    case "ko": return `${lvl}레벨`;
+    default: return `${lvl}-daraja`;
+  }
+}
+
+function formatLevelTitle(lvl: number, currentLang: string): string {
+  switch (currentLang) {
+    case "ru": return `${lvl}-й уровень (Level ${lvl})`;
+    case "en": return `Level ${lvl}`;
+    case "tr": return `${lvl}. Seviye (Level ${lvl})`;
+    case "ko": return `${lvl}레벨 (Level ${lvl})`;
+    default: return `${lvl}-Daraja (Level ${lvl})`;
+  }
+}
+
 const COMPLAINT_OPTIONS = [
   "Haqoratli so'zlar yoki nojo'ya xatti-harakat",
   "Mavzudan tashqari gaplashish / spam",
@@ -2654,10 +2721,15 @@ export default function UserHome() {
     if (sec === 0) return `0 ${dt.stats.hours}`;
     const hours = Math.floor(sec / 3600);
     const mins = Math.floor((sec % 3600) / 60);
-    if (hours > 0 && mins > 0) return `${hours} soat ${mins} daq`;
-    if (hours > 0) return `${hours} ${dt.stats.hours}`;
-    if (mins > 0) return `${mins} daqiqa`;
-    return `${sec} soniya`;
+
+    const hUnit = dt.stats.hours;
+    const mUnit = lang === "ru" ? "мин." : lang === "en" ? "min" : lang === "tr" ? "dk" : lang === "ko" ? "분" : "daq";
+    const sUnit = lang === "ru" ? "сек." : lang === "en" ? "sec" : lang === "tr" ? "sn" : lang === "ko" ? "초" : "son";
+
+    if (hours > 0 && mins > 0) return `${hours} ${hUnit} ${mins} ${mUnit}`;
+    if (hours > 0) return `${hours} ${hUnit}`;
+    if (mins > 0) return `${mins} ${mUnit}`;
+    return `${sec} ${sUnit}`;
   };
 
   const handleClaimDiamond = async () => {
@@ -2966,7 +3038,7 @@ export default function UserHome() {
 
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center">
             <div className="flex items-center justify-center gap-1 text-sm font-bold text-cyan-300">
-              <span>{userLevel}-daraja</span>
+              <span>{formatLevel(userLevel, lang)}</span>
               <Zap className="h-3.5 w-3.5 text-cyan-400 fill-cyan-400" />
             </div>
             <p className="mt-0.5 text-[10px] text-zinc-400 font-medium">{userXp} XP</p>
@@ -2978,7 +3050,7 @@ export default function UserHome() {
           <div className="flex items-center justify-between text-xs mb-1.5">
             <span className="inline-flex items-center gap-1.5 font-extrabold text-cyan-300">
               <Zap className="h-4 w-4 text-cyan-400 fill-cyan-400" />
-              {userLevel}-Daraja (Level {userLevel})
+              {formatLevelTitle(userLevel, lang)}
             </span>
             <span className="font-mono font-bold text-white">
               {userXp} XP{" "}
@@ -3073,7 +3145,7 @@ export default function UserHome() {
               <ClipboardCheck className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">Kunlik topshiriqlar</p>
+              <p className="text-sm font-semibold text-white">{dt.sidebar.dailyTasks || "Kunlik topshiriqlar"}</p>
               <p className="text-[11px] text-zinc-400">Har kuni 5 tilda topshiriqlar (+1 olmos va XP)</p>
             </div>
           </div>
@@ -3091,7 +3163,7 @@ export default function UserHome() {
               <Gamepad2 className="h-5 w-5" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">Topshiriqli o'yin</p>
+              <p className="text-sm font-semibold text-white">{dt.sidebar.taskGame || "Topshiriqli o'yin"}</p>
               <p className="text-[11px] text-zinc-400">Interaktiv til o'yini orqali XP va olmos yig'ing</p>
             </div>
           </div>
@@ -3110,7 +3182,7 @@ export default function UserHome() {
             </div>
             <div className="text-left">
               <div className="flex items-center gap-1.5">
-                <p className="text-sm font-semibold text-white">Foydali kitoblar</p>
+                <p className="text-sm font-semibold text-white">{dt.sidebar.books || "Foydali kitoblar"}</p>
                 <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-400/45 bg-gradient-to-r from-amber-500/25 to-yellow-500/25 px-1.5 py-0.5 text-[9px] font-black text-amber-300">
                   <Crown className="h-2.5 w-2.5 text-amber-300" />
                   PRO
@@ -3156,7 +3228,7 @@ export default function UserHome() {
               )}
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold text-white">Xabarlar</p>
+              <p className="text-sm font-semibold text-white">{dt.sidebar.messages || "Xabarlar"}</p>
               <p className="text-[11px] text-zinc-400">Do'stlar bilan yozishmalar va yangi xabarlar</p>
             </div>
           </div>
@@ -3722,7 +3794,7 @@ export default function UserHome() {
                 title="Yozishmalar ro'yxatiga qaytish"
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Orqaga</span>
+                <span className="hidden sm:inline">{lang === "ru" ? "Назад" : lang === "en" ? "Back" : lang === "tr" ? "Geri" : lang === "ko" ? "뒤로" : "Orqaga"}</span>
               </button>
 
               <div className="relative">
@@ -3748,7 +3820,7 @@ export default function UserHome() {
             </div>
 
             <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
-              Do'st
+              {lang === "ru" ? "Друг" : lang === "en" ? "Friend" : lang === "tr" ? "Arkadaş" : lang === "ko" ? "친구" : "Do'st"}
             </span>
           </div>
 
@@ -3788,7 +3860,7 @@ export default function UserHome() {
                     {/* Sender Full Name Header */}
                     <div className="flex items-center justify-between gap-3 mb-0.5">
                       <span className="text-[10px] font-bold opacity-90 truncate max-w-[160px]">
-                        {isMine ? (user?.name || "Siz") : (m.senderName || activeChatPartner.name)}
+                        {isMine ? (user?.name || dt.meeting.you || "Siz") : (m.senderName || activeChatPartner.name)}
                       </span>
                     </div>
 
@@ -3836,7 +3908,7 @@ export default function UserHome() {
               className="flex items-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-[0_0_15px_rgba(139,92,246,0.4)] disabled:opacity-50 hover:brightness-110 transition-all cursor-pointer shrink-0"
             >
               <Send className="h-4 w-4" />
-              <span className="hidden sm:inline">Yuborish</span>
+              <span className="hidden sm:inline">{dt.meeting.send || "Yuborish"}</span>
             </button>
           </form>
         </div>
@@ -3862,7 +3934,7 @@ export default function UserHome() {
               <MessageCircle className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white">Xabarlar</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-white">{dt.sidebar.messages || "Xabarlar"}</h1>
               <p className="text-xs sm:text-sm text-zinc-400">
                 Do'stlaringiz bilan shaxsiy yozishmalar va yangi xabarlar
               </p>
@@ -3870,7 +3942,7 @@ export default function UserHome() {
           </div>
           <div className="flex items-center gap-2">
             <span className="rounded-full border border-blue-500/30 bg-blue-500/15 px-3.5 py-1 text-xs font-bold text-blue-300">
-              Suhbatlar: {conversations.length}
+              {lang === "ru" ? "Диалоги" : lang === "en" ? "Conversations" : lang === "tr" ? "Sohbetler" : lang === "ko" ? "대화목록" : "Suhbatlar"}: {conversations.length}
             </span>
             {totalUnreadMessages > 0 && (
               <span className="rounded-full border border-sky-500/40 bg-sky-500/20 px-3.5 py-1 text-xs font-bold text-sky-300 animate-pulse">
@@ -4039,11 +4111,11 @@ export default function UserHome() {
           {/* Sort Filter Pills */}
           <div className="flex flex-wrap items-center gap-2">
             {[
-              { id: "all", label: "Umumiy", icon: Trophy },
-              { id: "xp", label: "XP va Daraja", icon: Zap },
-              { id: "diamonds", label: "Ko'p olmoslar", icon: Gem },
-              { id: "streak", label: "Doimiy faollar", icon: Flame },
-              { id: "talk", label: "Ko'p speaking", icon: Clock },
+              { id: "all", label: lang === "ru" ? "Общий" : lang === "en" ? "Overall" : lang === "tr" ? "Genel" : lang === "ko" ? "전체" : "Umumiy", icon: Trophy },
+              { id: "xp", label: lang === "ru" ? "XP и Уровень" : lang === "en" ? "XP & Level" : lang === "tr" ? "XP ve Seviye" : lang === "ko" ? "XP 및 레벨" : "XP va Daraja", icon: Zap },
+              { id: "diamonds", label: lang === "ru" ? "Больше алмазов" : lang === "en" ? "Most Diamonds" : lang === "tr" ? "En Çok Elmas" : lang === "ko" ? "최다 다이아몬드" : "Ko'p olmoslar", icon: Gem },
+              { id: "streak", label: lang === "ru" ? "Активные" : lang === "en" ? "Top Streak" : lang === "tr" ? "En Yüksek Seri" : lang === "ko" ? "연속 출석" : "Doimiy faollar", icon: Flame },
+              { id: "talk", label: lang === "ru" ? "Больше разговоров" : lang === "en" ? "Speaking Time" : lang === "tr" ? "Konuşma Süresi" : lang === "ko" ? "대화 시간" : "Ko'p speaking", icon: Clock },
             ].map((tab) => {
               const Icon = tab.icon;
               const active = ratingSort === tab.id;
@@ -4071,7 +4143,9 @@ export default function UserHome() {
         {sortedList.length === 0 ? (
           <div className="w-full flex flex-col items-center justify-center min-h-[42vh] text-center px-4">
             <Trophy className="h-12 w-12 text-amber-400 mb-3" />
-            <h3 className="text-lg font-bold text-white">Reyting yuklanmoqda...</h3>
+            <h3 className="text-lg font-bold text-white">
+              {lang === "ru" ? "Рейтинг загружается..." : lang === "en" ? "Loading leaderboard..." : lang === "tr" ? "Sıralama yükleniyor..." : lang === "ko" ? "랭킹 로딩 중..." : "Reyting yuklanmoqda..."}
+            </h3>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -4128,11 +4202,11 @@ export default function UserHome() {
                         {(item.isPremium || item.isVerified) && <VerifiedBadge size={16} />}
                         <span className="inline-flex items-center gap-1 rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[10px] font-extrabold text-cyan-300">
                           <Zap className="h-2.5 w-2.5 fill-cyan-400 text-cyan-400" />
-                          {itemLevel}-daraja
+                          {formatLevel(itemLevel, lang)}
                         </span>
                         {isMe && (
                           <span className="rounded-md bg-violet-500/25 border border-violet-400/40 px-2 py-0.5 text-[10px] font-bold text-violet-200">
-                            Siz
+                            {dt.meeting.you || "Siz"}
                           </span>
                         )}
                       </div>
@@ -4145,7 +4219,9 @@ export default function UserHome() {
                     <div className="flex items-center gap-1.5 rounded-xl border border-cyan-500/25 bg-cyan-500/10 px-3 py-1.5">
                       <Zap className="h-3.5 w-3.5 text-cyan-300 fill-cyan-400 shrink-0" />
                       <div className="text-left">
-                        <p className="text-[10px] text-zinc-400 leading-none">XP Daraja</p>
+                        <p className="text-[10px] text-zinc-400 leading-none">
+                          {lang === "ru" ? "XP / Уровень" : lang === "en" ? "XP / Level" : lang === "tr" ? "XP / Seviye" : lang === "ko" ? "XP / 레벨" : "XP Daraja"}
+                        </p>
                         <p className="text-xs font-extrabold text-white tabular-nums mt-0.5">
                           {itemXp} XP
                         </p>
@@ -4219,7 +4295,7 @@ export default function UserHome() {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-lg sm:text-xl font-bold text-white">
-                  Kunlik topshiriqlar
+                  {dt.sidebar.dailyTasks || "Kunlik topshiriqlar"}
                 </h1>
                 <span className="rounded-full border border-emerald-500/35 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-300">
                   Har bir topshiriq = +1 💎 Olmos + XP
@@ -4234,10 +4310,10 @@ export default function UserHome() {
           {/* Right Stats Pill */}
           <div className="flex items-center gap-2.5 self-start sm:self-center">
             <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2 text-center">
-              <p className="text-[10px] text-cyan-200/80 uppercase font-bold">Sizning darajangiz</p>
+              <p className="text-[10px] text-cyan-200/80 uppercase font-bold">{formatLevelTitle(userLevel, lang)}</p>
               <p className="text-xs sm:text-sm font-black text-white flex items-center justify-center gap-1 mt-0.5">
                 <Zap className="h-3.5 w-3.5 text-cyan-400 fill-cyan-400" />
-                <span>{userLevel}-Daraja • {userXp} XP</span>
+                <span>{formatLevel(userLevel, lang)} • {userXp} XP</span>
               </p>
             </div>
             <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 px-3.5 py-2 text-center">
@@ -4267,7 +4343,7 @@ export default function UserHome() {
               >
                 <CountryFlag code={l.flagCode} width={20} className="h-4 w-6 rounded-[3px] shrink-0" />
                 <div className="min-w-0">
-                  <p className="truncate text-xs sm:text-sm font-extrabold text-white">{l.name}</p>
+                  <p className="truncate text-xs sm:text-sm font-extrabold text-white">{getLocalizedLangName(l.id, lang, l.name)}</p>
                   <p className="truncate text-[10px] text-zinc-400">
                     {LANGUAGE_META[l.id].subtitle}
                   </p>
@@ -4539,7 +4615,9 @@ export default function UserHome() {
               <Gamepad2 className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-white">Topshiriqli o'yin</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-white">
+                {dt.sidebar.taskGame || "Topshiriqli o'yin"}
+              </h1>
               <p className="text-xs text-zinc-400">
                 Osondan qiyinga qarab ketma-ket savollarni yeching, XP darajangizni oshiring va bonus olmos yutib oling!
               </p>
@@ -4552,7 +4630,7 @@ export default function UserHome() {
             className="self-start sm:self-center inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-2 text-xs font-bold text-zinc-200 transition-all cursor-pointer"
           >
             <RotateCcw className="h-3.5 w-3.5 text-fuchsia-400" />
-            <span>Qayta boshlash</span>
+            <span>{lang === "ru" ? "Начать заново" : lang === "en" ? "Restart" : lang === "tr" ? "Yeniden başlat" : lang === "ko" ? "다시 시작" : "Qayta boshlash"}</span>
           </button>
         </div>
 
@@ -4573,7 +4651,7 @@ export default function UserHome() {
                 )}
               >
                 <CountryFlag code={l.flagCode} width={20} className="h-4 w-6 rounded-[2px] shrink-0" />
-                <span className="truncate text-xs sm:text-sm font-bold">{l.name}</span>
+                <span className="truncate text-xs sm:text-sm font-bold">{getLocalizedLangName(l.id, lang, l.name)}</span>
               </button>
             );
           })}
@@ -4749,7 +4827,9 @@ export default function UserHome() {
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-xl font-bold text-white">Foydali kitoblar</h1>
+                <h1 className="text-lg sm:text-xl font-bold text-white">
+                  {dt.sidebar.books || "Foydali kitoblar"}
+                </h1>
                 <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/45 bg-gradient-to-r from-amber-500/25 to-yellow-500/25 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-300">
                   <Crown className="h-3 w-3 text-amber-300" />
                   Premium
@@ -4768,12 +4848,12 @@ export default function UserHome() {
               className="self-start sm:self-center inline-flex items-center gap-2 rounded-2xl border border-amber-400/45 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-[0_0_25px_rgba(245,158,11,0.4)] hover:brightness-110 transition-all cursor-pointer"
             >
               <Crown className="h-4 w-4" />
-              <span>Premium olish</span>
+              <span>{dt.sidebar.premium || "Premium olish"}</span>
             </button>
           ) : (
             <span className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 px-3.5 py-2 text-xs font-extrabold text-emerald-300">
               <Crown className="h-4 w-4 text-amber-300" />
-              <span>Premium faol — Barcha kitoblar ochiq</span>
+              <span>{lang === "ru" ? "Премиум активен — Все книги открыты" : lang === "en" ? "Premium active — All books unlocked" : lang === "tr" ? "Premium aktif — Tüm kitaplar açık" : lang === "ko" ? "프리미엄 활성 — 모든 도서 이용 가능" : "Premium faol — Barcha kitoblar ochiq"}</span>
             </span>
           )}
         </div>
@@ -6425,7 +6505,7 @@ export default function UserHome() {
                                   ? "border-violet-400 bg-white/15 text-white"
                                   : "border-white/10 bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08] hover:text-white"
                               )}
-                              title="Yozishmalar (Chat)"
+                              title={dt.meeting.chatTitle || "Yozishmalar (Chat)"}
                             >
                               <MessageSquare className="h-6 w-6" />
                               {unreadChatCount > 0 && (
@@ -6443,7 +6523,7 @@ export default function UserHome() {
                                   <div className="flex items-center gap-2">
                                     <MessageSquare className="h-4 w-4 text-violet-400" />
                                     <span className="text-xs font-bold text-white">
-                                      Jonli yozishma (@{matchedPartner.username})
+                                      {dt.meeting.chatTitle || "Jonli yozishma"} (@{matchedPartner.username})
                                     </span>
                                   </div>
                                   <button
@@ -6473,7 +6553,7 @@ export default function UserHome() {
                                         )}
                                       >
                                         <span className="text-[10px] font-semibold opacity-70 mb-0.5">
-                                          {msg.isMe ? "Siz" : msg.senderName}
+                                          {msg.isMe ? (dt.meeting.you || "Siz") : msg.senderName}
                                         </span>
                                         <span className="break-words">{msg.text}</span>
                                       </div>
@@ -6490,7 +6570,7 @@ export default function UserHome() {
                                   <input
                                     type="text"
                                     maxLength={300}
-                                    placeholder="Xabar yozing..."
+                                    placeholder={dt.meeting.typeMessage || "Xabar yozing..."}
                                     value={chatInput}
                                     onChange={(e) => setChatInput(e.target.value)}
                                     className="flex-1 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none"
@@ -6514,7 +6594,7 @@ export default function UserHome() {
                             className="flex h-14 items-center gap-2 rounded-2xl border border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 px-5 text-sm font-bold text-white shadow-[0_0_25px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                           >
                             <SkipForward className="h-5 w-5" />
-                            <span>O'tkazib yuborish</span>
+                            <span>{dt.meeting.skip || "O'tkazib yuborish"}</span>
                           </button>
 
                           {/* 4. Suhbatni Tugatish Qizil Tugmasi */}
@@ -6536,7 +6616,7 @@ export default function UserHome() {
                             className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2 text-xs font-semibold text-amber-300 transition-all cursor-pointer shadow-sm"
                           >
                             <Flag className="h-3.5 w-3.5" />
-                            <span>Shikoyat bildirish</span>
+                            <span>{dt.meeting.complaintTitle || "Shikoyat bildirish"}</span>
                           </button>
                         </div>
                       </div>
@@ -6609,7 +6689,7 @@ export default function UserHome() {
                                 width={40}
                                 className="h-4 w-5.5 rounded-[3px]"
                               />
-                              <span>{l.name}</span>
+                              <span>{getLocalizedLangName(l.id, lang, l.name)}</span>
                             </div>
                           ))}
                         </div>
@@ -6725,7 +6805,7 @@ export default function UserHome() {
                               className="h-4 w-5.5 rounded-[2px] shrink-0"
                             />
                             <span className="truncate text-xs font-semibold text-white">
-                              {speakerOption.name}
+                              {getLocalizedLangName(speakerOption.id, lang, speakerOption.name)}
                             </span>
                           </div>
                           <ChevronDown
@@ -6761,7 +6841,7 @@ export default function UserHome() {
                                       width={40}
                                       className="h-3.5 w-5 rounded-[2px]"
                                     />
-                                    <span className="text-xs font-medium text-white">{opt.name}</span>
+                                    <span className="text-xs font-medium text-white">{getLocalizedLangName(opt.id, lang, opt.name)}</span>
                                   </div>
                                   {active && <Check className="h-3.5 w-3.5 text-violet-400" />}
                                 </button>
@@ -6979,12 +7059,12 @@ export default function UserHome() {
                       ) : claimingDaily ? (
                         <>
                           <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
-                          <span>Olinmoqda...</span>
+                          <span>{dt.reward.claiming || "Olinmoqda..."}</span>
                         </>
                       ) : (
                         <>
                           <Gem className="h-3.5 w-3.5 text-amber-400" />
-                          <span>5 ta olmosni olish</span>
+                          <span>{dt.reward.claimBtn || "5 ta olmosni olish"}</span>
                         </>
                       )}
                     </button>
@@ -7074,8 +7154,8 @@ export default function UserHome() {
             <button
               type="button"
               onClick={() => setActiveTab("club")}
-              title="Klub"
-              aria-label="Klub"
+              title={dt.sidebar.club || "Klub"}
+              aria-label={dt.sidebar.club || "Klub"}
               className={cn(
                 "relative group flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full transition-all cursor-pointer",
                 activeTab === "club"
@@ -7091,7 +7171,7 @@ export default function UserHome() {
                     : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
                 )}
               >
-                Klub
+                {dt.sidebar.club || "Klub"}
                 <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
               </span>
               <Radio className="h-5 w-5" />

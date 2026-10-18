@@ -247,6 +247,8 @@ const tr: Translation = {
     history: "Konuşma geçmişi",
     help: "Yardım",
     settings: "Ayarlar",
+    devices: "Cihazlarım",
+    level: "Seviye",
     complaints: "Şikayetler",
     contactAdmin: "Yöneticiye ulaş",
     logout: "Çıkış yap",

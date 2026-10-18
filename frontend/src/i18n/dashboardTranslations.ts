@@ -1,6 +1,12 @@
 export interface DashboardTranslation {
   sidebar: {
     home: string;
+    speaking?: string;
+    club?: string;
+    dailyTasks?: string;
+    taskGame?: string;
+    books?: string;
+    platform?: string;
     exercises: string;
     history: string;
     friends: string;
@@ -50,6 +56,7 @@ export interface DashboardTranslation {
     dailyTitle: string;
     dailyDesc: string;
     claimBtn: string;
+    claiming?: string;
     claimed: string;
     balance: string;
     topUp: string;
@@ -71,6 +78,7 @@ export interface DashboardTranslation {
     no: string;
     complaintTitle: string;
     complaintSubmit: string;
+    skip?: string;
   };
   profile: {
     diamonds: string;
@@ -168,6 +176,12 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
   uz: {
     sidebar: {
       home: "Speaking",
+      speaking: "Speaking",
+      club: "Klub",
+      dailyTasks: "Kunlik topshiriqlar",
+      taskGame: "Topshiriqli o'yin",
+      books: "Foydali kitoblar",
+      platform: "Platforma",
       exercises: "Mening tarixim",
       history: "Mening tarixim",
       friends: "Do'stlar",
@@ -217,6 +231,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       dailyTitle: "Kunlik olmos mukofoti",
       dailyDesc: "Har kuni kirib, 5 ta bepul olmos oling!",
       claimBtn: "5 ta olmosni olish",
+      claiming: "Olinmoqda...",
       claimed: "Bugungi olindi",
       balance: "Balans",
       topUp: "Hisobni to'ldirish",
@@ -238,6 +253,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       no: "Yo'q",
       complaintTitle: "Shikoyat bildirish",
       complaintSubmit: "Shikoyat yuborish",
+      skip: "O'tkazib yuborish",
     },
     profile: {
       diamonds: "Olmoslar",
@@ -350,7 +366,13 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
 
   ru: {
     sidebar: {
-      home: "Главная",
+      home: "Speaking",
+      speaking: "Speaking",
+      club: "Клубы",
+      dailyTasks: "Ежедневные задания",
+      taskGame: "Игра с заданиями",
+      books: "Полезные книги",
+      platform: "Платформа",
       exercises: "Моя история",
       history: "Моя история",
       friends: "Друзья",
@@ -398,8 +420,9 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
     },
     reward: {
       dailyTitle: "Ежедневная награда",
-      dailyDesc: "Заходите каждый день и получайте 10 бесплатных алмазов!",
-      claimBtn: "Получить 10 алмазов",
+      dailyDesc: "Заходите каждый день и получайте 5 бесплатных алмазов!",
+      claimBtn: "Получить 5 алмазов",
+      claiming: "Получение...",
       claimed: "Сегодня получено",
       balance: "Баланс",
       topUp: "Пополнить счет",
@@ -421,6 +444,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       no: "Нет",
       complaintTitle: "Подать жалобу",
       complaintSubmit: "Отправить жалобу",
+      skip: "Пропустить",
     },
     profile: {
       diamonds: "Алмазы",
@@ -533,7 +557,13 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
 
   en: {
     sidebar: {
-      home: "Home",
+      home: "Speaking",
+      speaking: "Speaking",
+      club: "Clubs",
+      dailyTasks: "Daily Tasks",
+      taskGame: "Challenge Game",
+      books: "Useful Books",
+      platform: "Platform",
       exercises: "My History",
       history: "My History",
       friends: "Friends",
@@ -581,8 +611,9 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
     },
     reward: {
       dailyTitle: "Daily Diamond Reward",
-      dailyDesc: "Log in every day to claim 10 free diamonds!",
-      claimBtn: "Claim 10 diamonds",
+      dailyDesc: "Log in every day to claim 5 free diamonds!",
+      claimBtn: "Claim 5 diamonds",
+      claiming: "Claiming...",
       claimed: "Claimed today",
       balance: "Balance",
       topUp: "Top up",
@@ -604,6 +635,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       no: "No",
       complaintTitle: "Report issue",
       complaintSubmit: "Submit report",
+      skip: "Skip",
     },
     profile: {
       diamonds: "Diamonds",
@@ -716,7 +748,13 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
 
   tr: {
     sidebar: {
-      home: "Ana Sayfa",
+      home: "Speaking",
+      speaking: "Speaking",
+      club: "Kulüpler",
+      dailyTasks: "Günlük Görevler",
+      taskGame: "Görevli Oyun",
+      books: "Faydalı Kitaplar",
+      platform: "Platform",
       exercises: "Geçmişim",
       history: "Geçmişim",
       friends: "Arkadaşlar",
@@ -764,8 +802,9 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
     },
     reward: {
       dailyTitle: "Günlük Elmas Ödülü",
-      dailyDesc: "Her gün giriş yapın ve 10 ücretsiz elmas kazanın!",
-      claimBtn: "10 elmas al",
+      dailyDesc: "Her gün giriş yapın ve 5 ücretsiz elmas kazanın!",
+      claimBtn: "5 elmas al",
+      claiming: "Alınıyor...",
       claimed: "Bugün alındı",
       balance: "Bakiye",
       topUp: "Bakiye Yükle",
@@ -787,6 +826,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       no: "Hayır",
       complaintTitle: "Şikayet bildir",
       complaintSubmit: "Şikayeti gönder",
+      skip: "Atla",
     },
     profile: {
       diamonds: "Elmaslar",
@@ -899,7 +939,13 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
 
   ko: {
     sidebar: {
-      home: "홈",
+      home: "스피킹",
+      speaking: "스피킹",
+      club: "클럽",
+      dailyTasks: "일일 과제",
+      taskGame: "과제 게임",
+      books: "유용한 도서",
+      platform: "플랫폼",
       exercises: "내 기록",
       history: "내 기록",
       friends: "친구",
@@ -947,8 +993,9 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
     },
     reward: {
       dailyTitle: "일일 다이아몬드 보상",
-      dailyDesc: "매일 접속하여 무료 다이아몬드 10개를 받으세요!",
-      claimBtn: "다이아몬드 10개 받기",
+      dailyDesc: "매일 접속하여 무료 다이아몬드 5개를 받으세요!",
+      claimBtn: "다이아몬드 5개 받기",
+      claiming: "받는 중...",
       claimed: "오늘 수령 완료",
       balance: "잔액",
       topUp: "충전",
@@ -970,6 +1017,7 @@ export const DASHBOARD_TRANSLATIONS: Record<string, DashboardTranslation> = {
       no: "아니오",
       complaintTitle: "신고하기",
       complaintSubmit: "신고 접수",
+      skip: "건너뛰기",
     },
     profile: {
       diamonds: "다이아몬드",

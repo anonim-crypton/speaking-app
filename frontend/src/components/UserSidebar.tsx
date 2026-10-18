@@ -61,12 +61,12 @@ export default function UserSidebar({
     icon: any;
     isPremiumBadge?: boolean;
   }> = [
-    { id: "home", label: "Speaking", icon: AudioWaveform },
-    { id: "club", label: "Klub", icon: Radio },
+    { id: "home", label: t.sidebar.speaking || "Speaking", icon: AudioWaveform },
+    { id: "club", label: t.sidebar.club || "Klub", icon: Radio },
     { id: "history", label: t.sidebar.history, icon: History },
-    { id: "daily_tasks", label: "Kunlik topshiriqlar", icon: CheckSquare },
-    { id: "task_game", label: "Topshiriqli o'yin", icon: Gamepad2 },
-    { id: "books", label: "Foydali kitoblar", icon: BookOpen, isPremiumBadge: true },
+    { id: "daily_tasks", label: t.sidebar.dailyTasks || "Kunlik topshiriqlar", icon: CheckSquare },
+    { id: "task_game", label: t.sidebar.taskGame || "Topshiriqli o'yin", icon: Gamepad2 },
+    { id: "books", label: t.sidebar.books || "Foydali kitoblar", icon: BookOpen, isPremiumBadge: true },
     { id: "friends", label: t.sidebar.friends, icon: Users },
     { id: "messages", label: t.sidebar.messages || "Xabarlar", icon: MessageCircle },
     { id: "rating", label: t.sidebar.rating, icon: Trophy },
@@ -109,7 +109,7 @@ export default function UserSidebar({
       {!isCollapsed && (
         <div className="px-2.5 mb-2">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-            Platforma
+            {t.sidebar.platform || "Platforma"}
           </span>
         </div>
       )}

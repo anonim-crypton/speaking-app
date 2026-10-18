@@ -43,7 +43,7 @@ interface AccountMenuProps {
  * chiziq, Shikoyat bo'limi, Admin bilan bog'lanish, chiziq, Hisobdan chiqish.
  */
 function AccountMenuComponent({ onSelectTab, diamondsOverride }: AccountMenuProps = {}) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -79,6 +79,21 @@ function AccountMenuComponent({ onSelectTab, diamondsOverride }: AccountMenuProp
   const level = user?.level ?? Math.floor(xp / 100) + 1;
   const xpInLevel = xp % 100;
   const isPremium = Boolean(user?.isPremium);
+
+  const levelLabel = useMemo(() => {
+    switch (lang) {
+      case "ru":
+        return `${level}-й уровень`;
+      case "en":
+        return `Level ${level}`;
+      case "tr":
+        return `${level}. Seviye`;
+      case "ko":
+        return `${level}레벨`;
+      default:
+        return `${level}-Daraja`;
+    }
+  }, [lang, level]);
 
   return (
     <DropdownMenu>
@@ -147,7 +162,7 @@ function AccountMenuComponent({ onSelectTab, diamondsOverride }: AccountMenuProp
             <div className="flex items-center gap-1.5">
               <Zap className="h-4 w-4 text-emerald-400" />
               <span className="text-xs font-bold text-emerald-300">
-                {level}-Daraja (Level {level})
+                {levelLabel}
               </span>
             </div>
             <span className="text-xs font-extrabold tabular-nums text-white">
@@ -206,7 +221,7 @@ function AccountMenuComponent({ onSelectTab, diamondsOverride }: AccountMenuProp
           className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5 text-zinc-200 hover:text-white"
         >
           <Laptop className="h-4 w-4 shrink-0 text-cyan-400" />
-          <span className="text-[13.5px] font-medium">Qurilmalarim</span>
+          <span className="text-[13.5px] font-medium">{t.account.devices || "Qurilmalarim"}</span>
         </DropdownMenuItem>
 
         {/* ── Chiziq ── */}

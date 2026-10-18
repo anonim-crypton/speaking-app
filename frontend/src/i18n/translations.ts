@@ -154,6 +154,8 @@ export interface Translation {
     history: string;
     help: string;
     settings: string;
+    devices?: string;
+    level?: string;
     complaints: string;
     contactAdmin: string;
     logout: string;
@@ -406,6 +408,8 @@ export const en: Translation = {
     history: "Speaking history",
     help: "Help",
     settings: "Settings",
+    devices: "My devices",
+    level: "Level",
     complaints: "Complaints",
     contactAdmin: "Contact admin",
     logout: "Log out",
@@ -657,6 +661,8 @@ export const uz: Translation = {
     history: "Gaplashish tarixi",
     help: "Yordam",
     settings: "Sozlamalar",
+    devices: "Qurilmalarim",
+    level: "Daraja",
     complaints: "Shikoyat bo'limi",
     contactAdmin: "Admin bilan bog'lanish",
     logout: "Hisobdan chiqish",
@@ -909,6 +915,8 @@ export const ru: Translation = {
     history: "История разговоров",
     help: "Помощь",
     settings: "Настройки",
+    devices: "Мои устройства",
+    level: "Уровень",
     complaints: "Жалобы",
     contactAdmin: "Связаться с админом",
     logout: "Выйти из аккаунта",
