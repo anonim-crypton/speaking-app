@@ -238,11 +238,18 @@ function AccountMenuComponent({ onSelectTab, diamondsOverride }: AccountMenuProp
 
         {/* ── 8. Admin bilan bog'lanish ── */}
         <DropdownMenuItem
-          onClick={() => handleTabClick("help")}
+          asChild
           className="gap-3 py-2.5 cursor-pointer rounded-lg hover:bg-white/5 text-zinc-200 hover:text-white"
         >
-          <Headset className="h-4 w-4 shrink-0 text-cyan-400" />
-          <span className="text-[13.5px] font-medium">{t.account.contactAdmin || "Admin bilan bog'lanish"}</span>
+          <a
+            href={import.meta.env.VITE_ADMIN_TELEGRAM || "https://t.me/lingospeek"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 w-full"
+          >
+            <Headset className="h-4 w-4 shrink-0 text-cyan-400" />
+            <span className="text-[13.5px] font-medium">{t.account.contactAdmin || "Admin bilan bog'lanish"}</span>
+          </a>
         </DropdownMenuItem>
 
         {/* ── Chiziq ── */}

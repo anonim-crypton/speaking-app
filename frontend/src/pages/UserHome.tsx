@@ -3311,9 +3311,9 @@ export default function UserHome() {
 
         {/* 8. Admin bilan bog'lanish */}
         <a
-          href="https://t.me"
+          href={import.meta.env.VITE_ADMIN_TELEGRAM || "https://t.me/lingospeek"}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer group"
         >
           <div className="flex items-center gap-3.5">
