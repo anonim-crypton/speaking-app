@@ -5,6 +5,7 @@ import {
   Play,
   Radio,
   Check,
+  CheckCircle2,
   ChevronDown,
   Users,
   X,
@@ -310,6 +311,10 @@ export default function UserHome() {
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [inMeetingRoom, setInMeetingRoom] = useState(false);
   const [transitionLoading, setTransitionLoading] = useState(false);
+  const [matchFoundPreview, setMatchFoundPreview] = useState(false);
+  const [previewCountdown, setPreviewCountdown] = useState<number>(3);
+  const matchFoundPreviewTimerRef = useRef<number | null>(null);
+  const countdownIntervalRef = useRef<number | null>(null);
 
   // Club ("Klub") State
   const [clubRooms, setClubRooms] = useState<ClubRoom[]>([]);
@@ -1741,12 +1746,41 @@ export default function UserHome() {
     setMatchedPartner(partner);
     setActiveRoomId(roomId);
     setIsSearching(false);
-    setTransitionLoading(true);
-    window.setTimeout(() => {
-      setTransitionLoading(false);
-      setInMeetingRoom(true);
-      setIsMicMuted(false);
-    }, 1300);
+
+    if (matchFoundPreviewTimerRef.current) {
+      window.clearTimeout(matchFoundPreviewTimerRef.current);
+      matchFoundPreviewTimerRef.current = null;
+    }
+    if (countdownIntervalRef.current) {
+      window.clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+
+    setMatchFoundPreview(true);
+    setPreviewCountdown(3);
+
+    countdownIntervalRef.current = window.setInterval(() => {
+      setPreviewCountdown((prev) => {
+        if (prev <= 1) {
+          if (countdownIntervalRef.current) {
+            window.clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          return 1;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    matchFoundPreviewTimerRef.current = window.setTimeout(() => {
+      setMatchFoundPreview(false);
+      setTransitionLoading(true);
+      window.setTimeout(() => {
+        setTransitionLoading(false);
+        setInMeetingRoom(true);
+        setIsMicMuted(false);
+      }, 1000);
+    }, 3000);
   };
 
   const isCreateRoomRoute = location.pathname.startsWith("/create-room");
@@ -2598,7 +2632,17 @@ export default function UserHome() {
     setMicError(null);
     setTimeoutNotice(null);
 
-    if (isSearching) {
+    if (isSearching || matchFoundPreview) {
+      if (matchFoundPreviewTimerRef.current) {
+        window.clearTimeout(matchFoundPreviewTimerRef.current);
+        matchFoundPreviewTimerRef.current = null;
+      }
+      if (countdownIntervalRef.current) {
+        window.clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      setMatchFoundPreview(false);
+      setMatchedPartner(null);
       stopMicStream();
       setIsSearching(false);
       await leaveMatchmakingServer();
@@ -6991,7 +7035,9 @@ export default function UserHome() {
                               className={cn(
                                 "group relative flex flex-col items-center justify-center rounded-full text-white transition-all duration-200 cursor-pointer disabled:opacity-60",
                                 "h-28 w-28 sm:h-32 sm:w-32",
-                                "border border-violet-300/30 bg-gradient-to-b from-violet-500 via-violet-600 to-indigo-700 shadow-[0_0_40px_rgba(139,92,246,0.45),inset_0_2px_0_rgba(255,255,255,0.25)] hover:shadow-[0_0_55px_rgba(139,92,246,0.7)] hover:scale-[1.03] active:scale-95"
+                                matchFoundPreview && matchedPartner
+                                  ? "border border-emerald-400/50 bg-gradient-to-b from-emerald-500 via-teal-600 to-emerald-700 shadow-[0_0_45px_rgba(16,185,129,0.55),inset_0_2px_0_rgba(255,255,255,0.25)] hover:scale-[1.03] active:scale-95 animate-pulse"
+                                  : "border border-violet-300/30 bg-gradient-to-b from-violet-500 via-violet-600 to-indigo-700 shadow-[0_0_40px_rgba(139,92,246,0.45),inset_0_2px_0_rgba(255,255,255,0.25)] hover:shadow-[0_0_55px_rgba(139,92,246,0.7)] hover:scale-[1.03] active:scale-95"
                               )}
                             >
                               {requestingMic ? (
@@ -6999,6 +7045,16 @@ export default function UserHome() {
                                   <Mic className="h-6 w-6 text-white animate-bounce" />
                                   <span className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-violet-100">
                                     Mic...
+                                  </span>
+                                </div>
+                              ) : matchFoundPreview && matchedPartner ? (
+                                <div className="flex flex-col items-center justify-center px-1 text-center">
+                                  <CheckCircle2 className="h-6 w-6 text-emerald-200 animate-bounce" />
+                                  <span className="mt-1 text-[10px] font-black uppercase tracking-wider text-emerald-100">
+                                    Sherik topildi!
+                                  </span>
+                                  <span className="mt-0.5 text-xs font-mono font-bold text-white tabular-nums">
+                                    {previewCountdown}s...
                                   </span>
                                 </div>
                               ) : isSearching ? (
@@ -7022,13 +7078,13 @@ export default function UserHome() {
                             </button>
                           </div>
 
-                          {isSearching && (
+                          {isSearching && !matchFoundPreview && (
                             <button
                               type="button"
                               onClick={handleStartOrStop}
-                              className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-red-500/35 bg-red-500/10 px-3.5 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/20 transition-colors"
+                              className="mt-8 sm:mt-10 inline-flex items-center gap-2 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold px-5 py-2.5 shadow-lg shadow-rose-500/25 transition-all hover:scale-105 active:scale-95 text-xs cursor-pointer"
                             >
-                              <X className="h-3.5 w-3.5" />
+                              <X className="h-4 w-4 stroke-[2.5]" />
                               <span>{dt.start.cancelBtn}</span>
                             </button>
                           )}
@@ -7050,45 +7106,59 @@ export default function UserHome() {
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-3.5 py-1">
-                            <div
-                              className={cn(
-                                "flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-dashed transition-colors",
-                                isSearching
-                                  ? "border-violet-400/50 bg-violet-500/10 text-violet-300 animate-pulse"
-                                  : "border-white/15 bg-white/[0.03] text-zinc-500"
-                              )}
-                            >
-                              <Users className="h-5 w-5" />
-                            </div>
+                          {matchFoundPreview && matchedPartner ? (
+                            <div className="flex items-center gap-3.5 py-1">
+                              <div className="relative shrink-0">
+                                <SpeakerAvatar
+                                  size={48}
+                                  src={matchedPartner.avatarUrl}
+                                  name={matchedPartner.name}
+                                  isPremium={matchedPartner.isPremium}
+                                  className="h-12 w-12 rounded-full border-2 border-emerald-400 ring-2 ring-emerald-500/30 object-cover shadow-lg"
+                                />
+                                <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[#12111a] bg-emerald-400" />
+                              </div>
 
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-semibold text-zinc-300">
-                                {isSearching ? dt.start.searching : dt.start.waitingQueue}
-                              </p>
-                              <p className="mt-0.5 truncate text-[11px] text-zinc-500">
-                                {isSearching ? `${speakerOption.name}...` : "@username"}
-                              </p>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="truncate text-xs font-bold text-white">
+                                    {matchedPartner.name}
+                                  </p>
+                                  {matchedPartner.isVerified && <VerifiedBadge size={14} />}
+                                </div>
+                                <p className="mt-0.5 truncate text-[11px] text-zinc-400">
+                                  @{matchedPartner.username || "speaker"}
+                                </p>
+                                <p className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  Chatga ulanmoqda ({previewCountdown}s)...
+                                </p>
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="flex items-center gap-3.5 py-1">
+                              <div
+                                className={cn(
+                                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-dashed transition-colors",
+                                  isSearching
+                                    ? "border-violet-400/50 bg-violet-500/10 text-violet-300 animate-pulse"
+                                    : "border-white/15 bg-white/[0.03] text-zinc-500"
+                                )}
+                              >
+                                <Users className="h-5 w-5" />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-semibold text-zinc-300">
+                                  {isSearching ? dt.start.searching : dt.start.waitingQueue}
+                                </p>
+                                <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+                                  {isSearching ? `${speakerOption.name}...` : "@username"}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-
-                      <div className="mt-6 flex flex-wrap items-center justify-center gap-4 border-t border-white/[0.05] pt-4 text-xs text-zinc-400">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Mic className="h-3.5 w-3.5 text-violet-400" />
-                          WebRTC Audio
-                        </span>
-                        <span className="h-1 w-1 rounded-full bg-zinc-700" />
-                        <span className="inline-flex items-center gap-1.5">
-                          <Headphones className="h-3.5 w-3.5 text-violet-400" />
-                          HD Voice
-                        </span>
-                        <span className="h-1 w-1 rounded-full bg-zinc-700" />
-                        <span className="inline-flex items-center gap-1.5">
-                          <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                          SSL Secure
-                        </span>
                       </div>
                     </div>
                   </div>
