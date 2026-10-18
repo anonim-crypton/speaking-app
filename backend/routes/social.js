@@ -189,9 +189,12 @@ router.get("/history", authRequired, async (req, res) => {
     await syncRemoteProfilesIfNeeded();
     const me = store.findById(req.user.id) || req.user;
     const rawHistory = Array.isArray(me.talkHistory) ? me.talkHistory : [];
+    const voiceHistory = rawHistory.filter(
+      (item) => item && Number(item.durationSeconds || 0) > 0
+    );
     const allUsers = store.readUsers();
 
-    const enriched = rawHistory.map((item) => {
+    const enriched = voiceHistory.map((item) => {
       const livePartner =
         allUsers.find((u) => u.id === item.partnerId) ||
         allUsers.find(
@@ -504,13 +507,111 @@ router.post("/friends/remove", authRequired, (req, res) => {
   }
 });
 
-/* ───────────────────────── 3. DIRECT MESSAGES (USER <-> USER CHAT) ───────────────────────── */
+/* ───────────────────────── 3. DIRECT MESSAGES & CONVERSATIONS ───────────────────────── */
+
+// Get list of active conversations with friends (with unread count & last message)
+router.get("/conversations", authRequired, async (req, res) => {
+  try {
+    await syncRemoteProfilesIfNeeded();
+    const myId = req.user.id;
+    const me = store.findById(myId) || req.user;
+    const myFriendsRaw = Array.isArray(me.friends) ? me.friends : [];
+    const friendIds = myFriendsRaw
+      .map((f) => (typeof f === "string" ? f : f?.userId))
+      .filter(Boolean);
+
+    const allUsers = store.readUsers();
+    const allDMs = readDMs();
+
+    // Map each friend to a conversation object
+    const conversations = friendIds.map((fId) => {
+      const friendUser = allUsers.find((u) => u.id === fId);
+      const prof = friendUser
+        ? formatPublicProfile(friendUser)
+        : {
+            id: fId,
+            name: "Do'st",
+            username: "user",
+            avatarUrl: null,
+            isPremium: false,
+            isVerified: false,
+          };
+
+      // Find all messages between myId and fId
+      const thread = allDMs.filter((m) => {
+        const from = m.fromUserId || m.fromId;
+        const to = m.toUserId || m.toId;
+        return (from === myId && to === fId) || (from === fId && to === myId);
+      });
+
+      // Unread messages from this friend to me
+      const unreadCount = thread.filter((m) => {
+        const from = m.fromUserId || m.fromId;
+        const to = m.toUserId || m.toId;
+        return from === fId && to === myId && !m.read;
+      }).length;
+
+      // Last message
+      const lastMsg = thread.length > 0 ? thread[thread.length - 1] : null;
+
+      return {
+        id: prof.id,
+        name: prof.name,
+        username: prof.username,
+        avatarUrl: prof.avatarUrl,
+        isPremium: prof.isPremium,
+        isVerified: prof.isVerified,
+        unreadCount,
+        lastMessage: lastMsg
+          ? {
+              id: lastMsg.id,
+              text: lastMsg.text,
+              createdAt: lastMsg.createdAt,
+              isMe: (lastMsg.fromUserId || lastMsg.fromId) === myId,
+              read: Boolean(lastMsg.read),
+            }
+          : null,
+      };
+    });
+
+    // Sort conversations: latest message first, then alphabetical
+    conversations.sort((a, b) => {
+      const timeA = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
+      const timeB = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
+      if (timeA !== timeB) return timeB - timeA;
+      return a.name.localeCompare(b.name);
+    });
+
+    return res.json({ success: true, conversations });
+  } catch (err) {
+    console.error("Get conversations error:", err);
+    return res.status(500).json({ success: false, message: "Suhbatlarni yuklashda xatolik" });
+  }
+});
+
+// Get messages with a specific partner & automatically mark partner's messages as read
 router.get("/dm/:partnerId", authRequired, (req, res) => {
   try {
     const myId = req.user.id;
     const partnerId = req.params.partnerId;
     const partner = store.findById(partnerId);
-    const allDMs = readDMs();
+    let allDMs = readDMs();
+
+    // Mark messages sent from partner to me as read
+    let updated = false;
+    allDMs = allDMs.map((m) => {
+      const f = m.fromUserId || m.fromId;
+      const t = m.toUserId || m.toId;
+      if (f === partnerId && t === myId && !m.read) {
+        updated = true;
+        return { ...m, read: true, readAt: new Date().toISOString() };
+      }
+      return m;
+    });
+
+    if (updated) {
+      writeDMs(allDMs);
+    }
 
     const conversation = allDMs
       .filter((m) => {
@@ -522,6 +623,7 @@ router.get("/dm/:partnerId", authRequired, (req, res) => {
         ...m,
         fromUserId: m.fromUserId || m.fromId,
         toUserId: m.toUserId || m.toId,
+        read: Boolean(m.read),
       }))
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
@@ -536,6 +638,32 @@ router.get("/dm/:partnerId", authRequired, (req, res) => {
   }
 });
 
+// Explicitly mark conversation messages as read
+router.post("/dm/:partnerId/read", authRequired, (req, res) => {
+  try {
+    const myId = req.user.id;
+    const partnerId = req.params.partnerId;
+    let allDMs = readDMs();
+    let updated = false;
+    allDMs = allDMs.map((m) => {
+      const f = m.fromUserId || m.fromId;
+      const t = m.toUserId || m.toId;
+      if (f === partnerId && t === myId && !m.read) {
+        updated = true;
+        return { ...m, read: true, readAt: new Date().toISOString() };
+      }
+      return m;
+    });
+    if (updated) {
+      writeDMs(allDMs);
+    }
+    return res.json({ success: true, updated });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: "Xatolik yuz berdi" });
+  }
+});
+
+// Send a direct message (only allowed between accepted friends)
 router.post("/dm/:partnerId", authRequired, (req, res) => {
   try {
     const myId = req.user.id;
@@ -546,6 +674,23 @@ router.post("/dm/:partnerId", authRequired, (req, res) => {
     }
 
     const me = store.findById(myId) || req.user;
+    const partner = store.findById(partnerId);
+    if (!partner) {
+      return res.status(404).json({ success: false, message: "Foydalanuvchi topilmadi" });
+    }
+
+    // Check friendship: must be accepted friends!
+    const myFriends = Array.isArray(me.friends) ? me.friends : [];
+    const isFriend = myFriends.some((f) =>
+      typeof f === "string" ? f === partnerId : f?.userId === partnerId
+    );
+    if (!isFriend) {
+      return res.status(403).json({
+        success: false,
+        message: "Faqat do'stlashish taklifi qabul qilingan do'stlar bilan xabarlashish mumkin. Avval do'stlik taklifini yuboring yoki qabul qiling.",
+      });
+    }
+
     const allDMs = readDMs();
     const newMsg = {
       id: "dm_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
@@ -555,13 +700,16 @@ router.post("/dm/:partnerId", authRequired, (req, res) => {
       toUserId: partnerId,
       senderName: me.name || me.username || "Foydalanuvchi",
       senderUsername: me.username || "speaker",
+      senderAvatar: me.avatarUrl || me.onboarding?.avatarUrl || null,
       text,
+      read: false,
+      readAt: null,
       createdAt: new Date().toISOString(),
     };
     allDMs.push(newMsg);
-    writeDMs(allDMs.slice(-2000));
+    writeDMs(allDMs.slice(-3000));
 
-    touchTalkHistoryBetween(myId, partnerId);
+    // Notice: Do NOT call touchTalkHistoryBetween! Chatting does not add to voice call history.
 
     const conversation = allDMs
       .filter((m) => {
@@ -573,6 +721,7 @@ router.post("/dm/:partnerId", authRequired, (req, res) => {
         ...m,
         fromUserId: m.fromUserId || m.fromId,
         toUserId: m.toUserId || m.toId,
+        read: Boolean(m.read),
       }));
 
     return res.status(201).json({

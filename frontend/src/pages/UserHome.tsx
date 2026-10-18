@@ -54,6 +54,7 @@ import {
   UserPlus,
   UserMinus,
   MessageCircle,
+  CheckCheck,
   Medal,
   Loader2,
   ClipboardCheck,
@@ -616,6 +617,63 @@ export default function UserHome() {
   const [dmInput, setDmInput] = useState("");
   const [dmSending, setDmSending] = useState(false);
   const dmEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Dedicated Messages & Conversations State
+  const [conversations, setConversations] = useState<
+    Array<{
+      id: string;
+      name: string;
+      username: string;
+      avatarUrl?: string | null;
+      isPremium?: boolean;
+      isVerified?: boolean;
+      unreadCount: number;
+      lastMessage?: {
+        id: string;
+        text: string;
+        createdAt: string;
+        isMe: boolean;
+        read: boolean;
+      } | null;
+    }>
+  >([]);
+  const [messagesSearchQuery, setMessagesSearchQuery] = useState("");
+  const [activeChatPartner, setActiveChatPartner] = useState<{
+    id: string;
+    name: string;
+    username: string;
+    avatarUrl?: string | null;
+    isPremium?: boolean;
+    isVerified?: boolean;
+    unreadCount: number;
+    lastMessage?: {
+      id: string;
+      text: string;
+      createdAt: string;
+      isMe: boolean;
+      read: boolean;
+    } | null;
+  } | null>(null);
+  const [dmThreadMessages, setDmThreadMessages] = useState<
+    Array<{
+      id: string;
+      fromUserId: string;
+      toUserId: string;
+      senderName?: string;
+      senderUsername?: string;
+      text: string;
+      createdAt: string;
+      read?: boolean;
+    }>
+  >([]);
+  const [dmThreadInput, setDmThreadInput] = useState("");
+  const [dmThreadSending, setDmThreadSending] = useState(false);
+  const dmThreadEndRef = useRef<HTMLDivElement | null>(null);
+
+  const totalUnreadMessages = conversations.reduce(
+    (acc, curr) => acc + (Number(curr.unreadCount) || 0),
+    0
+  );
 
   const displayName =
     user?.name ||
@@ -1267,12 +1325,17 @@ export default function UserHome() {
     isPremium?: boolean;
     isVerified?: boolean;
   }) => {
-    setDmPartner(partner);
-    setDmMessages([]);
-    void fetchDmMessages(partner.id);
-    setTimeout(() => {
-      dmEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 200);
+    setActiveTab("messages");
+    handleOpenChatWith({
+      id: partner.id,
+      name: partner.name,
+      username: partner.username,
+      avatarUrl: partner.avatarUrl,
+      isPremium: Boolean(partner.isPremium),
+      isVerified: Boolean(partner.isVerified),
+      unreadCount: 0,
+      lastMessage: null,
+    });
   };
 
   const handleSendDmMessage = async (e: FormEvent) => {
@@ -1308,6 +1371,108 @@ export default function UserHome() {
       /* ignore */
     } finally {
       setDmSending(false);
+    }
+  };
+
+  // Fetch conversations with friends
+  const fetchConversations = async () => {
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/social/conversations`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.conversations)) {
+        setConversations(data.conversations);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const fetchActiveChatMessages = async (partnerId: string) => {
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken || !partnerId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/social/dm/${partnerId}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.messages)) {
+        setDmThreadMessages(data.messages);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Poll conversations regularly
+  useEffect(() => {
+    if (!token) return;
+    void fetchConversations();
+    const interval = window.setInterval(() => {
+      void fetchConversations();
+    }, 3500);
+    return () => window.clearInterval(interval);
+  }, [token]);
+
+  // When activeChatPartner is open, poll chat messages every 1.5s
+  useEffect(() => {
+    if (!activeChatPartner?.id) return;
+    void fetchActiveChatMessages(activeChatPartner.id);
+    void fetchConversations();
+    const interval = window.setInterval(() => {
+      void fetchActiveChatMessages(activeChatPartner.id);
+    }, 1500);
+    return () => window.clearInterval(interval);
+  }, [activeChatPartner?.id, token]);
+
+  const handleOpenChatWith = (partner: any) => {
+    setActiveChatPartner(partner);
+    setDmThreadMessages([]);
+    void fetchActiveChatMessages(partner.id);
+    void fetchConversations();
+    setTimeout(() => {
+      dmThreadEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 150);
+  };
+
+  const handleSendChatMessage = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!activeChatPartner?.id || !dmThreadInput.trim() || dmThreadSending) return;
+    const authToken = token || localStorage.getItem("ls_token");
+    if (!authToken) return;
+    const textToSend = dmThreadInput.trim();
+    setDmThreadSending(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/social/dm/${activeChatPartner.id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ text: textToSend }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setDmThreadInput("");
+        if (Array.isArray(data.messages)) {
+          setDmThreadMessages(data.messages);
+        } else {
+          await fetchActiveChatMessages(activeChatPartner.id);
+        }
+        void fetchConversations();
+        setTimeout(() => {
+          dmThreadEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 80);
+      } else if (data?.message) {
+        alert(data.message);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setDmThreadSending(false);
     }
   };
 
@@ -2975,6 +3140,29 @@ export default function UserHome() {
           <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
         </button>
 
+        {/* 2.1. Xabarlar */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("messages")}
+          className="flex items-center justify-between rounded-2xl p-3 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-colors cursor-pointer group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-400 group-hover:scale-105 transition-transform relative">
+              <MessageCircle className="h-5 w-5" />
+              {totalUnreadMessages > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white shadow-md">
+                  {totalUnreadMessages}
+                </span>
+              )}
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Xabarlar</p>
+              <p className="text-[11px] text-zinc-400">Do'stlar bilan yozishmalar va yangi xabarlar</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </button>
+
         {/* 3. Reyting */}
         <button
           type="button"
@@ -3401,16 +3589,19 @@ export default function UserHome() {
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                       <button
                         type="button"
-                        onClick={() =>
-                          handleOpenDmModal({
+                        onClick={() => {
+                          setActiveTab("messages");
+                          handleOpenChatWith({
                             id: fr.id,
                             name: fr.name,
                             username: fr.username,
                             avatarUrl: fr.avatarUrl,
-                            isPremium: fr.isPremium,
-                            isVerified: fr.isVerified,
-                          })
-                        }
+                            isPremium: Boolean(fr.isPremium),
+                            isVerified: Boolean(fr.isVerified),
+                            unreadCount: 0,
+                            lastMessage: null,
+                          });
+                        }}
                         className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/40 bg-violet-500/15 hover:bg-violet-500/25 px-3.5 py-2 text-xs font-bold text-violet-200 transition-all cursor-pointer"
                       >
                         <MessageCircle className="h-3.5 w-3.5" />
@@ -3512,6 +3703,313 @@ export default function UserHome() {
       </div>
     </div>
   );
+
+  const renderMessagesView = () => {
+    // If a chat partner is selected, show the active chat conversation view!
+    if (activeChatPartner) {
+      return (
+        <div className="flex flex-col h-[calc(100vh-140px)] max-h-[820px] rounded-3xl border border-white/[0.1] bg-[#0c0820]/90 backdrop-blur-2xl shadow-2xl overflow-hidden animate-in fade-in duration-200">
+          {/* Chat Header */}
+          <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.03] px-4 sm:px-6 py-3.5">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveChatPartner(null);
+                  void fetchConversations();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-medium text-xs transition-colors cursor-pointer"
+                title="Yozishmalar ro'yxatiga qaytish"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Orqaga</span>
+              </button>
+
+              <div className="relative">
+                <SpeakerAvatar
+                  name={activeChatPartner.name}
+                  avatarUrl={activeChatPartner.avatarUrl}
+                  isPremium={Boolean(activeChatPartner.isPremium)}
+                  size={40}
+                />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="truncate text-sm sm:text-base font-bold text-white">
+                    {activeChatPartner.name}
+                  </h2>
+                  {(activeChatPartner.isPremium || activeChatPartner.isVerified) && (
+                    <VerifiedBadge size={15} />
+                  )}
+                </div>
+                <p className="truncate text-xs text-violet-300">@{activeChatPartner.username}</p>
+              </div>
+            </div>
+
+            <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
+              Do'st
+            </span>
+          </div>
+
+          {/* Chat Messages Body */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-2.5 text-xs">
+            {dmThreadMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-10 px-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-500/25 bg-violet-500/10 text-violet-300 mb-2">
+                  <MessageCircle className="h-6 w-6" />
+                </div>
+                <p className="text-sm font-semibold text-white">
+                  {activeChatPartner.name} bilan xabarlar tarixi bo'sh
+                </p>
+                <p className="text-xs text-zinc-400 mt-1 max-w-xs">
+                  Birinchi bo'lib salom deb yozing va suhbatni boshlang!
+                </p>
+              </div>
+            ) : (
+              dmThreadMessages.map((m, idx) => {
+                const isMine = String(m.fromUserId) === String(user?.id);
+                const timeStr = m.createdAt
+                  ? new Date(m.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "";
+                return (
+                  <div
+                    key={m.id || idx}
+                    className={cn(
+                      "flex flex-col max-w-[82%] sm:max-w-[70%] rounded-2xl px-3.5 py-2 shadow-sm leading-snug",
+                      isMine
+                        ? "ml-auto bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-br-sm"
+                        : "mr-auto bg-white/[0.06] border border-white/10 text-zinc-100 rounded-bl-sm"
+                    )}
+                  >
+                    {/* Sender Full Name Header */}
+                    <div className="flex items-center justify-between gap-3 mb-0.5">
+                      <span className="text-[10px] font-bold opacity-90 truncate max-w-[160px]">
+                        {isMine ? (user?.name || "Siz") : (m.senderName || activeChatPartner.name)}
+                      </span>
+                    </div>
+
+                    {/* Text */}
+                    <p className="text-xs sm:text-[13px] whitespace-pre-wrap break-words">{m.text}</p>
+
+                    {/* Footer: Time + Read Status */}
+                    <div className="flex items-center justify-end gap-1.5 mt-1 self-end">
+                      <span className="text-[9.5px] opacity-70 font-mono">{timeStr}</span>
+                      {isMine && (
+                        m.read ? (
+                          <span title="O'qildi" className="flex items-center text-sky-300">
+                            <CheckCheck className="h-3.5 w-3.5" />
+                          </span>
+                        ) : (
+                          <span title="Yuborildi" className="flex items-center text-white/60">
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={dmThreadEndRef} />
+          </div>
+
+          {/* Chat Input Form */}
+          <form
+            onSubmit={handleSendChatMessage}
+            className="flex items-center gap-2 border-t border-white/[0.08] bg-[#090518] p-3 sm:p-4"
+          >
+            <input
+              type="text"
+              placeholder={`@${activeChatPartner.username} ga xabar yozing...`}
+              value={dmThreadInput}
+              onChange={(e) => setDmThreadInput(e.target.value)}
+              maxLength={500}
+              className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs sm:text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!dmThreadInput.trim() || dmThreadSending}
+              className="flex items-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-[0_0_15px_rgba(139,92,246,0.4)] disabled:opacity-50 hover:brightness-110 transition-all cursor-pointer shrink-0"
+            >
+              <Send className="h-4 w-4" />
+              <span className="hidden sm:inline">Yuborish</span>
+            </button>
+          </form>
+        </div>
+      );
+    }
+
+    // Default: List of Conversations
+    const filteredConversations = conversations.filter((c) => {
+      const q = messagesSearchQuery.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.username && c.username.toLowerCase().includes(q))
+      );
+    });
+
+    return (
+      <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-blue-500/30 bg-blue-500/15 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.25)]">
+              <MessageCircle className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-white">Xabarlar</h1>
+              <p className="text-xs sm:text-sm text-zinc-400">
+                Do'stlaringiz bilan shaxsiy yozishmalar va yangi xabarlar
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-blue-500/30 bg-blue-500/15 px-3.5 py-1 text-xs font-bold text-blue-300">
+              Suhbatlar: {conversations.length}
+            </span>
+            {totalUnreadMessages > 0 && (
+              <span className="rounded-full border border-sky-500/40 bg-sky-500/20 px-3.5 py-1 text-xs font-bold text-sky-300 animate-pulse">
+                {totalUnreadMessages} ta o'qilmagan
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Search Input */}
+        <div className="relative max-w-xl">
+          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+          <input
+            type="text"
+            value={messagesSearchQuery}
+            onChange={(e) => setMessagesSearchQuery(e.target.value)}
+            placeholder="Ism yoki @username orqali xabarlarni qidirish..."
+            className="w-full rounded-2xl border border-white/15 bg-white/[0.04] pl-11 pr-10 py-3 text-xs sm:text-sm text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+          />
+          {messagesSearchQuery && (
+            <button
+              type="button"
+              onClick={() => setMessagesSearchQuery("")}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Conversations List */}
+        <div className="flex flex-col gap-3">
+          {conversations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-3xl border border-white/[0.08] bg-[#0c0820]/60 p-10 text-center backdrop-blur-xl">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10 text-blue-400 mb-3">
+                <MessageCircle className="h-7 w-7" />
+              </div>
+              <h3 className="text-base font-bold text-white">Hozircha hech qanday do'stingiz yo'q</h3>
+              <p className="text-xs text-zinc-400 mt-1 max-w-sm">
+                Xabar yozish uchun avval "Do'stlar" bo'limiga o'tib, boshqa foydalanuvchilarga do'stlik taklifini yuboring yoki takliflarini qabul qiling.
+              </p>
+              <Button
+                variant="glow"
+                size="sm"
+                onClick={() => setActiveTab("friends")}
+                className="mt-4"
+              >
+                Do'stlar bo'limiga o'tish
+              </Button>
+            </div>
+          ) : filteredConversations.length === 0 ? (
+            <div className="rounded-3xl border border-white/[0.08] bg-white/[0.02] p-8 text-center text-xs text-zinc-400">
+              "{messagesSearchQuery}" bo'yicha suhbatlar topilmadi
+            </div>
+          ) : (
+            filteredConversations.map((c) => (
+              <div
+                key={c.id}
+                onClick={() => handleOpenChatWith(c)}
+                className="group flex items-center justify-between gap-4 rounded-3xl border border-white/[0.08] bg-[#0c0820]/75 p-4 sm:p-4.5 hover:border-blue-500/50 hover:bg-white/[0.04] transition-all cursor-pointer shadow-lg hover:shadow-[0_0_25px_rgba(59,130,246,0.18)]"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  {/* Avatar with unread badge */}
+                  <div className="relative shrink-0">
+                    <SpeakerAvatar
+                      name={c.name}
+                      avatarUrl={c.avatarUrl}
+                      isPremium={Boolean(c.isPremium)}
+                      size={46}
+                    />
+                    {c.unreadCount > 0 && (
+                      <span className="absolute -bottom-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-extrabold text-white shadow-[0_0_12px_rgba(37,99,235,0.7)] ring-2 ring-[#0c0820] animate-pulse">
+                        {c.unreadCount}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Info & Last message snippet */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="truncate text-sm sm:text-base font-bold text-white group-hover:text-blue-300 transition-colors">
+                        {c.name}
+                      </h3>
+                      {(c.isPremium || c.isVerified) && <VerifiedBadge size={15} />}
+                      <span className="truncate text-xs text-zinc-500">@{c.username}</span>
+                    </div>
+
+                    <div className="mt-1 flex items-center gap-2 text-xs">
+                      {c.lastMessage ? (
+                        <p className={cn(
+                          "truncate text-xs",
+                          c.unreadCount > 0 ? "text-white font-semibold" : "text-zinc-400"
+                        )}>
+                          {c.lastMessage.isMe && (
+                            <span className="text-violet-300 font-semibold mr-1">
+                              Siz:
+                            </span>
+                          )}
+                          {c.lastMessage.text}
+                        </p>
+                      ) : (
+                        <p className="text-zinc-500 italic text-[11px]">
+                          Yozishmani boshlash uchun bosing
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Timestamp and Arrow */}
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  {c.lastMessage?.createdAt && (
+                    <span className="text-[11px] font-mono text-zinc-500">
+                      {new Date(c.lastMessage.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  )}
+                  {c.lastMessage?.isMe && (
+                    c.lastMessage.read ? (
+                      <span title="O'qildi" className="flex items-center text-sky-400">
+                        <CheckCheck className="h-3.5 w-3.5" />
+                      </span>
+                    ) : (
+                      <span title="Yuborildi" className="flex items-center text-zinc-500">
+                        <Check className="h-3.5 w-3.5" />
+                      </span>
+                    )
+                  )}
+                  <ChevronRight className="h-4 w-4 text-zinc-600 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderRatingView = () => {
     const sortedList = [...leaderboard].sort((a, b) => {
@@ -6060,6 +6558,8 @@ export default function UserHome() {
               renderBooksView()
             ) : activeTab === "friends" ? (
               renderFriendsView()
+            ) : activeTab === "messages" ? (
+              renderMessagesView()
             ) : activeTab === "rating" ? (
               renderRatingView()
             ) : activeTab === "achievements" ? (
@@ -6619,6 +7119,31 @@ export default function UserHome() {
               <Users className="h-4 w-4" />
             </div>
             <span className="text-[10px] font-medium tracking-tight">{dt.sidebar.friends}</span>
+          </button>
+
+          {/* 4.1 Xabarlar */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("messages")}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer relative",
+              activeTab === "messages" ? "text-blue-400" : "text-zinc-400 hover:text-zinc-200"
+            )}
+          >
+            <div
+              className={cn(
+                "relative flex h-8 w-8 items-center justify-center rounded-xl transition-all",
+                activeTab === "messages" ? "bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.4)]" : ""
+              )}
+            >
+              <MessageCircle className="h-4 w-4" />
+              {totalUnreadMessages > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white shadow-md">
+                  {totalUnreadMessages}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-medium tracking-tight">Xabarlar</span>
           </button>
 
           {/* 5. Profil (faqat avatar) */}
