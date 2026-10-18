@@ -506,21 +506,65 @@ router.post("/:roomId/leave", authRequired, (req, res) => {
 
     const room = clubs[idx];
     const myId = String(req.user.id);
+    const isOwner = String(room.owner?.id) === myId;
+    const maxCapacity = Number(room.maxMembers) || 2;
+    const currentMembers = Array.isArray(room.members) ? room.members : [];
 
-    // If room creator leaves/ends the room, close & delete the room
-    if (String(room.owner?.id) === myId) {
-      clubs.splice(idx, 1);
+    // Filter out the departing user from members & pendingRequests
+    const remainingMembers = currentMembers.filter((m) => String(m.id) !== myId);
+    room.pendingRequests = (room.pendingRequests || []).filter((p) => String(p.id) !== myId);
+
+    if (isOwner) {
+      // 1. Agar 2 kishilik xonadan admin chiqib ketsa yoki xonada boshqa a'zo qolmagan bo'lsa -> xona avtomatik yopilsin
+      if (maxCapacity === 2 || remainingMembers.length === 0) {
+        clubs.splice(idx, 1);
+        writeClubs(clubs);
+        return res.json({
+          success: true,
+          closed: true,
+          message: "2 kishilik xona admini chiqib ketdi va xona yopildi",
+        });
+      }
+
+      // 2. Agar 2 kishilikdan kattaroq xonadan admin chiqib ketsa -> adminlik huquqi keyingi foydalanuvchiga o'tsin
+      const nextOwner = remainingMembers[0];
+      nextOwner.role = "owner";
+      nextOwner.mutedByAdmin = false;
+
+      const newOwnerSummary = formatUserSummary(findLive(nextOwner.id) || nextOwner);
+      room.owner = {
+        ...newOwnerSummary,
+        role: "owner",
+      };
+      room.members = remainingMembers.map((m, i) => (i === 0 ? { ...m, role: "owner" } : m));
+
+      // System notification in group chat
+      if (!Array.isArray(room.messages)) room.messages = [];
+      room.messages.push({
+        id: `msg_${Date.now()}_sys`,
+        sender: {
+          id: "system",
+          name: "Lingo Speek",
+          username: "system",
+        },
+        text: `🛡️ Xona yaratuvchisi chiqib ketdi. Xona adminligi huquqi ${newOwnerSummary.name || "keyingi foydalanuvchi"}ga o'tdi.`,
+        createdAt: new Date().toISOString(),
+      });
+
+      clubs[idx] = room;
       writeClubs(clubs);
+
       return res.json({
         success: true,
-        closed: true,
-        message: "Xona yopildi",
+        closed: false,
+        transferredTo: newOwnerSummary.id,
+        room: enrichRoomUsers(room),
+        message: `Adminlik huquqi ${newOwnerSummary.name || "keyingi foydalanuvchi"}ga topshirildi`,
       });
     }
 
-    // Otherwise remove this participant from members & pendingRequests
-    room.members = (room.members || []).filter((m) => String(m.id) !== myId);
-    room.pendingRequests = (room.pendingRequests || []).filter((p) => String(p.id) !== myId);
+    // Oddiy foydalanuvchi chiqib ketganda
+    room.members = remainingMembers;
     clubs[idx] = room;
     writeClubs(clubs);
 

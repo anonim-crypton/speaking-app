@@ -81,6 +81,7 @@ import SpeakerAvatar, { resolveAvatarUrl } from "@/components/SpeakerAvatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import VipUserCard from "@/components/VipUserCard";
 import AiLoader from "@/components/ui/ai-loader";
+import CalendarCapacityPicker from "@/components/CalendarCapacityPicker";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { API_BASE } from "@/lib/api";
@@ -5587,11 +5588,11 @@ export default function UserHome() {
               />
             </div>
 
-            {/* 3. Xonaga kiradigan foydalanuvchilar soni (2 kishilikdan 100 kishilikgacha) */}
+            {/* 3. Xonaga kiradigan foydalanuvchilar soni (2 dan 99 kishilikgacha kalendar shaklida) */}
             <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <label className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                  Foydalanuvchilar soni (2 kishilikdan — 100 kishilikgacha)
+                  Foydalanuvchilar soni (2 kishilikdan — 99 kishilikgacha)
                 </label>
                 <span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/35 bg-violet-500/15 px-3 py-1 text-xs font-extrabold text-violet-200">
                   <Users className="h-3.5 w-3.5 text-violet-400" />
@@ -5599,27 +5600,11 @@ export default function UserHome() {
                 </span>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <input
-                  type="range"
-                  min={2}
-                  max={100}
-                  value={clubFormMaxMembers}
-                  onChange={(e) => setClubFormMaxMembers(Number(e.target.value))}
-                  className="w-full accent-violet-500 cursor-pointer"
-                />
-                <select
-                  value={clubFormMaxMembers}
-                  onChange={(e) => setClubFormMaxMembers(Number(e.target.value))}
-                  className="w-full sm:w-44 rounded-xl border border-white/15 bg-[#120c2b] px-3 py-2.5 text-xs font-bold text-white focus:border-violet-500 focus:outline-none cursor-pointer"
-                >
-                  {Array.from({ length: 99 }, (_, idx) => idx + 2).map((num) => (
-                    <option key={num} value={num} className="bg-[#120c2b] text-white">
-                      {num} kishilik ({num - 1} ta odam + Siz)
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Kalendar shaklidagi sig'im tanlash paneli (20 tadan qismlar, Pagination & Back) */}
+              <CalendarCapacityPicker
+                value={clubFormMaxMembers}
+                onChange={(val) => setClubFormMaxMembers(val)}
+              />
 
               <p className="mt-3 text-xs text-violet-300 font-medium">
                 💡 <span className="font-bold text-white">{clubFormMaxMembers} kishilik</span>{" "}
