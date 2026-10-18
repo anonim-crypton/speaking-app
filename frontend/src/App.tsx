@@ -28,7 +28,7 @@ function Protected({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isAuthed) return <Navigate to="/login" replace />;
+  if (!isAuthed) return <Navigate to="/" replace />;
 
   return <>{children}</>;
 }

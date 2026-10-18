@@ -190,11 +190,11 @@ export const en: Translation = {
   },
   mockup: {
     nav: {
-      home: "Home",
+      home: "Speaking",
       liveRooms: "Live Rooms",
       messages: "Messages",
-      community: "Community",
-      courses: "Courses",
+      community: "Friends",
+      courses: "Books",
       progress: "My Progress",
     },
     voiceChannels: "Voice Channels",
@@ -444,11 +444,11 @@ export const uz: Translation = {
   },
   mockup: {
     nav: {
-      home: "Bosh sahifa",
+      home: "Speaking",
       liveRooms: "Jonli xonalar",
       messages: "Xabarlar",
-      community: "Jamiyat",
-      courses: "Kurslar",
+      community: "Do'stlar",
+      courses: "Kitoblar",
       progress: "Natijalarim",
     },
     voiceChannels: "Ovozli kanallar",
@@ -697,11 +697,11 @@ export const ru: Translation = {
   },
   mockup: {
     nav: {
-      home: "Главная",
+      home: "Speaking",
       liveRooms: "Живые комнаты",
       messages: "Сообщения",
-      community: "Сообщество",
-      courses: "Курсы",
+      community: "Друзья",
+      courses: "Книги",
       progress: "Мой прогресс",
     },
     voiceChannels: "Голосовые каналы",

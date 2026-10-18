@@ -75,13 +75,18 @@ export default function Navbar() {
     return (
       <header
         className={cn(
-          "sticky top-0 z-50 w-full transition-colors duration-200",
-          scrolled
-            ? "border-b border-border/60 bg-background/80 backdrop-blur-xl"
-            : "border-b border-transparent bg-transparent"
+          "sticky top-0 z-50 w-full transition-all duration-300 ease-out pointer-events-none",
+          scrolled ? "pt-2.5 sm:pt-3 px-3 sm:px-6 md:px-8" : "pt-0 px-0"
         )}
       >
-        <div className="container">
+        <div
+          className={cn(
+            "pointer-events-auto transition-all duration-300 ease-out",
+            scrolled
+              ? "mx-auto max-w-6xl rounded-2xl border border-white/15 bg-[#090518]/65 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.65)] px-4 sm:px-6"
+              : "w-full border-b border-white/[0.06] bg-[#070414]/90 backdrop-blur-md px-4 sm:px-8"
+          )}
+        >
           <div className="flex h-16 items-center justify-between">
             <Link to="/" className="shrink-0 flex items-center" aria-label="Lingo Speek home">
               <Logo />
@@ -108,13 +113,18 @@ export default function Navbar() {
     <>
       <header
         className={cn(
-          "sticky top-0 z-50 w-full transition-colors duration-200",
-          scrolled
-            ? "border-b border-border/60 bg-background/75 backdrop-blur-xl"
-            : "border-b border-transparent bg-transparent"
+          "sticky top-0 z-50 w-full transition-all duration-300 ease-out pointer-events-none",
+          scrolled ? "pt-2.5 sm:pt-3 px-3 sm:px-6 md:px-8" : "pt-0 px-0"
         )}
       >
-        <div className="container">
+        <div
+          className={cn(
+            "pointer-events-auto transition-all duration-300 ease-out",
+            scrolled
+              ? "mx-auto max-w-6xl rounded-2xl border border-white/15 bg-[#090518]/65 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.65)] px-4 sm:px-6"
+              : "w-full border-b border-white/[0.06] bg-[#070414]/90 backdrop-blur-md px-4 sm:px-8"
+          )}
+        >
           <div className="flex h-16 items-center justify-between gap-4">
             <Link to="/" className="shrink-0 flex items-center" aria-label="Lingo Speek home">
               <Logo />

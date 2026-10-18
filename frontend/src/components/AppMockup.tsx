@@ -1,6 +1,8 @@
 import {
   Globe,
   GraduationCap,
+  BookOpen,
+  AudioWaveform,
   Hash,
   Hand,
   Heart,
@@ -59,11 +61,11 @@ export default function AppMockup() {
   const m = t.mockup;
 
   const navItems = [
-    { icon: Home, label: m.nav.home },
+    { icon: AudioWaveform, label: m.nav.home },
     { icon: Radio, label: m.nav.liveRooms, active: true },
     { icon: MessageSquare, label: m.nav.messages, badge: 3 },
     { icon: Users, label: m.nav.community },
-    { icon: GraduationCap, label: m.nav.courses },
+    { icon: BookOpen, label: m.nav.courses },
     { icon: TrendingUp, label: m.nav.progress },
   ];
 

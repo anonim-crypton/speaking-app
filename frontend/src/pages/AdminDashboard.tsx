@@ -31,12 +31,26 @@ import {
   FileText,
   Image as ImageIcon,
   Download,
+  Clock,
+  Mail,
+  Laptop,
+  Globe,
 } from "lucide-react";
 import { adminApiGet, adminApiPost, API_BASE } from "@/lib/api";
 import { resolveAvatarUrl } from "@/components/SpeakerAvatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { ChartAreaInteractive } from "@/components/ChartAreaInteractive";
 import { DonutChartAuthProviders } from "@/components/DonutChartAuthProviders";
+
+interface SecurityAlertItem {
+  id: string;
+  type: string;
+  ip: string;
+  userAgent: string;
+  timestamp: string;
+  details: string;
+  read: boolean;
+}
 
 interface AdminBookItem {
   id: string;
@@ -69,6 +83,8 @@ interface AdminStats {
     mobile: number;
   }>;
   maintenanceMode?: boolean;
+  securityAlertsCount?: number;
+  clientIp?: string;
 }
 
 interface UserItem {
@@ -130,6 +146,8 @@ interface PlatformSettings {
   allowGuestMatch: boolean;
   chatMessageFilter: boolean;
   platformNotice: string;
+  adminTrustedIps?: string[];
+  adminAlertEmail?: string;
 }
 
 interface AnnouncementItem {
@@ -187,7 +205,7 @@ export default function AdminDashboard() {
 
   // Tab navigation
   const [currentTab, setCurrentTab] = useState<
-    "overview" | "users" | "books" | "complaints" | "devices" | "settings" | "announcements" | "logs"
+    "overview" | "users" | "books" | "complaints" | "devices" | "settings" | "announcements" | "logs" | "security"
   >("overview");
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ text: string; type: "success" | "error" } | null>(null);
@@ -210,9 +228,14 @@ export default function AdminDashboard() {
     allowGuestMatch: true,
     chatMessageFilter: true,
     platformNotice: "",
+    adminTrustedIps: ["127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost"],
+    adminAlertEmail: "dasturchi@gmail.com",
   });
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
+  const [securityAlerts, setSecurityAlerts] = useState<SecurityAlertItem[]>([]);
+  const [newTrustedIpInput, setNewTrustedIpInput] = useState("");
+  const [sessionSecondsLeft, setSessionSecondsLeft] = useState<number>(3600);
 
   // Books management state
   const [books, setBooks] = useState<AdminBookItem[]>([]);
@@ -279,7 +302,7 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       void loadBooks();
-      const [statsRes, usersRes, complaintsRes, devicesRes, settingsRes, annRes, logsRes] =
+      const [statsRes, usersRes, complaintsRes, devicesRes, settingsRes, annRes, logsRes, alertsRes] =
         await Promise.allSettled([
           adminApiGet<{ success: boolean; stats: AdminStats }>("/stats/", adminToken),
           adminApiGet<{ success: boolean; users: UserItem[] }>("/users/", adminToken),
@@ -288,6 +311,7 @@ export default function AdminDashboard() {
           adminApiGet<{ success: boolean; settings: PlatformSettings }>("/settings/", adminToken),
           adminApiGet<{ success: boolean; announcements: AnnouncementItem[] }>("/announcements/", adminToken),
           adminApiGet<{ success: boolean; logs: AuditLogItem[] }>("/logs/", adminToken),
+          adminApiGet<{ success: boolean; alerts: SecurityAlertItem[] }>("/security-alerts/", adminToken),
         ]);
 
       if (statsRes.status === "fulfilled" && statsRes.value.success) {
@@ -311,12 +335,15 @@ export default function AdminDashboard() {
       if (logsRes.status === "fulfilled" && logsRes.value.success) {
         setAuditLogs(logsRes.value.logs);
       }
+      if (alertsRes.status === "fulfilled" && alertsRes.value.success && Array.isArray(alertsRes.value.alerts)) {
+        setSecurityAlerts(alertsRes.value.alerts);
+      }
     } catch {
       notify("Ma'lumotlarni yuklashda xatolik", "error");
     } finally {
       setLoading(false);
     }
-  }, [adminToken]);
+  }, [adminToken, loadBooks]);
 
   const isSyncingRef = useRef(false);
 
@@ -325,12 +352,13 @@ export default function AdminDashboard() {
     if (!adminToken || isSyncingRef.current) return;
     isSyncingRef.current = true;
     try {
-      const [statsRes, usersRes, complaintsRes, devicesRes] =
+      const [statsRes, usersRes, complaintsRes, devicesRes, alertsRes] =
         await Promise.allSettled([
           adminApiGet<{ success: boolean; stats: AdminStats }>("/stats/", adminToken),
           adminApiGet<{ success: boolean; users: UserItem[] }>("/users/", adminToken),
           adminApiGet<{ success: boolean; complaints: ComplaintItem[] }>("/complaints/", adminToken),
           adminApiGet<{ success: boolean; devices: DeviceItem[] }>("/devices/", adminToken),
+          adminApiGet<{ success: boolean; alerts: SecurityAlertItem[] }>("/security-alerts/", adminToken),
         ]);
 
       if (statsRes.status === "fulfilled" && statsRes.value.success) {
@@ -344,6 +372,9 @@ export default function AdminDashboard() {
       }
       if (devicesRes.status === "fulfilled" && devicesRes.value.success) {
         setDevices(devicesRes.value.devices);
+      }
+      if (alertsRes.status === "fulfilled" && alertsRes.value.success && Array.isArray(alertsRes.value.alerts)) {
+        setSecurityAlerts(alertsRes.value.alerts);
       }
     } catch {
       /* silent background sync */
@@ -360,6 +391,34 @@ export default function AdminDashboard() {
     }
   }, [adminToken, loadData, silentSyncData]);
 
+  // 1-hour session auto-logout check (3600 seconds)
+  useEffect(() => {
+    if (!adminToken) return;
+
+    const checkSession = () => {
+      const loginTimeStr = localStorage.getItem("lingo_admin_login_time");
+      if (!loginTimeStr) {
+        localStorage.setItem("lingo_admin_login_time", String(Date.now()));
+        setSessionSecondsLeft(3600);
+        return;
+      }
+      const elapsedSeconds = Math.floor((Date.now() - Number(loginTimeStr)) / 1000);
+      const remaining = Math.max(0, 3600 - elapsedSeconds);
+      setSessionSecondsLeft(remaining);
+
+      if (remaining <= 0) {
+        localStorage.removeItem("lingo_admin_token");
+        localStorage.removeItem("lingo_admin_login_time");
+        setAdminToken(null);
+        notify("Admin seansi 1 soatdan so'ng xavfsizlik maqsadida yakunlandi. Iltimos, qayta kiring.", "error");
+      }
+    };
+
+    checkSession();
+    const timer = setInterval(checkSession, 1000);
+    return () => clearInterval(timer);
+  }, [adminToken]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
@@ -375,7 +434,9 @@ export default function AdminDashboard() {
 
       if (res.success && res.token) {
         localStorage.setItem("lingo_admin_token", res.token);
+        localStorage.setItem("lingo_admin_login_time", String(Date.now()));
         setAdminToken(res.token);
+        setSessionSecondsLeft(3600);
         if (res.csrfToken) {
           setCsrfData({ token: res.csrfToken, sig: res.urlSignature || "" });
           localStorage.setItem("lingo_admin_csrf", res.csrfToken);
@@ -390,7 +451,9 @@ export default function AdminDashboard() {
       if (username.trim() === "admin" && password === "admin123") {
         const fallbackToken = `admin-token-${Date.now()}`;
         localStorage.setItem("lingo_admin_token", fallbackToken);
+        localStorage.setItem("lingo_admin_login_time", String(Date.now()));
         setAdminToken(fallbackToken);
+        setSessionSecondsLeft(3600);
         updateEncryptedUrl("overview", csrfData.token || "sec", csrfData.sig || "gate");
         notify("Admin panelga muvaffaqiyatli kirdingiz!");
       } else {
@@ -404,8 +467,92 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("lingo_admin_token");
+    localStorage.removeItem("lingo_admin_login_time");
     setAdminToken(null);
     updateEncryptedUrl("auth-gate", csrfData.token, csrfData.sig);
+  };
+
+  const handleClearSecurityAlerts = async () => {
+    if (!adminToken) return;
+    try {
+      const res = await adminApiPost<{ success: boolean; message: string }>("/security-alerts/clear/", {}, adminToken);
+      if (res.success) {
+        setSecurityAlerts([]);
+        notify(res.message || "Barcha xavfsizlik ogohlantirishlari tozalandi");
+      }
+    } catch {
+      notify("Xatolik yuz berdi", "error");
+    }
+  };
+
+  const handleAddCurrentIp = async () => {
+    if (!adminToken) return;
+    try {
+      const res = await adminApiPost<{ success: boolean; message: string; trustedIps: string[] }>("/settings/add-current-ip/", {}, adminToken);
+      if (res.success) {
+        notify(res.message || "Joriy IP manzil qo'shildi");
+        if (res.trustedIps) {
+          setSettingsData((prev) => ({ ...prev, adminTrustedIps: res.trustedIps }));
+        }
+      }
+    } catch {
+      notify("Xatolik yuz berdi", "error");
+    }
+  };
+
+  const handleAddCustomIp = async () => {
+    if (!newTrustedIpInput.trim() || !adminToken) return;
+    const ip = newTrustedIpInput.trim();
+    const currentList = settingsData.adminTrustedIps || ["127.0.0.1", "::1", "localhost"];
+    if (currentList.includes(ip)) {
+      notify("Bu IP manzil allaqachon ro'yxatda mavjud", "error");
+      return;
+    }
+    const updatedIps = [...currentList, ip];
+    try {
+      const res = await adminApiPost<{ success: boolean; message: string }>("/settings/", {
+        adminTrustedIps: updatedIps,
+      }, adminToken);
+      if (res.success) {
+        setSettingsData((prev) => ({ ...prev, adminTrustedIps: updatedIps }));
+        setNewTrustedIpInput("");
+        notify(`IP ${ip} ishonchli ro'yxatga kiritildi`);
+      }
+    } catch {
+      notify("Xatolik yuz berdi", "error");
+    }
+  };
+
+  const handleRemoveTrustedIp = async (ipToRemove: string) => {
+    if (!adminToken) return;
+    const currentList = settingsData.adminTrustedIps || [];
+    const updatedIps = currentList.filter((ip) => ip !== ipToRemove);
+    try {
+      const res = await adminApiPost<{ success: boolean; message: string }>("/settings/", {
+        adminTrustedIps: updatedIps,
+      }, adminToken);
+      if (res.success) {
+        setSettingsData((prev) => ({ ...prev, adminTrustedIps: updatedIps }));
+        notify(`IP ${ipToRemove} ishonchli ro'yxatdan olib tashlandi`);
+      }
+    } catch {
+      notify("Xatolik yuz berdi", "error");
+    }
+  };
+
+  const handleSaveAlertEmail = async (email: string) => {
+    if (!adminToken) return;
+    try {
+      const res = await adminApiPost<{ success: boolean; message: string }>("/settings/", {
+        adminAlertEmail: email,
+      }, adminToken);
+      if (res.success) {
+        setSettingsData((prev) => ({ ...prev, adminAlertEmail: email }));
+        notify("Xavfsizlik ogohlantirish emaili saqlandi");
+      }
+    } catch {
+      notify("Xatolik yuz berdi", "error");
+    }
   };
 
   const handleUserAction = async (userId: string, action: string, extra?: Record<string, unknown>) => {
@@ -867,6 +1014,26 @@ export default function AdminDashboard() {
                   <History className="w-5 h-5 ml-1.5" />
                   <span>Audit Jurnali</span>
                 </button>
+
+                {/* Xavfsizlik & IP */}
+                <button
+                  onClick={() => setCurrentTab("security")}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all outline-none focus:outline-none ring-0 ${
+                    currentTab === "security"
+                      ? "text-white bg-gradient-to-r from-teal-500/25 via-cyan-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_20px_rgba(6,182,212,0.25)]"
+                      : "text-zinc-400 border border-transparent hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <Shield className="w-5 h-5 ml-1.5" />
+                    <span>Xavfsizlik & IP</span>
+                  </div>
+                  {securityAlerts.length > 0 && (
+                    <span className="rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 text-xs font-mono font-bold animate-pulse">
+                      {securityAlerts.length}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -897,11 +1064,25 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      {/* ── RIGHT MAIN PANEL (Huddi rasmdagidek) ─────────────────────────── */}
+      {/* ── RIGHT MAIN PANEL ────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto relative z-10">
 
-        {/* Top Bar (Uycha va Panel/Overview olib tashlandi) */}
-        <header className="px-5 py-3 flex items-center justify-end">
+        {/* Top Bar with 1-Hour Session Timer & Client IP */}
+        <header className="px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-xs font-mono shadow-[0_0_12px_rgba(6,182,212,0.15)]">
+              <Clock className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+              <span>
+                Seans: {Math.floor(sessionSecondsLeft / 60)}:{(sessionSecondsLeft % 60).toString().padStart(2, "0")}
+              </span>
+            </div>
+            {stats?.clientIp && (
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 text-zinc-300 text-xs font-mono">
+                <Laptop className="w-3.5 h-3.5 text-cyan-400" />
+                <span>IP: {stats.clientIp}</span>
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-xs font-mono text-zinc-300">
@@ -2398,6 +2579,274 @@ export default function AdminDashboard() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── SECURITY & IP MANAGEMENT TAB ──────────────────────────────── */}
+          {currentTab === "security" && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-black text-white flex items-center gap-3">
+                    <Shield className="h-6 w-6 text-cyan-400" />
+                    <span>Admin Xavfsizlik & IP Manzil Nazorati</span>
+                  </h2>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    Faqat sizning shaxsiy kompyuteringizdan kirish, 1 soatlik seans cheklovi va begona qurilmalarni zudlik bilan aniqlash
+                  </p>
+                </div>
+                {securityAlerts.length > 0 && (
+                  <button
+                    onClick={handleClearSecurityAlerts}
+                    className="flex items-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 px-4 py-2 text-xs font-bold transition-all shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Ogohlantirishlarni tozalash</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Status Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 1. 1-Hour Session Timer */}
+                <div className="rounded-2xl border border-white/10 bg-[#0c1322]/80 p-5 shadow-xl backdrop-blur-xl relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      1 Soatlik Seans
+                    </span>
+                    <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                  </div>
+                  <div className="text-3xl font-black font-mono text-white tracking-tight">
+                    {Math.floor(sessionSecondsLeft / 60)}:{(sessionSecondsLeft % 60).toString().padStart(2, "0")}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-2 leading-relaxed">
+                    Xavfsizlik maqsadida admin hisobi har 1 soatdan so'ng avtomatik tizimdan chiqariladi.
+                  </p>
+                  <div className="mt-3 w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-teal-400 to-cyan-500 h-full transition-all duration-1000"
+                      style={{ width: `${Math.min(100, Math.max(0, (sessionSecondsLeft / 3600) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Current Device IP */}
+                <div className="rounded-2xl border border-white/10 bg-[#0c1322]/80 p-5 shadow-xl backdrop-blur-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                      <Laptop className="w-4 h-4" />
+                      Joriy Kompyuteringiz
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                      Ulangan
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold font-mono text-emerald-300 truncate">
+                    {stats?.clientIp || "127.0.0.1"}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-2">
+                    Siz hozir ushbu IP orqali admin tizimidasiz.
+                  </p>
+                  <button
+                    onClick={handleAddCurrentIp}
+                    className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 py-2 text-xs font-bold transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Ishonchli ro'yxatga kiritish</span>
+                  </button>
+                </div>
+
+                {/* 3. Security Email Alert */}
+                <div className="rounded-2xl border border-white/10 bg-[#0c1322]/80 p-5 shadow-xl backdrop-blur-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                      <Mail className="w-4 h-4" />
+                      Email Xabarnoma
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+                      Aktiv
+                    </span>
+                  </div>
+                  <input
+                    type="email"
+                    value={settingsData.adminAlertEmail || ""}
+                    onChange={(e) => setSettingsData((prev) => ({ ...prev, adminAlertEmail: e.target.value }))}
+                    placeholder="email@example.com"
+                    className="w-full rounded-xl border border-white/10 bg-[#080d19] px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => handleSaveAlertEmail(settingsData.adminAlertEmail || "")}
+                    className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 py-2 text-xs font-bold transition-all"
+                  >
+                    <span>Emailni saqlash</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* IP Whitelist Management */}
+              <div className="rounded-3xl border border-white/10 bg-[#0c1322]/80 p-6 shadow-xl backdrop-blur-xl space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <Globe className="w-5 h-5 text-cyan-400" />
+                      <span>Ruxsat berilgan IP manzillar (Kompyuteringiz)</span>
+                    </h3>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Faqat shu ro'yxatdagi IP manzillardan admin panelga kirish mumkin. Begona IP darhol bloklanadi va emailingizga xabar ketadi.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    value={newTrustedIpInput}
+                    onChange={(e) => setNewTrustedIpInput(e.target.value)}
+                    placeholder="Yangi IP manzil kiriting (masalan: 192.168.1.100 yoki 84.54.80.*)..."
+                    className="flex-1 rounded-2xl border border-white/10 bg-[#080d19] px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-cyan-400 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleAddCustomIp}
+                    className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 px-6 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/20 hover:opacity-95 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>IP Qo'shish</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
+                  {(settingsData.adminTrustedIps || ["127.0.0.1", "::1", "localhost"]).map((ip) => {
+                    const isLocal = ip === "127.0.0.1" || ip === "::1" || ip === "localhost" || ip === "::ffff:127.0.0.1";
+                    const isCurrent = stats?.clientIp && (stats.clientIp === ip || stats.clientIp.replace(/^::ffff:/, "") === ip);
+                    return (
+                      <div
+                        key={ip}
+                        className="flex items-center justify-between p-3.5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/[0.08] transition-all"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-cyan-300 truncate">{ip}</span>
+                            {isCurrent && (
+                              <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 text-[9px] font-bold">
+                                SIZ
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-zinc-500">
+                            {isLocal ? "Lokal kompyuter" : "Ishonchli IP"}
+                          </span>
+                        </div>
+                        {!isLocal && (
+                          <button
+                            onClick={() => handleRemoveTrustedIp(ip)}
+                            className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                            title="O'chirish"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Security Intrusion Log */}
+              <div className="rounded-3xl border border-white/10 bg-[#0c1322]/80 p-6 shadow-xl backdrop-blur-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-rose-400" />
+                      <span>Begona Qurilmalardan Kirish Urinishlari</span>
+                    </h3>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Ruxsat etilmagan begona qurilmalardan admin panelga kirishga bo'lgan urinishlar avtomatik ushlanadi va bloklanadi
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-mono font-bold">
+                    {securityAlerts.length} ta urinish
+                  </span>
+                </div>
+
+                {securityAlerts.length === 0 ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-3 border border-white/5 rounded-2xl bg-white/[0.02]">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white">Hech qanday shubhali faoliyat yo'q</h4>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Begona qurilmalardan kirish urinishlari qayd etilmadi. Tizimingiz to'liq xavfsiz.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {securityAlerts.map((alert) => (
+                      <div
+                        key={alert.id}
+                        className="p-4 rounded-2xl border border-rose-500/30 bg-rose-500/[0.07] hover:bg-rose-500/[0.1] transition-all space-y-2.5"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-pulse"></span>
+                            <span className="font-mono text-sm font-bold text-rose-300">
+                              IP: {alert.ip}
+                            </span>
+                            <span className="rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 text-[10px] font-bold">
+                              BLOKLANDI & EMAILGA YUBORILDI
+                            </span>
+                          </div>
+                          <span className="text-xs text-zinc-400 font-mono">
+                            {new Date(alert.timestamp).toLocaleString("uz-UZ", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-zinc-300 space-y-1">
+                          <div>
+                            <span className="text-zinc-500">Qurilma / Brauzer: </span>
+                            <span className="font-mono text-zinc-200">{alert.userAgent}</span>
+                          </div>
+                          <div>
+                            <span className="text-zinc-500">Tafsilot: </span>
+                            <span className="text-zinc-300">{alert.details}</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-1 flex items-center justify-end">
+                          <button
+                            onClick={async () => {
+                              const updatedIps = Array.from(new Set([...(settingsData.adminTrustedIps || []), alert.ip]));
+                              try {
+                                await adminApiPost<{ success: boolean; message: string }>("/settings/", {
+                                  adminTrustedIps: updatedIps,
+                                }, adminToken);
+                                setSettingsData((prev) => ({ ...prev, adminTrustedIps: updatedIps }));
+                                notify(`IP ${alert.ip} ishonchli kompyuterlar ro'yxatiga qo'shildi`);
+                              } catch {
+                                notify("Xatolik yuz berdi", "error");
+                              }
+                            }}
+                            className="flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 px-3 py-1.5 text-xs font-semibold transition-all"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Bu mening qurilmam (Ruxsat berish)</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

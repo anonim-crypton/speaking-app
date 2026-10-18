@@ -3331,7 +3331,10 @@ export default function UserHome() {
         <div className="pt-2 mt-1 border-t border-white/[0.06]">
           <button
             type="button"
-            onClick={logout}
+            onClick={() => {
+              logout();
+              navigate("/");
+            }}
             className="w-full flex items-center justify-between rounded-2xl p-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all cursor-pointer group"
           >
             <div className="flex items-center gap-3.5">
@@ -5991,23 +5994,27 @@ export default function UserHome() {
                             void handleClubMemberAction(member.id, "toggle-mute")
                           }
                           className={cn(
-                            "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-bold transition-colors cursor-pointer",
+                            "inline-flex items-center gap-2 rounded-full border p-1 pr-3 text-xs font-bold transition-all cursor-pointer shadow-sm hover:scale-[1.02]",
                             member.mutedByAdmin
-                              ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
-                              : "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
+                              ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+                              : "border-amber-500/35 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
                           )}
                         >
-                          {member.mutedByAdmin ? (
-                            <>
+                          <span
+                            className={cn(
+                              "flex h-7 w-7 items-center justify-center rounded-full shadow-sm",
+                              member.mutedByAdmin
+                                ? "bg-emerald-500/30 text-emerald-300"
+                                : "bg-amber-500/30 text-amber-300"
+                            )}
+                          >
+                            {member.mutedByAdmin ? (
                               <Mic className="h-3.5 w-3.5" />
-                              <span>Mikrofonini yoqish</span>
-                            </>
-                          ) : (
-                            <>
+                            ) : (
                               <MicOff className="h-3.5 w-3.5" />
-                              <span>Mikrofonini yopib qo'yish</span>
-                            </>
-                          )}
+                            )}
+                          </span>
+                          <span>{member.mutedByAdmin ? "Yoqish" : "Mute"}</span>
                         </button>
 
                         <button
@@ -6015,10 +6022,12 @@ export default function UserHome() {
                           onClick={() =>
                             void handleClubMemberAction(member.id, "kick")
                           }
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-500/40 bg-red-500/15 hover:bg-red-500/25 px-2.5 py-1.5 text-[11px] font-bold text-red-300 transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-2 rounded-full border border-red-500/35 bg-red-500/10 p-1 pr-3 text-xs font-bold text-red-300 hover:bg-red-500/20 hover:scale-[1.02] transition-all cursor-pointer shadow-sm"
                         >
-                          <UserX className="h-3.5 w-3.5" />
-                          <span>Xonadan chiqarib yuborish</span>
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/30 text-red-300 shadow-sm">
+                            <UserX className="h-3.5 w-3.5" />
+                          </span>
+                          <span>Chetlatish</span>
                         </button>
                       </div>
                     )}
@@ -6029,140 +6038,149 @@ export default function UserHome() {
           </div>
         </div>
 
-        {/* ── 3. ENG PASDA: Mikrofon tugmasi, Chat tugmasi va Chatni tugatish tugmasi (Adminga ham, qo'shilgan foydalanuvchilarga ham ko'rinadi) ── */}
-        <div className="rounded-3xl border border-white/[0.1] bg-[#0b071b]/90 p-4 sm:p-5 shadow-[0_10px_40px_rgba(0,0,0,0.75)] backdrop-blur-2xl flex items-center justify-center gap-4 relative">
-          {/* 1. Mikrofon tugmasi */}
-          <button
-            type="button"
-            disabled={Boolean(meMemberObj?.mutedByAdmin)}
-            onClick={() => void handleToggleClubMic()}
-            className={cn(
-              "flex h-14 px-5 items-center justify-center gap-2 rounded-2xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-lg disabled:opacity-50 disabled:cursor-not-allowed",
-              clubMicMuted || meMemberObj?.mutedByAdmin
-                ? "border-red-500/40 bg-red-500/20 text-red-300 hover:bg-red-500/30"
-                : "border-violet-400/40 bg-gradient-to-b from-violet-600 to-indigo-600 text-white shadow-[0_0_25px_rgba(139,92,246,0.5)]"
-            )}
-          >
-            {clubMicMuted || meMemberObj?.mutedByAdmin ? (
-              <>
-                <MicOff className="h-5 w-5" />
-                <span>{meMemberObj?.mutedByAdmin ? "Admin yopgan" : "Mikrofon yopiq"}</span>
-              </>
-            ) : (
-              <>
-                <Mic className="h-5 w-5" />
-                <span>Mikrofon</span>
-              </>
-            )}
-          </button>
-
-          {/* 2. Chat tugmasi */}
-          <div className="relative">
+        {/* ── 3. ENG PASDA: Mikrofon, Chat va Chatni tugatish tugmalari (Pastki menubar uslubidagi dumaloq floating dock) ── */}
+        <div className="flex items-center justify-center pt-2 pb-1">
+          <div className="flex items-center gap-3 sm:gap-4 rounded-full border border-white/15 bg-[#0e0924]/90 p-2 sm:p-2.5 shadow-[0_12px_35px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl relative">
+            {/* 1. Mikrofon tugmasi */}
             <button
               type="button"
-              onClick={() => {
-                setClubChatOpen((o) => {
-                  const next = !o;
-                  if (next) setClubUnreadChat(0);
-                  return next;
-                });
-              }}
+              disabled={Boolean(meMemberObj?.mutedByAdmin)}
+              onClick={() => void handleToggleClubMic()}
+              title={meMemberObj?.mutedByAdmin ? "Admin yopgan" : clubMicMuted ? "Mikrofonni yoqish" : "Mikrofonni o'chirish"}
               className={cn(
-                "relative flex h-14 px-5 items-center justify-center gap-2 rounded-2xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-lg",
-                clubChatOpen
-                  ? "border-violet-400 bg-white/15 text-white"
-                  : "border-white/10 bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08] hover:text-white"
+                "relative group flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full transition-all cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed",
+                clubMicMuted || meMemberObj?.mutedByAdmin
+                  ? "border border-red-500/40 bg-red-500/20 text-red-300 hover:bg-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.25)]"
+                  : "border border-violet-400/40 bg-gradient-to-b from-violet-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.45)] hover:scale-105"
               )}
             >
-              <MessageSquare className="h-5 w-5" />
-              <span>Chat</span>
-              {clubUnreadChat > 0 && (
-                <span className="absolute -top-2 -right-2 flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-[11px] font-black text-white shadow-lg ring-2 ring-[#0b071b] animate-bounce">
-                  {clubUnreadChat > 99 ? "99+" : clubUnreadChat}
-                </span>
+              <span className="pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3 py-1 text-xs font-extrabold text-white shadow-xl backdrop-blur-2xl transition-all duration-200 z-50 opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0">
+                {meMemberObj?.mutedByAdmin ? "Admin yopgan" : clubMicMuted ? "Mikrofon yopiq" : "Mikrofon"}
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
+              </span>
+              {clubMicMuted || meMemberObj?.mutedByAdmin ? (
+                <MicOff className="h-5 w-5" />
+              ) : (
+                <Mic className="h-5 w-5" />
               )}
             </button>
 
-            {clubChatOpen && (
-              <div className="absolute bottom-[68px] left-1/2 -translate-x-1/2 z-50 w-[320px] sm:w-[380px] rounded-2xl border border-white/[0.12] bg-[#0e0924]/95 shadow-[0_10px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.03] px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-violet-400" />
-                    <span className="text-xs font-bold text-white">
-                      Xona chati ({activeClubRoom.name})
-                    </span>
+            {/* 2. Chat tugmasi */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setClubChatOpen((o) => {
+                    const next = !o;
+                    if (next) setClubUnreadChat(0);
+                    return next;
+                  });
+                }}
+                title="Chat"
+                className={cn(
+                  "relative group flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full transition-all cursor-pointer shadow-md",
+                  clubChatOpen
+                    ? "border border-violet-400/60 bg-white/20 text-white shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+                    : "border border-white/10 bg-white/[0.05] text-zinc-300 hover:text-white hover:bg-white/[0.1]"
+                )}
+              >
+                <span className="pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3 py-1 text-xs font-extrabold text-white shadow-xl backdrop-blur-2xl transition-all duration-200 z-50 opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0">
+                  Chat
+                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
+                </span>
+                <MessageSquare className="h-5 w-5" />
+                {clubUnreadChat > 0 && (
+                  <span className="absolute -top-1 -right-1 flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-[10px] font-black text-white shadow-lg ring-2 ring-[#0b071b] animate-bounce">
+                    {clubUnreadChat > 99 ? "99+" : clubUnreadChat}
+                  </span>
+                )}
+              </button>
+
+              {clubChatOpen && (
+                <div className="absolute bottom-[68px] left-1/2 -translate-x-1/2 z-50 w-[320px] sm:w-[380px] rounded-2xl border border-white/[0.12] bg-[#0e0924]/95 shadow-[0_10px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                  <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.03] px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-violet-400" />
+                      <span className="text-xs font-bold text-white">
+                        Xona chati ({activeClubRoom.name})
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setClubChatOpen(false)}
+                      className="text-zinc-400 hover:text-white cursor-pointer"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setClubChatOpen(false)}
-                    className="text-zinc-400 hover:text-white cursor-pointer"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
 
-                <div className="flex-1 max-h-[260px] min-h-[180px] overflow-y-auto p-3.5 space-y-2.5 text-xs">
-                  {!activeClubRoom.messages || activeClubRoom.messages.length === 0 ? (
-                    <p className="text-center text-[11px] text-zinc-500 py-6">
-                      Hali xabarlar yo'q. Birinchi bo'lib yozing!
-                    </p>
-                  ) : (
-                    activeClubRoom.messages.map((msg) => {
-                      const isMine = String(msg.senderId) === myId;
-                      return (
-                        <div
-                          key={msg.id}
-                          className={cn(
-                            "flex flex-col max-w-[85%] rounded-2xl px-3 py-2 leading-relaxed",
-                            isMine
-                              ? "ml-auto bg-violet-600 text-white rounded-br-none"
-                              : "mr-auto bg-white/10 text-zinc-100 rounded-bl-none"
-                          )}
-                        >
-                          <span className="text-[10px] font-semibold opacity-75 mb-0.5">
-                            {isMine ? "Siz" : `${msg.senderName} (@${msg.senderUsername})`}
-                          </span>
-                          <span className="break-words">{msg.text}</span>
-                        </div>
-                      );
-                    })
-                  )}
-                  <div ref={clubChatEndRef} />
-                </div>
+                  <div className="flex-1 max-h-[260px] min-h-[180px] overflow-y-auto p-3.5 space-y-2.5 text-xs">
+                    {!activeClubRoom.messages || activeClubRoom.messages.length === 0 ? (
+                      <p className="text-center text-[11px] text-zinc-500 py-6">
+                        Hali xabarlar yo'q. Birinchi bo'lib yozing!
+                      </p>
+                    ) : (
+                      activeClubRoom.messages.map((msg) => {
+                        const isMine = String(msg.senderId) === myId;
+                        return (
+                          <div
+                            key={msg.id}
+                            className={cn(
+                              "flex flex-col max-w-[85%] rounded-2xl px-3 py-2 leading-relaxed",
+                              isMine
+                                ? "ml-auto bg-violet-600 text-white rounded-br-none"
+                                : "mr-auto bg-white/10 text-zinc-100 rounded-bl-none"
+                            )}
+                          >
+                            <span className="text-[10px] font-semibold opacity-75 mb-0.5">
+                              {isMine ? "Siz" : `${msg.senderName} (@${msg.senderUsername})`}
+                            </span>
+                            <span className="break-words">{msg.text}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                    <div ref={clubChatEndRef} />
+                  </div>
 
-                <form
-                  onSubmit={handleSendClubMessage}
-                  className="flex items-center gap-2 border-t border-white/[0.08] p-2 bg-white/[0.02]"
-                >
-                  <input
-                    type="text"
-                    maxLength={300}
-                    placeholder="Xabar yozing..."
-                    value={clubChatInput}
-                    onChange={(e) => setClubChatInput(e.target.value)}
-                    className="flex-1 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!clubChatInput.trim()}
-                    className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 transition-colors cursor-pointer"
+                  <form
+                    onSubmit={handleSendClubMessage}
+                    className="flex items-center gap-2 border-t border-white/[0.08] p-2 bg-white/[0.02]"
                   >
-                    <Send className="h-3.5 w-3.5" />
-                  </button>
-                </form>
-              </div>
-            )}
+                    <input
+                      type="text"
+                      maxLength={300}
+                      placeholder="Xabar yozing..."
+                      value={clubChatInput}
+                      onChange={(e) => setClubChatInput(e.target.value)}
+                      className="flex-1 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!clubChatInput.trim()}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 transition-colors cursor-pointer"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
+                  </form>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Chatni tugatish tugmasi */}
+            <button
+              type="button"
+              onClick={() => void handleLeaveClubRoom()}
+              title="Chatni tugatish"
+              className="relative group flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-red-500/40 bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+            >
+              <span className="pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3 py-1 text-xs font-extrabold text-white shadow-xl backdrop-blur-2xl transition-all duration-200 z-50 opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0">
+                Chatni tugatish
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
+              </span>
+              <PhoneOff className="h-5 w-5" />
+            </button>
           </div>
-
-          {/* 3. Chatni tugatish tugmasi */}
-          <button
-            type="button"
-            onClick={() => void handleLeaveClubRoom()}
-            className="flex h-14 items-center gap-2 rounded-2xl border border-red-500/40 bg-gradient-to-r from-red-600 to-rose-700 px-5 text-xs sm:text-sm font-bold text-white shadow-[0_0_25px_rgba(239,68,68,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-          >
-            <PhoneOff className="h-5 w-5" />
-            <span>Chatni tugatish</span>
-          </button>
         </div>
       </div>
     );

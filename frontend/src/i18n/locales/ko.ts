@@ -28,11 +28,11 @@ const ko: Translation = {
   },
   mockup: {
     nav: {
-      home: "홈",
+      home: "스피킹",
       liveRooms: "라이브 룸",
       messages: "메시지",
-      community: "커뮤니티",
-      courses: "코스",
+      community: "친구들",
+      courses: "도서",
       progress: "내 진행 상황",
     },
     voiceChannels: "음성 채널",

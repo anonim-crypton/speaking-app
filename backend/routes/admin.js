@@ -2,6 +2,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 const supabase = require("../lib/supabase");
 
 const router = express.Router();
@@ -13,6 +14,7 @@ const COMPLAINTS_FILE = path.join(DATA_DIR, "complaints.json");
 const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 const ANNOUNCEMENTS_FILE = path.join(DATA_DIR, "announcements.json");
 const AUDIT_LOGS_FILE = path.join(DATA_DIR, "audit_logs.json");
+const SECURITY_ALERTS_FILE = path.join(DATA_DIR, "security_alerts.json");
 
 const DEFAULT_SETTINGS = {
   maintenanceMode: false,
@@ -22,6 +24,8 @@ const DEFAULT_SETTINGS = {
   allowGuestMatch: true,
   chatMessageFilter: true,
   platformNotice: "Lingo Speek platformasi barqaror ishlamoqda.",
+  adminTrustedIps: ["127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost"],
+  adminAlertEmail: process.env.ADMIN_ALERT_EMAIL || "dasturchi@gmail.com",
 };
 
 if (!fs.existsSync(DATA_DIR)) {
@@ -34,6 +38,7 @@ for (const [filePath, defVal] of [
   [COMPLAINTS_FILE, []],
   [ANNOUNCEMENTS_FILE, []],
   [AUDIT_LOGS_FILE, []],
+  [SECURITY_ALERTS_FILE, []],
   [SETTINGS_FILE, DEFAULT_SETTINGS],
 ]) {
   if (!fs.existsSync(filePath)) {
@@ -201,6 +206,158 @@ async function syncUsersFromSupabase() {
   }
 }
 
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.socket?.remoteAddress || req.ip || "127.0.0.1";
+}
+
+function isIpTrusted(ip, trustedList = []) {
+  if (!ip) return false;
+  const cleanIp = String(ip).replace(/^::ffff:/, "").trim();
+  // Localhost addresses are always trusted
+  if (cleanIp === "127.0.0.1" || cleanIp === "::1" || cleanIp === "localhost") {
+    return true;
+  }
+
+  for (const trusted of trustedList) {
+    if (!trusted) continue;
+    const cleanTrusted = String(trusted).replace(/^::ffff:/, "").trim();
+    if (cleanTrusted === cleanIp) return true;
+    if (cleanTrusted.endsWith("*") && cleanIp.startsWith(cleanTrusted.slice(0, -1))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function sendAdminSecurityAlert({ ip, userAgent, time, details }) {
+  const settings = readJson(SETTINGS_FILE, DEFAULT_SETTINGS);
+  const targetEmail = settings.adminAlertEmail || process.env.ADMIN_ALERT_EMAIL || "dasturchi@gmail.com";
+  const nowIso = time || new Date().toISOString();
+
+  // 1. Record alert in security_alerts.json for Admin Dashboard UI
+  const alerts = readJson(SECURITY_ALERTS_FILE, []);
+  const alertItem = {
+    id: "sec_" + crypto.randomBytes(5).toString("hex"),
+    type: "UNAUTHORIZED_ADMIN_ACCESS_ATTEMPT",
+    ip,
+    userAgent: userAgent || "Noma'lum qurilma",
+    timestamp: nowIso,
+    details: details || "Begona qurilma yoki ruxsat etilmagan IP manzil orqali kirish urinishi bloklandi.",
+    read: false,
+  };
+  alerts.unshift(alertItem);
+  writeJson(SECURITY_ALERTS_FILE, alerts.slice(0, 150));
+
+  // 2. Record audit log
+  logAdminAction(
+    "security_intrusion_blocked",
+    `Begona qurilmadan admin panelga kirish bloklandi. IP: ${ip}, Qurilma: ${userAgent || "Noma'lum"}`
+  );
+
+  // 3. Dispatch Email Alert
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: Boolean(process.env.SMTP_SECURE === "true"),
+      auth: {
+        user: process.env.SMTP_USER || process.env.EMAIL_USER,
+        pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
+
+    const mailOptions = {
+      from: `"Lingo Speek Xavfsizlik" <${process.env.SMTP_USER || "security@lingospeek.com"}>`,
+      to: targetEmail,
+      subject: "🚨 DIQQAT: Admin panelga begona qurilmadan kirishga urinish!",
+      html: `
+        <div style="font-family: Arial, sans-serif; background: #0b071b; color: #ffffff; padding: 25px; border-radius: 12px; max-width: 550px; border: 1px solid rgba(239,68,68,0.4);">
+          <h2 style="color: #ef4444; margin-top: 0;">🚨 Xavfsizlik Ogohlantirishi</h2>
+          <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6;">
+            Sizning <b>Lingo Speek Admin Panelingizga</b> begona va ruxsat berilmagan qurilmadan kirishga urinish qayd etildi va tizim tomonidan <b>bloklandi</b>!
+          </p>
+          <div style="background: rgba(255,255,255,0.06); padding: 15px; border-radius: 8px; margin: 18px 0; font-size: 13px; border-left: 4px solid #ef4444;">
+            <p style="margin: 5px 0;"><b>🌐 IP Manzil:</b> <span style="color: #f87171; font-family: monospace;">${ip}</span></p>
+            <p style="margin: 5px 0;"><b>📱 Qurilma / Brauzer:</b> <span style="color: #cbd5e1;">${userAgent || "Noma'lum"}</span></p>
+            <p style="margin: 5px 0;"><b>⏰ Vaqt:</b> <span style="color: #93c5fd;">${new Date().toLocaleString("uz-UZ", { timeZone: "Asia/Tashkent" })}</span></p>
+            <p style="margin: 5px 0;"><b>🛡️ Holati:</b> <span style="color: #34d399; font-weight: bold;">Bloklandi (Kirish rad etildi)</span></p>
+          </div>
+          <p style="color: #94a3b8; font-size: 12px;">
+            Agar bu siz bo'lmasangiz, darhol admin parolini tekshiring. Agar bu sizning yangi qurilmangiz bo'lsa, admin paneldan ushbu IP manzilni tasdiqlang.
+          </p>
+        </div>
+      `,
+    };
+
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      await transporter.sendMail(mailOptions);
+      console.log(`[SECURITY] Alert email sent successfully to ${targetEmail} for IP ${ip}`);
+    } else {
+      console.log(`[SECURITY ALERT LOGGED]: Unauthorized admin access attempt from IP: ${ip}, Device: ${userAgent}`);
+    }
+  } catch (err) {
+    console.error("[SECURITY] Email alert sending error:", err.message);
+  }
+}
+
+// Active admin sessions with 1-hour expiration
+const activeAdminSessions = new Map();
+const ADMIN_SESSION_DURATION = 3600 * 1000; // 1 hour (3600 seconds)
+
+function requireAdminAuth(req, res, next) {
+  const clientIp = getClientIp(req);
+  const settings = readJson(SETTINGS_FILE, DEFAULT_SETTINGS);
+  const trustedIps = settings.adminTrustedIps || ["127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost"];
+
+  // 1. IP Whitelist check
+  if (!isIpTrusted(clientIp, trustedIps)) {
+    void sendAdminSecurityAlert({
+      ip: clientIp,
+      userAgent: req.headers["user-agent"] || "Noma'lum",
+      time: new Date().toISOString(),
+      details: `Ruxsatsiz IP orqali admin so'rovi: ${req.method} ${req.originalUrl}`,
+    });
+    return res.status(403).json({
+      success: false,
+      code: "IP_BLOCKED",
+      message: "Begona qurilma yoki ruxsat etilmagan IP manzil orqali admin panelga kirish taqiqlangan! Xabarnoma admin emailiga yuborildi.",
+    });
+  }
+
+  // 2. Token & 1-hour expiration check
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim() || req.query.token;
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      code: "AUTH_REQUIRED",
+      message: "Admin autentifikatsiyasi talab etiladi",
+    });
+  }
+
+  const session = activeAdminSessions.get(token);
+  if (session) {
+    if (Date.now() > session.expiresAt) {
+      activeAdminSessions.delete(token);
+      return res.status(401).json({
+        success: false,
+        code: "ADMIN_SESSION_EXPIRED",
+        message: "Admin seansi 1 soatdan so'ng xavfsizlik maqsadida yakunlandi. Iltimos, qaytadan kiring.",
+      });
+    }
+  }
+
+  next();
+}
+
 router.get(["/csrf", "/csrf/"], (req, res) => {
   const sub = req.query.scope || "guest";
   return res.json({
@@ -209,17 +366,51 @@ router.get(["/csrf", "/csrf/"], (req, res) => {
   });
 });
 
-router.post(["/login", "/login/"], (req, res) => {
+router.post(["/login", "/login/"], async (req, res) => {
   const username = String(req.body?.username || "").trim();
   const password = String(req.body?.password || "").trim();
+  const clientIp = getClientIp(req);
+  const userAgent = req.headers["user-agent"] || "Noma'lum qurilma";
 
+  const settings = readJson(SETTINGS_FILE, DEFAULT_SETTINGS);
+  const trustedIps = settings.adminTrustedIps || ["127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost"];
+
+  // 1. Check if login attempt is from trusted IP/computer
+  if (!isIpTrusted(clientIp, trustedIps)) {
+    await sendAdminSecurityAlert({
+      ip: clientIp,
+      userAgent,
+      time: new Date().toISOString(),
+      details: `Begona qurilmadan admin login urinishi: login "${username}"`,
+    });
+    return res.status(403).json({
+      success: false,
+      code: "IP_BLOCKED",
+      message: "Faqat belgilangan kompyuterdan kirish mumkin! Begona qurilmadan kirishga urinish aniqlandi va xabarnoma admin emailiga yuborildi.",
+    });
+  }
+
+  // 2. Verify admin credentials
   if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
     const sec = generateCsrfAndSignature("session");
     const sessionToken = `adm_${sec.csrfToken}`;
-    logAdminAction("admin_login", "Admin tizimga muvaffaqiyatli kirdi");
+    const expiresAt = Date.now() + ADMIN_SESSION_DURATION;
+
+    activeAdminSessions.set(sessionToken, {
+      createdAt: Date.now(),
+      expiresAt,
+      ip: clientIp,
+      userAgent,
+    });
+
+    logAdminAction("admin_login", `Admin tizimga kirdi (IP: ${clientIp})`);
+
     return res.json({
       success: true,
       token: sessionToken,
+      expiresIn: 3600,
+      expiresAt,
+      clientIp,
       csrfToken: sec.csrfToken,
       urlSignature: sec.urlSignature,
       encryptedUrlHash: `token=${sessionToken.slice(0, 12)}...&sig=${sec.urlSignature}`,
@@ -235,6 +426,9 @@ router.post(["/login", "/login/"], (req, res) => {
     message: "Noto'g'ri login yoki parol",
   });
 });
+
+// Protect all remaining admin endpoints with IP whitelist & 1-hour session expiration
+router.use(requireAdminAuth);
 
 router.get(["/stats", "/stats/"], async (req, res) => {
   const users = await syncUsersFromSupabase();
@@ -313,6 +507,8 @@ router.get(["/stats", "/stats/"], async (req, res) => {
       providers,
       deviceChart,
       maintenanceMode: Boolean(settingsData.maintenanceMode),
+      securityAlertsCount: readJson(SECURITY_ALERTS_FILE, []).length,
+      clientIp: getClientIp(req),
     },
   });
 });
@@ -572,6 +768,35 @@ router.post(["/announcements", "/announcements/"], (req, res) => {
 router.get(["/logs", "/logs/"], (req, res) => {
   const logs = readJson(AUDIT_LOGS_FILE, []);
   return res.json({ success: true, logs });
+});
+
+router.get(["/security-alerts", "/security-alerts/"], (req, res) => {
+  const alerts = readJson(SECURITY_ALERTS_FILE, []);
+  return res.json({ success: true, alerts });
+});
+
+router.post(["/security-alerts/clear", "/security-alerts/clear/"], (req, res) => {
+  writeJson(SECURITY_ALERTS_FILE, []);
+  logAdminAction("security_alerts_cleared", "Xavfsizlik ogohlantirishlari ro'yxati tozalandi");
+  return res.json({ success: true, message: "Barcha xavfsizlik ogohlantirishlari tozalandi" });
+});
+
+router.post(["/settings/add-current-ip", "/settings/add-current-ip/"], (req, res) => {
+  const ip = getClientIp(req);
+  const s = readJson(SETTINGS_FILE, DEFAULT_SETTINGS);
+  if (!Array.isArray(s.adminTrustedIps)) {
+    s.adminTrustedIps = ["127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost"];
+  }
+  if (!s.adminTrustedIps.includes(ip)) {
+    s.adminTrustedIps.push(ip);
+  }
+  writeJson(SETTINGS_FILE, s);
+  logAdminAction("trusted_ip_added", `Joriy IP manzil (${ip}) ishonchli ro'yxatga kiritildi`);
+  return res.json({
+    success: true,
+    message: `IP ${ip} muvaffaqiyatli ishonchli kompyuterlar ro'yxatiga qo'shildi`,
+    trustedIps: s.adminTrustedIps,
+  });
 });
 
 module.exports = router;

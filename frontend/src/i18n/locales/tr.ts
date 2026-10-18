@@ -28,11 +28,11 @@ const tr: Translation = {
   },
   mockup: {
     nav: {
-      home: "Ana Sayfa",
+      home: "Speaking",
       liveRooms: "Canlı Odalar",
       messages: "Mesajlar",
-      community: "Topluluk",
-      courses: "Kurslar",
+      community: "Arkadaşlar",
+      courses: "Kitaplar",
       progress: "İlerlemem",
     },
     voiceChannels: "Ses Kanalları",

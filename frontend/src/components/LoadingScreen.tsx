@@ -121,11 +121,6 @@ export default function LoadingScreen({ visible, label = "Loading" }: LoadingScr
       <p className="relative mt-5 text-lg font-extrabold tracking-tight text-foreground">
         {BRAND}
       </p>
-
-      {/* indeterminate progress hint — the loader stays until the network settles */}
-      <div className="relative mt-4 h-1 w-40 overflow-hidden rounded-full bg-white/10">
-        <span className="block h-full w-1/3 animate-loading-bar rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-400" />
-      </div>
     </div>
   );
 }
