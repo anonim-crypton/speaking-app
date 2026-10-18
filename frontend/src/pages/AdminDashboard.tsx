@@ -36,8 +36,9 @@ import {
   Laptop,
   Globe,
   Sparkles,
+  Minus,
 } from "lucide-react";
-import { adminApiGet, adminApiPost, API_BASE } from "@/lib/api";
+import { adminApiGet, adminApiPost, adminApiDelete, API_BASE } from "@/lib/api";
 import { resolveAvatarUrl } from "@/components/SpeakerAvatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { ChartAreaInteractive } from "@/components/ChartAreaInteractive";
@@ -730,6 +731,41 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleUpdateDiamondSetting = async (
+    key: "dailyRewardDiamonds" | "defaultSignupDiamonds",
+    val: number
+  ) => {
+    const nextVal = Math.max(0, Math.floor(val));
+    setSettingsData((prev) => ({ ...prev, [key]: nextVal }));
+    try {
+      const res = await adminApiPost<{ success: boolean; message: string }>("/settings/", {
+        [key]: nextVal,
+      }, adminToken);
+      if (res.success) {
+        notify(
+          key === "dailyRewardDiamonds"
+            ? `Kunlik olmos miqdori ${nextVal} ta qilib belgilandi`
+            : `Ro'yxatdan o'tgandagi olmos ${nextVal} ta qilib belgilandi`
+        );
+      }
+    } catch {
+      notify("Sozlamani saqlashda xatolik", "error");
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!window.confirm("Rostdan ham ushbu e'lonni o'chirmoqchimisiz?")) return;
+    try {
+      const res = await adminApiDelete<{ success: boolean; message: string }>(`/announcements/${id}/`, adminToken);
+      if (res.success) {
+        notify("E'lon o'chirildi");
+        setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      }
+    } catch {
+      notify("E'lonni o'chirishda xatolik", "error");
+    }
+  };
+
   const filteredUsers = useMemo(() => {
     if (!userSearch.trim()) return users;
     const q = userSearch.toLowerCase();
@@ -1105,7 +1141,7 @@ export default function AdminDashboard() {
 
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 py-3 text-sm font-semibold shadow-[0_0_15px_rgba(244,63,94,0.15)] transition-all"
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white py-3 text-sm font-bold shadow-lg shadow-rose-500/25 transition-all cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
             <span>Chiqish</span>
@@ -1352,7 +1388,7 @@ export default function AdminDashboard() {
                                         <button
                                           type="button"
                                           onClick={() => handleUserAction(u.id, "ban")}
-                                          className="rounded-xl border border-rose-500/40 bg-rose-500/15 px-3.5 py-2 text-xs font-bold text-rose-300 hover:bg-rose-500/25 transition-all outline-none focus:outline-none"
+                                          className="rounded-2xl bg-rose-500 hover:bg-rose-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-rose-500/20 transition-all outline-none focus:outline-none cursor-pointer"
                                         >
                                           Foydalanuvchini Bloklash
                                         </button>
@@ -1364,7 +1400,7 @@ export default function AdminDashboard() {
                                             handleUserAction(u.id, "delete");
                                           }
                                         }}
-                                        className="rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 px-3.5 py-2 text-xs font-bold text-rose-300 transition-all outline-none focus:outline-none"
+                                        className="rounded-2xl bg-rose-500 hover:bg-rose-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-rose-500/20 transition-all outline-none focus:outline-none cursor-pointer"
                                       >
                                         O'chirish (Supabase)
                                       </button>
@@ -1427,7 +1463,7 @@ export default function AdminDashboard() {
                                             handleUserAction(u.id, "revoke_diamonds", { amount: amt });
                                             setGiftDiamondsMap({ ...giftDiamondsMap, [u.id]: "" });
                                           }}
-                                          className="flex-1 py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/15 text-rose-300 font-bold text-xs hover:bg-rose-500/25 transition-all outline-none focus:outline-none"
+                                          className="flex-1 py-2.5 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-md shadow-rose-500/20 transition-all outline-none focus:outline-none cursor-pointer"
                                         >
                                           ⟲ Qaytarib Olish
                                         </button>
@@ -1633,7 +1669,7 @@ export default function AdminDashboard() {
                                                     <button
                                                       type="button"
                                                       onClick={() => handleDeviceAction(d.id, "block")}
-                                                      className="rounded-lg border border-rose-500/40 bg-rose-500/15 hover:bg-rose-500/25 px-2.5 py-1 text-xs font-bold text-rose-300 transition-all outline-none focus:outline-none"
+                                                      className="rounded-2xl bg-rose-500 hover:bg-rose-600 px-3 py-1 text-xs font-bold text-white shadow-md shadow-rose-500/20 transition-all outline-none focus:outline-none cursor-pointer"
                                                     >
                                                       Bloklash
                                                     </button>
@@ -1911,7 +1947,7 @@ export default function AdminDashboard() {
                               <button
                                 type="button"
                                 onClick={() => void handleDeleteBook(b.id)}
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/35 bg-rose-500/15 hover:bg-rose-500/25 px-3 py-2 text-xs font-bold text-rose-300 transition-all cursor-pointer"
+                                className="inline-flex items-center gap-1.5 rounded-2xl bg-rose-500 hover:bg-rose-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-rose-500/20 transition-all cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 <span>O'chirish</span>
@@ -2419,7 +2455,7 @@ export default function AdminDashboard() {
                                 <button
                                   type="button"
                                   onClick={() => handleDeviceAction(d.id, "block")}
-                                  className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/25 transition-all outline-none focus:outline-none"
+                                  className="rounded-2xl bg-rose-500 hover:bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-rose-500/20 transition-all outline-none focus:outline-none cursor-pointer"
                                 >
                                   Bloklash
                                 </button>
@@ -2446,9 +2482,9 @@ export default function AdminDashboard() {
           {/* TIZIM SOZLAMALARI TAB */}
           {currentTab === "settings" && (
             <div className="space-y-6 animate-in fade-in duration-200 max-w-2xl">
-              <div className="rounded-3xl border border-white/10 bg-[#0d1527]/90 p-6 md:p-8 shadow-2xl backdrop-blur-2xl">
+              <div className="rounded-3xl border border-white/10 bg-[#0d1527]/90 p-6 md:p-8 shadow-2xl backdrop-blur-2xl space-y-6">
                 {/* Header */}
-                <div className="flex items-center gap-3 pb-5 mb-6 border-b border-white/10">
+                <div className="flex items-center gap-3 pb-5 border-b border-white/10">
                   <div className="h-10 w-10 rounded-2xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-400 flex items-center justify-center shrink-0">
                     <Settings className="w-5 h-5" />
                   </div>
@@ -2457,16 +2493,16 @@ export default function AdminDashboard() {
                       Tizim Sozlamalari
                     </h2>
                     <p className="text-xs text-zinc-400 mt-0.5">
-                      Platforma va premium funksiyalarini boshqarish
+                      Platforma, olmoslar va premium funksiyalarini boshqarish
                     </p>
                   </div>
                 </div>
 
-                {/* iOS Style Row matching screenshot */}
-                <div className="border-b border-white/10 pb-4">
+                {/* 1. iOS Style Row matching screenshot: Premuimni yoqish o'chirish */}
+                <div className="border-b border-white/10 pb-6">
                   <div className="flex items-center justify-between py-2">
-                    <div className="flex flex-col">
-                      <span className="text-base font-medium text-white">
+                    <div className="flex flex-col pr-4">
+                      <span className="text-base font-semibold text-white">
                         Premuimni yoqish o'chirish
                       </span>
                       <span className="text-xs text-zinc-400 mt-0.5">
@@ -2494,51 +2530,287 @@ export default function AdminDashboard() {
                     </button>
                   </div>
                 </div>
+
+                {/* 2. Kunlik olmos (Har bir foydalanuvchiga kunlik beriladigan olmos) */}
+                <div className="border-b border-white/10 pb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2">
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <Gem className="w-4 h-4 text-emerald-400" />
+                        <span className="text-base font-semibold text-white">
+                          Kunlik olmos miqdori
+                        </span>
+                      </div>
+                      <span className="text-xs text-zinc-400 mt-0.5">
+                        Har bir foydalanuvchiga 24 soatda 1 marta beriladigan kunlik bepul olmos soni
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateDiamondSetting(
+                            "dailyRewardDiamonds",
+                            Math.max(0, (Number(settingsData.dailyRewardDiamonds) || 0) - 1)
+                          )
+                        }
+                        className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-all cursor-pointer font-bold"
+                        title="1 taga kamaytirish"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+
+                      <input
+                        type="number"
+                        min="0"
+                        max="10000"
+                        value={settingsData.dailyRewardDiamonds ?? 5}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          setSettingsData((prev) => ({
+                            ...prev,
+                            dailyRewardDiamonds: isNaN(v) ? 0 : v,
+                          }));
+                        }}
+                        onBlur={() =>
+                          handleUpdateDiamondSetting(
+                            "dailyRewardDiamonds",
+                            settingsData.dailyRewardDiamonds ?? 5
+                          )
+                        }
+                        className="w-16 h-9 rounded-xl border border-emerald-500/30 bg-[#070b14] px-2 text-center text-sm font-bold text-emerald-300 focus:border-emerald-500 focus:outline-none"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateDiamondSetting(
+                            "dailyRewardDiamonds",
+                            (Number(settingsData.dailyRewardDiamonds) || 0) + 1
+                          )
+                        }
+                        className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-all cursor-pointer font-bold"
+                        title="1 taga ko'paytirish"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Ro'yxatdan o'tgandagi sovg'a olmos */}
+                <div className="pb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2">
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-violet-400" />
+                        <span className="text-base font-semibold text-white">
+                          Ro'yxatdan o'tgandagi sovg'a olmos
+                        </span>
+                      </div>
+                      <span className="text-xs text-zinc-400 mt-0.5">
+                        Yangi foydalanuvchi ro'yxatdan o'tganda yoki onboarding sovg'asi sifatida beriladigan olmos soni
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateDiamondSetting(
+                            "defaultSignupDiamonds",
+                            Math.max(0, (Number(settingsData.defaultSignupDiamonds) || 0) - 5)
+                          )
+                        }
+                        className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-all cursor-pointer font-bold"
+                        title="5 taga kamaytirish"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+
+                      <input
+                        type="number"
+                        min="0"
+                        max="100000"
+                        value={settingsData.defaultSignupDiamonds ?? 50}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          setSettingsData((prev) => ({
+                            ...prev,
+                            defaultSignupDiamonds: isNaN(v) ? 0 : v,
+                          }));
+                        }}
+                        onBlur={() =>
+                          handleUpdateDiamondSetting(
+                            "defaultSignupDiamonds",
+                            settingsData.defaultSignupDiamonds ?? 50
+                          )
+                        }
+                        className="w-16 h-9 rounded-xl border border-violet-500/30 bg-[#070b14] px-2 text-center text-sm font-bold text-violet-300 focus:border-violet-500 focus:outline-none"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateDiamondSetting(
+                            "defaultSignupDiamonds",
+                            (Number(settingsData.defaultSignupDiamonds) || 0) + 5
+                          )
+                        }
+                        className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-all cursor-pointer font-bold"
+                        title="5 taga ko'paytirish"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           {/* ANNOUNCEMENTS TAB */}
           {currentTab === "announcements" && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2.5">
-                    <Bell className="h-5 w-5 text-violet-400" />
-                    <span>Foydalanuvchilarga E'lon Tarqatish</span>
-                  </h2>
-                  <p className="text-sm text-zinc-400 mt-1">
-                    Barcha foydalanuvchilar ekranida ko'rsatiladigan bildirishnomalar
-                  </p>
+            <div className="space-y-6 animate-in fade-in duration-200 max-w-4xl">
+              {/* 1. Yangi E'lon Yuborish Formasi */}
+              <div className="rounded-3xl border border-white/10 bg-[#0d1527]/90 p-6 md:p-8 shadow-2xl backdrop-blur-2xl">
+                <div className="flex items-center gap-3 pb-5 mb-6 border-b border-white/10">
+                  <div className="h-10 w-10 rounded-2xl bg-violet-500/15 border border-violet-400/30 text-violet-400 flex items-center justify-center shrink-0">
+                    <Bell className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-white">
+                      Foydalanuvchilarga Yangi E'lon Yuborish
+                    </h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Barcha foydalanuvchilar navbari bildirishnomalarida ko'rsatiladigan e'lon
+                    </p>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setShowAnnounceModal(true)}
-                  className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-600/20 hover:bg-violet-500 transition-all flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Yangi E'lon Yaratish</span>
-                </button>
+
+                <form onSubmit={handleCreateAnnouncement} className="space-y-5">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-300 mb-2 uppercase tracking-wider">
+                      E'lonning asosiy nomi (Sarlavha) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Masalan: Yangi audio mashg'ulotlar va foydali kitoblar qo'shildi!"
+                      value={newAnnouncement.title}
+                      onChange={(e) =>
+                        setNewAnnouncement({ ...newAnnouncement, title: e.target.value })
+                      }
+                      className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-violet-500/80 focus:bg-white/[0.07] focus:outline-none transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-300 mb-2 uppercase tracking-wider">
+                      E'lonning asosiy maqsadi va tavsifi *
+                    </label>
+                    <textarea
+                      required
+                      rows={4}
+                      placeholder="E'lonning to'liq maqsadi, yangiliklari va foydalanuvchilar uchun tavsifi..."
+                      value={newAnnouncement.body}
+                      onChange={(e) =>
+                        setNewAnnouncement({ ...newAnnouncement, body: e.target.value })
+                      }
+                      className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-zinc-500 focus:border-violet-500/80 focus:bg-white/[0.07] focus:outline-none transition-all resize-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-zinc-400">Darajasi:</span>
+                      <select
+                        value={newAnnouncement.priority}
+                        onChange={(e) =>
+                          setNewAnnouncement({ ...newAnnouncement, priority: e.target.value })
+                        }
+                        className="rounded-xl border border-white/10 bg-[#080514] px-3 py-1.5 text-xs text-white focus:outline-none"
+                      >
+                        <option value="info">Ma'lumot (Oddiy)</option>
+                        <option value="important">Muhim yangilik</option>
+                        <option value="urgent">Shoshilinch</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-indigo-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-violet-600/30 transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>E'lon yuborish</span>
+                    </button>
+                  </div>
+                </form>
               </div>
 
-              {announcements.length === 0 ? (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-16 text-center text-zinc-500 text-sm">
-                  Hozircha hech qanday e'lon tarqatilmagan.
+              {/* 2. Tarqatilgan E'lonlar Ro'yxati */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                    <History className="w-4 h-4 text-violet-400" />
+                    <span>Yuborilgan E'lonlar Tarixi ({announcements.length} ta)</span>
+                  </h3>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {announcements.map((a) => (
-                    <div key={a.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold text-white">{a.title}</span>
-                        <span className="text-xs text-zinc-400 font-mono">
-                          {new Date(a.createdAt).toLocaleString()}
-                        </span>
+
+                {announcements.length === 0 ? (
+                  <div className="rounded-3xl border border-white/10 bg-[#0d1527]/70 p-12 text-center text-zinc-400 text-sm">
+                    Hozircha hech qanday e'lon tarqatilmagan.
+                  </div>
+                ) : (
+                  <div className="grid gap-3.5">
+                    {announcements.map((a) => (
+                      <div
+                        key={a.id}
+                        className="rounded-2xl border border-white/10 bg-[#0d1527]/80 p-5 shadow-lg backdrop-blur-xl flex flex-col sm:flex-row sm:items-start justify-between gap-4"
+                      >
+                        <div className="space-y-1.5 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-white">{a.title}</span>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                a.priority === "urgent"
+                                  ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                                  : a.priority === "important"
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                  : "bg-violet-500/20 text-violet-300 border border-violet-500/40"
+                              }`}
+                            >
+                              {a.priority === "urgent"
+                                ? "Shoshilinch"
+                                : a.priority === "important"
+                                ? "Muhim"
+                                : "Oddiy"}
+                            </span>
+                            <span className="text-[11px] text-zinc-400 font-mono">
+                              {new Date(a.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                            {a.body}
+                          </p>
+                        </div>
+
+                        {/* Solid vibrant red delete button matching requested spec */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAnnouncement(a.id)}
+                          className="self-end sm:self-center shrink-0 rounded-2xl bg-rose-500 hover:bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-rose-500/25 transition-all flex items-center gap-1.5 cursor-pointer"
+                          title="E'lonni o'chirish"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>O'chirish</span>
+                        </button>
                       </div>
-                      <p className="text-sm text-zinc-300 leading-relaxed">{a.body}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -2607,7 +2879,7 @@ export default function AdminDashboard() {
                 {securityAlerts.length > 0 && (
                   <button
                     onClick={handleClearSecurityAlerts}
-                    className="flex items-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 px-4 py-2 text-xs font-bold transition-all shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+                    className="flex items-center gap-2 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 text-xs font-bold transition-all shadow-md shadow-rose-500/25 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Ogohlantirishlarni tozalash</span>
@@ -2896,7 +3168,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-end gap-3 pt-3">
               <button
                 onClick={() => setDiamondModalUser(null)}
-                className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm text-zinc-400 hover:text-white"
+                className="rounded-2xl bg-rose-500 hover:bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-rose-500/20 transition-all cursor-pointer"
               >
                 Bekor qilish
               </button>
@@ -2955,7 +3227,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowAnnounceModal(false)}
-                  className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm text-zinc-400 hover:text-white"
+                  className="rounded-2xl bg-rose-500 hover:bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-md shadow-rose-500/20 transition-all cursor-pointer"
                 >
                   Bekor qilish
                 </button>

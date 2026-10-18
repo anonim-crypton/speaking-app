@@ -13,6 +13,26 @@ const { saveAvatarFile } = require("../utils/avatarStorage");
 
 const router = express.Router();
 
+const SETTINGS_FILE = path.join(__dirname, "..", "data", "settings.json");
+
+function getPlatformSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
+      return {
+        defaultSignupDiamonds: Number(parsed.defaultSignupDiamonds) || 50,
+        dailyRewardDiamonds: Number(parsed.dailyRewardDiamonds) || 5,
+      };
+    }
+  } catch (e) {
+    console.warn("Failed to read settings.json:", e);
+  }
+  return {
+    defaultSignupDiamonds: 50,
+    dailyRewardDiamonds: 5,
+  };
+}
+
 /** Countries that sign up with a phone number only by default (Uzbekistan). */
 const PHONE_REGIONS = new Set(["UZ"]);
 
@@ -648,7 +668,7 @@ router.get("/me", authRequired, async (req, res) => {
   res.json({ success: true, user: publicUser(currentUser), sid: req.sid || null });
 });
 
-/* ─────────────────────────────── Onboarding +10 Diamonds Bonus ──────── */
+/* ─────────────────────────────── Onboarding Diamonds Bonus ──────── */
 router.post("/claim-onboarding-bonus", authRequired, async (req, res) => {
   try {
     const user = store.findById(req.user.id) || req.user;
@@ -660,12 +680,14 @@ router.post("/claim-onboarding-bonus", authRequired, async (req, res) => {
         user: publicUser(user),
       });
     }
-    const newDiamonds = Number(user.diamonds || 0) + 10;
+    const { defaultSignupDiamonds } = getPlatformSettings();
+    const bonusAmount = Number(defaultSignupDiamonds) || 50;
+    const newDiamonds = Number(user.diamonds || 0) + bonusAmount;
     const history = Array.isArray(user.diamondHistory) ? [...user.diamondHistory] : [];
     history.unshift({
       id: "gift_onb_" + Date.now(),
-      amount: 10,
-      reason: "Ro'yxatdan o'tish va savollarga javob berish mukofoti (+10 Olmos)",
+      amount: bonusAmount,
+      reason: `Ro'yxatdan o'tish va savollarga javob berish mukofoti (+${bonusAmount} Olmos)`,
       createdAt: new Date().toISOString(),
     });
     const updated = store.updateUser(user.id, {
@@ -678,7 +700,7 @@ router.post("/claim-onboarding-bonus", authRequired, async (req, res) => {
       success: true,
       diamonds: newDiamonds,
       user: publicUser(updated || user),
-      message: "Tabriklaymiz! Sizga 10 ta olmos taqdim etildi!",
+      message: `Tabriklaymiz! Sizga ${bonusAmount} ta olmos taqdim etildi!`,
     });
   } catch (err) {
     console.error("Claim onboarding bonus error:", err);
@@ -686,7 +708,7 @@ router.post("/claim-onboarding-bonus", authRequired, async (req, res) => {
   }
 });
 
-/* ─────────────────────────────── Daily +5 Diamonds Reward (24h) ─────── */
+/* ─────────────────────────────── Daily Diamonds Reward (24h) ─────── */
 router.post("/claim-daily", authRequired, async (req, res) => {
   try {
     const user = store.findById(req.user.id) || req.user;
@@ -708,13 +730,15 @@ router.post("/claim-daily", authRequired, async (req, res) => {
       }
     }
 
+    const { dailyRewardDiamonds } = getPlatformSettings();
+    const rewardAmount = Number(dailyRewardDiamonds) || 5;
     const nowIso = new Date(now).toISOString();
-    const newDiamonds = Number(user.diamonds || 0) + 5;
+    const newDiamonds = Number(user.diamonds || 0) + rewardAmount;
     const history = Array.isArray(user.diamondHistory) ? [...user.diamondHistory] : [];
     history.unshift({
       id: "daily_" + now,
-      amount: 5,
-      reason: "Kunlik olmos mukofoti (+5 Olmos)",
+      amount: rewardAmount,
+      reason: `Kunlik olmos mukofoti (+${rewardAmount} Olmos)`,
       createdAt: nowIso,
     });
 
@@ -731,7 +755,7 @@ router.post("/claim-daily", authRequired, async (req, res) => {
       lastDailyClaimAt: nowIso,
       nextClaimAt: new Date(now + COOLDOWN_MS).toISOString(),
       user: publicUser(updated || user),
-      message: "5 ta kunlik olmos hisobingizga qo'shildi!",
+      message: `${rewardAmount} ta kunlik olmos hisobingizga qo'shildi!`,
     });
   } catch (err) {
     console.error("Claim daily diamonds error:", err);

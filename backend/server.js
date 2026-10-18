@@ -79,6 +79,23 @@ app.use("/api/social", socialRoutes);
 app.use("/api/clubs", clubsRoutes);
 app.use("/api/admin", adminRoutes);
 
+// Public announcements for all users
+const ANNOUNCEMENTS_FILE = path.join(__dirname, "data", "announcements.json");
+app.get(["/api/announcements", "/api/announcements/"], (req, res) => {
+  try {
+    if (fs.existsSync(ANNOUNCEMENTS_FILE)) {
+      const items = JSON.parse(fs.readFileSync(ANNOUNCEMENTS_FILE, "utf8"));
+      return res.json({
+        success: true,
+        announcements: Array.isArray(items) ? items.filter((a) => a.active !== false) : [],
+      });
+    }
+  } catch (e) {
+    console.warn("Failed to read announcements:", e);
+  }
+  return res.json({ success: true, announcements: [] });
+});
+
 // Profile update aliases
 app.all(
   ["/api/profile", "/api/profile/", "/api/user/profile", "/api/user/profile/"],

@@ -140,3 +140,16 @@ export async function adminApiPost<T>(
   return handle<T>(res);
 }
 
+export async function adminApiDelete<T>(
+  endpoint: string,
+  token?: string | null
+): Promise<T> {
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const url = `${DJANGO_BASE}${cleanEndpoint}`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return handle<T>(res);
+}
+

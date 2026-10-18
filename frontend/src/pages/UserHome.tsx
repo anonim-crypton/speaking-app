@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Bell,
@@ -83,6 +83,7 @@ import VipUserCard from "@/components/VipUserCard";
 import AiLoader from "@/components/ui/ai-loader";
 import CalendarCapacityPicker from "@/components/CalendarCapacityPicker";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { API_BASE } from "@/lib/api";
 import {
@@ -354,6 +355,45 @@ export default function UserHome() {
   const [messagesModalOpen, setMessagesModalOpen] = useState(false);
   const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
 
+  // Announcements (Admin E'lonlari) State
+  const [announcements, setAnnouncements] = useState<
+    Array<{ id: string; title: string; body: string; priority?: string; createdAt: string; active?: boolean }>
+  >([]);
+  const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("lingo_read_announcements") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/announcements`);
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.announcements)) {
+        setAnnouncements(data.announcements);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch announcements:", e);
+    }
+  }, []);
+
+  const unreadAnnouncementsCount = useMemo(() => {
+    return announcements.filter((a) => !readAnnouncementIds.includes(a.id)).length;
+  }, [announcements, readAnnouncementIds]);
+
+  const handleOpenNotificationsModal = () => {
+    setNotificationsModalOpen(true);
+    if (announcements.length > 0) {
+      const allIds = announcements.map((a) => a.id);
+      setReadAnnouncementIds(allIds);
+      try {
+        localStorage.setItem("lingo_read_announcements", JSON.stringify(allIds));
+      } catch {}
+    }
+  };
+
   // Admin <-> User Messages State
   const [adminMessages, setAdminMessages] = useState<
     Array<{ id: string; text: string; sender: string; isAdmin: boolean; createdAt: string; read?: boolean }>
@@ -381,9 +421,13 @@ export default function UserHome() {
 
   useEffect(() => {
     fetchAdminMessages();
-    const interval = setInterval(fetchAdminMessages, 2000);
+    fetchAnnouncements();
+    const interval = setInterval(() => {
+      fetchAdminMessages();
+      fetchAnnouncements();
+    }, 4000);
     return () => clearInterval(interval);
-  }, [token]);
+  }, [token, fetchAnnouncements]);
 
   const handleOpenMessagesModal = () => {
     setMessagesModalOpen(true);
@@ -6050,12 +6094,12 @@ export default function UserHome() {
                           onClick={() =>
                             void handleClubMemberAction(member.id, "kick")
                           }
-                          className="inline-flex items-center gap-2 rounded-full border border-red-500/35 bg-red-500/10 p-1 pr-3 text-xs font-bold text-red-300 hover:bg-red-500/20 hover:scale-[1.02] transition-all cursor-pointer shadow-sm"
+                          className="inline-flex items-center gap-2 rounded-full bg-rose-500 hover:bg-rose-600 p-1 pr-3 text-xs font-bold text-white shadow-md shadow-rose-500/25 hover:scale-[1.02] transition-all cursor-pointer"
                         >
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/30 text-red-300 shadow-sm">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white shadow-sm">
                             <UserX className="h-3.5 w-3.5" />
                           </span>
-                          <span>Chetlatish</span>
+                          <span>Chiqarish</span>
                         </button>
                       </div>
                     )}
@@ -6283,33 +6327,39 @@ export default function UserHome() {
                 <LanguageSwitcher />
               </div>
 
-              {/* Xabarlar tugmasi (Account avatar o'rniga navbar yonida) */}
-              <button
+              {/* Xabarlar tugmasi (shadcn Button + Badge) */}
+              <Button
+                size="icon"
+                variant="outline"
                 type="button"
                 onClick={handleOpenMessagesModal}
-                className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04] text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer"
+                className="relative rounded-full h-9 w-9 border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]"
                 title="Xabarlar"
               >
                 <MessageSquare className="h-4 w-4" />
-                {unreadAdminCount > 0 ? (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white shadow-lg ring-2 ring-[#080514] animate-bounce">
+                {unreadAdminCount > 0 && (
+                  <Badge className="absolute -top-2 left-full min-w-5 -translate-x-1/2 px-1 text-[10px] bg-rose-500 hover:bg-rose-600 text-white font-bold border-0 shadow-md">
                     {unreadAdminCount > 99 ? "99+" : unreadAdminCount}
-                  </span>
-                ) : (
-                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#080514]" />
+                  </Badge>
                 )}
-              </button>
+              </Button>
 
-              {/* Bildirishnomalar */}
-              <button
+              {/* Bildirishnomalar (shadcn Button + Badge) */}
+              <Button
+                size="icon"
+                variant="outline"
                 type="button"
-                onClick={() => setNotificationsModalOpen(true)}
-                className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.04] text-zinc-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer"
+                onClick={handleOpenNotificationsModal}
+                className="relative rounded-full h-9 w-9 border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]"
                 title={dt.topbar.notifications}
               >
                 <Bell className="h-4 w-4" />
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-violet-400 ring-2 ring-[#080514]" />
-              </button>
+                {unreadAnnouncementsCount > 0 && (
+                  <Badge className="absolute -top-2 left-full min-w-5 -translate-x-1/2 px-1 text-[10px] bg-rose-500 hover:bg-rose-600 text-white font-bold border-0 shadow-md">
+                    {unreadAnnouncementsCount > 99 ? "99+" : unreadAnnouncementsCount}
+                  </Badge>
+                )}
+              </Button>
 
               {/* Desktop Account Menu (Telefonda pastdagi navigatsiyada, Desktopda esa tepada chiqadi) */}
               <div className="hidden md:block">
@@ -6429,7 +6479,7 @@ export default function UserHome() {
                       <button
                         type="button"
                         onClick={() => void handleCancelInRoomSearch()}
-                        className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-red-500/35 bg-red-500/15 px-4 py-2 text-xs font-bold text-red-300 hover:bg-red-500/25 transition-colors cursor-pointer"
+                        className="mt-5 inline-flex items-center gap-1.5 rounded-2xl bg-rose-500 hover:bg-rose-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-500/25 transition-all cursor-pointer"
                       >
                         <X className="h-4 w-4" />
                         <span>Bekor qilish</span>
@@ -7465,7 +7515,7 @@ export default function UserHome() {
                       <button
                         type="button"
                         onClick={handleDeleteAvatar}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1.5 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold shadow-md shadow-rose-500/20 px-3.5 py-1.5 text-xs transition-all cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         <span>Rasmni o'chirish</span>
@@ -7532,7 +7582,7 @@ export default function UserHome() {
                   size="sm"
                   disabled={editSaving}
                   onClick={() => setEditProfileModalOpen(false)}
-                  className="rounded-xl border-white/10 text-xs px-4"
+                  className="rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold border-0 shadow-md shadow-rose-500/20 text-xs px-4 py-2 cursor-pointer"
                 >
                   Bekor qilish
                 </Button>
@@ -7699,7 +7749,7 @@ export default function UserHome() {
                 <button
                   type="button"
                   onClick={() => setComplaintModalOpen(false)}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 cursor-pointer"
+                  className="flex-1 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold shadow-md shadow-rose-500/20 py-2.5 text-xs transition-all cursor-pointer"
                 >
                   Bekor qilish
                 </button>
@@ -7825,23 +7875,83 @@ export default function UserHome() {
 
       {/* ── Bildirishnomalar modali ── */}
       {notificationsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-sm rounded-2xl border border-white/[0.1] bg-[#0e0922] p-6 shadow-2xl text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-violet-500/30 bg-violet-500/15 text-violet-300 mb-3">
-              <Bell className="h-6 w-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl border border-white/[0.12] bg-[#0d0924]/95 p-6 sm:p-7 shadow-2xl backdrop-blur-2xl flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/15 text-violet-300">
+                  <Bell className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Bildirishnomalar va E'lonlar</h3>
+                  <p className="text-xs text-zinc-400">
+                    Platforma ma'muriyati (admin) tomonidan e'lon qilingan yangiliklar
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNotificationsModalOpen(false)}
+                className="text-zinc-400 hover:text-white p-1 rounded-xl hover:bg-white/5 transition-all cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <h3 className="text-base font-bold text-white">Bildirishnomalar</h3>
-            <p className="mt-2 text-xs text-zinc-400">
-              Hozircha yangi bildirishnomalar mavjud emas.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setNotificationsModalOpen(false)}
-              className="mt-5 w-full rounded-xl text-xs border-white/10 cursor-pointer"
-            >
-              Yopish
-            </Button>
+
+            {announcements.length === 0 ? (
+              <div className="py-12 text-center text-zinc-400">
+                <Bell className="h-8 w-8 mx-auto mb-2 text-zinc-600" />
+                <p className="text-sm font-semibold text-zinc-300">Hozircha yangi bildirishnomalar mavjud emas</p>
+                <p className="text-xs text-zinc-500 mt-1">Yangi e'lonlar e'lon qilinganda shu yerda ko'rinadi</p>
+              </div>
+            ) : (
+              <div className="overflow-y-auto space-y-3.5 pr-1 max-h-[50vh]">
+                {announcements.map((a) => (
+                  <div
+                    key={a.id}
+                    className="rounded-2xl border border-white/10 bg-white/[0.04] p-4.5 space-y-2 hover:bg-white/[0.07] transition-all"
+                  >
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">{a.title}</span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            a.priority === "urgent"
+                              ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                              : a.priority === "important"
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                              : "bg-violet-500/20 text-violet-300 border border-violet-500/40"
+                          }`}
+                        >
+                          {a.priority === "urgent"
+                            ? "Shoshilinch"
+                            : a.priority === "important"
+                            ? "Muhim"
+                            : "E'lon"}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-zinc-400 font-mono">
+                        {new Date(a.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                      {a.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="pt-4 mt-auto border-t border-white/10">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setNotificationsModalOpen(false)}
+                className="w-full rounded-2xl text-xs border-white/10 hover:bg-white/10 text-zinc-300 hover:text-white cursor-pointer py-2.5 font-bold"
+              >
+                Yopish
+              </Button>
+            </div>
           </div>
         </div>
       )}

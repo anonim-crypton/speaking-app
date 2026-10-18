@@ -818,7 +818,14 @@ router.get(["/settings", "/settings/"], (req, res) => {
 
 router.post(["/settings", "/settings/"], (req, res) => {
   const current = readJson(SETTINGS_FILE, DEFAULT_SETTINGS);
-  const nextSettings = { ...current, ...(req.body || {}) };
+  const patch = req.body || {};
+  if (patch.defaultSignupDiamonds !== undefined) {
+    patch.defaultSignupDiamonds = Math.max(0, parseInt(patch.defaultSignupDiamonds, 10) || 0);
+  }
+  if (patch.dailyRewardDiamonds !== undefined) {
+    patch.dailyRewardDiamonds = Math.max(0, parseInt(patch.dailyRewardDiamonds, 10) || 0);
+  }
+  const nextSettings = { ...current, ...patch };
   writeJson(SETTINGS_FILE, nextSettings);
   logAdminAction("settings_updated", "Platforma asosiy sozlamalari yangilandi");
   return res.json({
@@ -858,6 +865,19 @@ router.post(["/announcements", "/announcements/"], (req, res) => {
     success: true,
     message: "Bildirishnoma barcha foydalanuvchilarga yuborildi",
     announcement: newItem,
+  });
+});
+
+router.delete(["/announcements/:id", "/announcements/:id/"], (req, res) => {
+  const { id } = req.params;
+  let items = readJson(ANNOUNCEMENTS_FILE, []);
+  const target = items.find((a) => a.id === id);
+  items = items.filter((a) => a.id !== id);
+  writeJson(ANNOUNCEMENTS_FILE, items);
+  logAdminAction("delete_announcement", `E'lon o'chirildi: ${target?.title || id}`);
+  return res.json({
+    success: true,
+    message: "E'lon muvaffaqiyatli o'chirildi",
   });
 });
 
