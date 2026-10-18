@@ -783,6 +783,73 @@ function hashDateSeed(str: string): number {
   return Math.abs(h);
 }
 
+function mulberry32(a: number): () => number {
+  return function () {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Savollar variantlarini (options) tasodifiy aralashtiradi va
+ * ketma-ket savollarda to'g'ri javob bir xil o'rinda (masalan, faqat A yoki faqat B)
+ * qolib ketmasligini ta'minlaydi. Har bir savolda to'g'ri javob turli xil pozitsiyalarda
+ * (1-qator / 2-qator, chap / o'ng) dinamik almashib turadi.
+ */
+export function shuffleQuestionsWithVariedAnswers(
+  questions: DailyTaskQuestion[],
+  baseSeed?: string
+): DailyTaskQuestion[] {
+  let prevCorrectIndex = -1;
+
+  return questions.map((q, qIdx) => {
+    const originalOptions = q.options;
+    const originalCorrectIdx = q.correctIndex;
+
+    const items = originalOptions.map((text, idx) => ({
+      text,
+      isCorrect: idx === originalCorrectIdx,
+    }));
+
+    const shuffled = [...items];
+
+    // Agar baseSeed berilgan bo'lsa (Kunlik topshiriqlar uchun) — kun davomida bir xil saqlanuvchi yuqori sifatli psevdo-tasodifiy generator
+    // Agar berilmagan bo'lsa (Topshiriqli o'yin uchun) — har o'yin boshlanganda yangi Math.random()
+    const rand = baseSeed
+      ? mulberry32(hashDateSeed(`${baseSeed}_${q.id}_${qIdx}`))
+      : Math.random;
+
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    let curCorrect = shuffled.findIndex((item) => item.isCorrect);
+
+    // Agar ketma-ket bir xil o'rinda chiqib qolsa (masalan, oldingi savolda ham shu indeks bo'lsa),
+    // uni boshqa qatorga yoki ustunga swap qilamiz, shunda javoblar ketma-ket bir xil joyda turmaydi.
+    if (curCorrect === prevCorrectIndex && shuffled.length > 1) {
+      const shift = qIdx % 2 === 0 ? 2 : 1;
+      const swapTarget = (curCorrect + shift) % shuffled.length;
+      [shuffled[curCorrect], shuffled[swapTarget]] = [
+        shuffled[swapTarget],
+        shuffled[curCorrect],
+      ];
+      curCorrect = swapTarget;
+    }
+
+    prevCorrectIndex = curCorrect;
+
+    return {
+      ...q,
+      options: shuffled.map((item) => item.text),
+      correctIndex: curCorrect >= 0 ? curCorrect : 0,
+    };
+  });
+}
+
 /**
  * Har kuni sanaga qarab avtomatik almashadigan va foydalanuvchining
  * bajargan topshiriqlari soniga (`totalTasksCompleted`) qarab A1 -> A2 -> B1 -> B2 -> C1
@@ -853,8 +920,15 @@ export function getDailyTasksForUser(
   // Kunlik 5 ta topshiriq (eng osondan boshlab o'sib boruvchi tartibda)
   const selected = rotated.slice(0, 5);
 
+  // Variantlarni kunlik deterministik tartibda aralashtiramiz,
+  // to'g'ri javob turli xil o'rinlarda (A, B, C, D) chiqadi
+  const randomizedTasks = shuffleQuestionsWithVariedAnswers(
+    selected,
+    `${dateStr}_${language}`
+  );
+
   return {
-    tasks: selected,
+    tasks: randomizedTasks,
     activeTier,
     progressionTitle,
     progressionDescription,
@@ -864,8 +938,12 @@ export function getDailyTasksForUser(
 /**
  * "Topshiriqli o'yin" (Task Game) uchun 5 ta tildan tanlangan til bo'yicha
  * osondan qiyinga qarab tuzilgan o'yin savollari.
+ * Javoblar har bir yangi o'yinda tasodifiy o'rinlarda (A, B, C, D) tarqatiladi.
  */
 export function getTaskGameQuestions(language: LanguageKey): DailyTaskQuestion[] {
   const list = TASKS_BANK[language] || TASKS_BANK.en;
-  return [...list].sort((a, b) => TIER_META[a.tier].order - TIER_META[b.tier].order);
+  const sorted = [...list].sort(
+    (a, b) => TIER_META[a.tier].order - TIER_META[b.tier].order
+  );
+  return shuffleQuestionsWithVariedAnswers(sorted);
 }
