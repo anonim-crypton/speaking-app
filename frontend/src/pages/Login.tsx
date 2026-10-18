@@ -43,7 +43,7 @@ export default function Login() {
       setLoading(true);
       try {
         const data = await loginWithPhone(`998${phoneDigits}`);
-        navigate(data.user.onboardingCompleted ? "/" : "/onboarding");
+        navigate(data.user.slug ? `/u/${data.user.slug}` : "/");
       } catch (err) {
         setError(errorText(err));
       } finally {
@@ -59,7 +59,7 @@ export default function Login() {
     setLoading(true);
     try {
       const data = await login(email.trim(), password);
-      navigate(data.user.onboardingCompleted ? "/" : "/onboarding");
+      navigate(data.user.slug ? `/u/${data.user.slug}` : "/");
     } catch (err) {
       setError(errorText(err));
     } finally {

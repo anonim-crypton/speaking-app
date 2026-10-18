@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 
 /** Requires a session, and a completed questionnaire. */
 function Protected({ children }: { children: ReactNode }) {
-  const { isAuthed, loading, needsOnboarding } = useAuth();
+  const { isAuthed, loading } = useAuth();
 
   if (loading) {
     return (
@@ -29,14 +29,13 @@ function Protected({ children }: { children: ReactNode }) {
   }
 
   if (!isAuthed) return <Navigate to="/login" replace />;
-  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
 
   return <>{children}</>;
 }
 
 /** "/" → the landing page for visitors, the personal /u/<slug> page for signed-in users. */
 function HomeGate() {
-  const { isAuthed, loading, user, needsOnboarding } = useAuth();
+  const { isAuthed, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -46,7 +45,7 @@ function HomeGate() {
     );
   }
   if (isAuthed && user) {
-    return <Navigate to={needsOnboarding ? "/onboarding" : `/u/${user.slug}`} replace />;
+    return <Navigate to={`/u/${user.slug}`} replace />;
   }
   return <Home />;
 }

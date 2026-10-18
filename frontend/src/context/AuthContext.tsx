@@ -367,7 +367,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const needsOnboarding = Boolean(user && (!user.onboardingCompleted || !user.username));
+  const needsOnboarding = Boolean(user && !user.onboardingCompleted);
 
   return (
     <AuthContext.Provider

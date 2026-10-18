@@ -238,7 +238,7 @@ export default function Onboarding() {
 
   if (loading) return <LoadingScreen visible label={t.common.loading} />;
   if (!isAuthed) return <Navigate to="/register" replace />;
-  if (user?.onboardingCompleted && user?.username && phase === "questions") {
+  if (user?.onboardingCompleted && phase === "questions") {
     return <Navigate to="/" replace />;
   }
 

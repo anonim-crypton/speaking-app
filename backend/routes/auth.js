@@ -54,7 +54,7 @@ function publicUser(user) {
     onboardingBonusClaimed: Boolean(user.onboardingBonusClaimed),
     streakDays: Number(user.streakDays || 1),
     talkSeconds: Number(user.talkSeconds || 0),
-    onboardingCompleted: Boolean(user.onboardingCompleted && user.username),
+    onboardingCompleted: Boolean(user.onboardingCompleted),
     createdAt: user.createdAt,
   };
 }
@@ -344,11 +344,25 @@ router.post("/google", async (req, res) => {
       user = store.updateUser(user.id, { name: String(name).trim() }) || user;
     }
 
+    let fallbackUsername = user.username;
+    if (!fallbackUsername) {
+      const base = (user.name || cleanEmail.split("@")[0] || "user")
+        .replace(/[^a-zA-Z0-9_]/g, "")
+        .toLowerCase()
+        .slice(0, 15) || "user";
+      fallbackUsername = `${base}_${user.id.slice(0, 4)}`;
+      user =
+        store.updateUser(user.id, {
+          username: fallbackUsername,
+          onboardingCompleted: true,
+        }) || user;
+    }
+
     /* Always upsert into Supabase `profiles` so Google accounts are guaranteed to be in `profiles`. */
     const saved = await supabase.saveProfile({
       id: user.id,
       name: user.name,
-      username: user.username || null,
+      username: user.username || fallbackUsername,
       email: cleanEmail,
       provider: user.provider || "google",
       googleEmail: cleanEmail,
@@ -358,7 +372,7 @@ router.post("/google", async (req, res) => {
       purpose: user.purpose ?? user.onboarding?.purpose ?? null,
       gender: user.gender ?? user.onboarding?.gender ?? null,
       diamonds: user.diamonds ?? 0,
-      onboardingCompleted: Boolean(user.onboardingCompleted && user.username),
+      onboardingCompleted: true,
     });
     if (!saved.ok && !saved.skipped) {
       console.warn("[supabase] google profile upsert failed:", saved.error);
@@ -448,12 +462,27 @@ router.post("/login", async (req, res) => {
         });
       }
 
+      // Ensure user has a valid username and completed onboarding on login
+      let fallbackUsername = user.username;
+      if (!fallbackUsername) {
+        const base = (user.name || "user")
+          .replace(/[^a-zA-Z0-9_]/g, "")
+          .toLowerCase()
+          .slice(0, 15) || "user";
+        fallbackUsername = `${base}_${user.id.slice(0, 4)}`;
+      }
+      user =
+        store.updateUser(user.id, {
+          username: fallbackUsername,
+          onboardingCompleted: true,
+        }) || user;
+
       // Ensure synced in Supabase profiles in background
       void supabase
         .saveProfile({
           id: user.id,
           name: user.name,
-          username: user.username || null,
+          username: user.username,
           avatarUrl: user.avatarUrl || user.onboarding?.avatarUrl || null,
           phone: user.phone,
           provider: user.provider || "phone",
@@ -462,7 +491,7 @@ router.post("/login", async (req, res) => {
           purpose: user.purpose ?? user.onboarding?.purpose ?? null,
           gender: user.gender ?? user.onboarding?.gender ?? null,
           diamonds: user.diamonds ?? 0,
-          onboardingCompleted: Boolean(user.onboardingCompleted && user.username),
+          onboardingCompleted: true,
         })
         .catch(() => {});
 
@@ -542,11 +571,26 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    // Ensure user has a valid username and completed onboarding on login
+    let fallbackUsername = user.username;
+    if (!fallbackUsername) {
+      const base = (user.name || cleanEmail.split("@")[0] || "user")
+        .replace(/[^a-zA-Z0-9_]/g, "")
+        .toLowerCase()
+        .slice(0, 15) || "user";
+      fallbackUsername = `${base}_${user.id.slice(0, 4)}`;
+    }
+    user =
+      store.updateUser(user.id, {
+        username: fallbackUsername,
+        onboardingCompleted: true,
+      }) || user;
+
     // Ensure synced in Supabase profiles
     await supabase.saveProfile({
       id: user.id,
       name: user.name,
-      username: user.username || null,
+      username: user.username,
       avatarUrl: user.avatarUrl || user.onboarding?.avatarUrl || null,
       email: user.email,
       passwordHash: user.passwordHash,
@@ -556,7 +600,7 @@ router.post("/login", async (req, res) => {
       purpose: user.purpose ?? user.onboarding?.purpose ?? null,
       gender: user.gender ?? user.onboarding?.gender ?? null,
       diamonds: user.diamonds ?? 0,
-      onboardingCompleted: Boolean(user.onboardingCompleted && user.username),
+      onboardingCompleted: true,
     });
 
     const sessionRes = sessionStore.createSession({
