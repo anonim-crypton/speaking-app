@@ -196,14 +196,14 @@ export default function Navbar() {
           >
             <span
               className={cn(
-                "pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 z-50",
+                "pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 z-50",
                 isHomeActive
                   ? "opacity-100 scale-100 translate-y-0"
                   : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
               )}
             >
               {t.nav.home}
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
             </span>
             <Home className="h-5 w-5" />
           </button>
@@ -223,14 +223,14 @@ export default function Navbar() {
           >
             <span
               className={cn(
-                "pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 z-50",
+                "pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 z-50",
                 isPracticeActive
                   ? "opacity-100 scale-100 translate-y-0"
                   : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
               )}
             >
               {t.nav.practice}
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
             </span>
             <Mic className="h-5 w-5" />
           </button>
@@ -250,14 +250,14 @@ export default function Navbar() {
           >
             <span
               className={cn(
-                "pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 z-50",
+                "pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 z-50",
                 isAboutActive
                   ? "opacity-100 scale-100 translate-y-0"
                   : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
               )}
             >
               {t.nav.about}
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
             </span>
             <Users className="h-5 w-5" />
           </button>
@@ -265,6 +265,7 @@ export default function Navbar() {
           {/* 4. Yordam (Biz haqimizda yonida) */}
           <Link
             to="/help"
+            onClick={() => window.scrollTo({ top: 0, left: 0, behavior: "instant" })}
             title={t.account?.help || "Yordam"}
             aria-label={t.account?.help || "Yordam"}
             className={cn(
@@ -276,14 +277,14 @@ export default function Navbar() {
           >
             <span
               className={cn(
-                "pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 z-50",
+                "pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 z-50",
                 isHelpActive
                   ? "opacity-100 scale-100 translate-y-0"
                   : "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0"
               )}
             >
               {t.account?.help || "Yordam"}
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
             </span>
             <HelpCircle className="h-5 w-5" />
           </Link>
@@ -296,9 +297,9 @@ export default function Navbar() {
           aria-label={t.nav.login}
           className="pointer-events-auto relative group flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[#0e0924]/90 text-zinc-300 shadow-[0_12px_30px_rgba(0,0,0,0.55)] backdrop-blur-2xl backdrop-saturate-[180%] transition-all hover:scale-105 hover:border-violet-500/50 hover:bg-violet-500/20 hover:text-white active:scale-95 cursor-pointer"
         >
-          <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 z-50">
+          <span className="pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 z-50">
             {t.nav.login}
-            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
           </span>
           <LogIn className="h-5 w-5" />
         </Link>
@@ -309,9 +310,9 @@ export default function Navbar() {
           aria-label={t.nav.register}
           className="pointer-events-auto relative group flex h-12 w-12 items-center justify-center rounded-full border border-violet-400/50 bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.45)] backdrop-blur-xl transition-all hover:scale-105 hover:brightness-110 active:scale-95 cursor-pointer"
         >
-          <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-[#0e0924]/95 px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-200 opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 z-50">
+          <span className="pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-xl border border-white/20 bg-[#0d0724]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-white shadow-[0_8px_25px_rgba(0,0,0,0.75)] shadow-violet-900/30 backdrop-blur-2xl transition-all duration-200 opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 z-50">
             {t.nav.register}
-            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-[#0e0924]" />
+            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-[#0d0724]" />
           </span>
           <UserPlus className="h-5 w-5" />
         </Link>

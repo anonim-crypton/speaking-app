@@ -108,8 +108,9 @@ export default function App() {
       return;
     }
 
-    // Skip global route loader when transitioning between /create-room, /chat-room, or admin routes
+    // Skip global route loader when transitioning to /help, /create-room, /chat-room, or admin routes
     if (
+      location.pathname.startsWith("/help") ||
       location.pathname.startsWith("/create-room") ||
       location.pathname.startsWith("/chat-room") ||
       location.pathname.startsWith("/admin") ||
@@ -122,6 +123,11 @@ export default function App() {
     setRouteLoading(true);
     const timer = window.setTimeout(() => setRouteLoading(false), routeLoadDuration());
     return () => window.clearTimeout(timer);
+  }, [location.pathname]);
+
+  /* Always reset scroll to the very top when navigating between pages */
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [location.pathname]);
 
   return (

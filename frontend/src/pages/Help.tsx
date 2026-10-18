@@ -94,6 +94,10 @@ export default function Help() {
   const [feedbackSent, setFeedbackSent] = useState(false);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, []);
+
+  useEffect(() => {
     const tabParam = searchParams.get("tab") as HelpTab;
     if (tabParam && tabParam !== activeTab) {
       setActiveTab(tabParam);
