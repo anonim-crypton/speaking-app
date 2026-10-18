@@ -300,20 +300,18 @@ export const en: Translation = {
     tagline: "Real Conversations. A Brighter You.",
     columns: [
       {
-        title: "Product",
-        links: ["Courses", "Live Rooms", "Practice", "Progress"],
-      },
-      {
-        title: "Community",
-        links: ["Community Hub", "Events", "Leaderboard", "Become a Host"],
-      },
-      {
         title: "Support",
-        links: ["Help Center", "Contact Us", "Feedback", "Community Guidelines"],
+        links: [
+          "Help Center",
+          "Contact Us",
+          "Feedback",
+          "Community Guidelines",
+          "Frequently Asked Questions",
+        ],
       },
       {
         title: "Legal",
-        links: ["Terms of Service", "Privacy Policy", "Cookie Policy", "Safety"],
+        links: ["Terms of Service", "Privacy Policy", "Safety & Security"],
       },
     ],
     newsletterTitle: "Get the latest updates",
@@ -489,7 +487,7 @@ export const uz: Translation = {
   },
   stats: {
     items: [
-      { icon: "users", value: "10K+", label: "Faol o'quvchilar", sub: "150+ davlatdan" },
+      { icon: "users", value: "100", label: "Faol o'quvchilar", sub: "4+ davlatdan" },
       { icon: "mic", value: "500+", label: "Suhbat xonalari", sub: "Har kuni yangi suhbatlar" },
       {
         icon: "clock",
@@ -554,20 +552,18 @@ export const uz: Translation = {
     tagline: "Haqiqiy suhbatlar. Yorqinroq siz.",
     columns: [
       {
-        title: "Mahsulot",
-        links: ["Kurslar", "Jonli xonalar", "Amaliyot", "Natijalar"],
-      },
-      {
-        title: "Jamiyat",
-        links: ["Jamiyat markazi", "Tadbirlar", "Reyting", "Boshlovchi bo'lish"],
-      },
-      {
         title: "Yordam",
-        links: ["Yordam markazi", "Bog'lanish", "Fikr-mulohaza", "Jamiyat qoidalari"],
+        links: [
+          "Yordam markazi",
+          "Bog'lanish",
+          "Fikr-mulohaza",
+          "Jamiyat qoidalari",
+          "Ko'p so'raladigan savollar",
+        ],
       },
       {
         title: "Huquqiy",
-        links: ["Foydalanish shartlari", "Maxfiylik siyosati", "Cookie siyosati", "Xavfsizlik"],
+        links: ["Foydalanish shartlari", "Maxfiylik siyosati", "Xavfsizlik va himoya"],
       },
     ],
     newsletterTitle: "So'nggi yangiliklardan xabardor bo'ling",
@@ -807,20 +803,18 @@ export const ru: Translation = {
     tagline: "Живые разговоры. Лучшая версия вас.",
     columns: [
       {
-        title: "Продукт",
-        links: ["Курсы", "Живые комнаты", "Практика", "Прогресс"],
-      },
-      {
-        title: "Сообщество",
-        links: ["Центр сообщества", "События", "Рейтинг", "Стать хостом"],
-      },
-      {
         title: "Поддержка",
-        links: ["Центр помощи", "Связаться с нами", "Обратная связь", "Правила сообщества"],
+        links: [
+          "Центр помощи",
+          "Связаться с нами",
+          "Обратная связь",
+          "Правила сообщества",
+          "Часто задаваемые вопросы",
+        ],
       },
       {
         title: "Правовое",
-        links: ["Условия использования", "Политика конфиденциальности", "Cookie", "Безопасность"],
+        links: ["Условия использования", "Политика конфиденциальности", "Безопасность"],
       },
     ],
     newsletterTitle: "Получайте последние новости",

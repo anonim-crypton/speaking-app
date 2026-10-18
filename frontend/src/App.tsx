@@ -11,6 +11,7 @@ import Onboarding from "@/pages/Onboarding";
 import Dashboard from "@/pages/Dashboard";
 import UserHome from "@/pages/UserHome";
 import AdminDashboard from "@/pages/AdminDashboard";
+import Help from "@/pages/Help";
 import { useAuth } from "@/context/AuthContext";
 import { loaderDuration, measureRtt, routeLoadDuration } from "@/lib/network";
 import { cn } from "@/lib/utils";
@@ -141,6 +142,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/help" element={<Help />} />
           <Route path="/speak-admin" element={<AdminDashboard />} />
           <Route path="/speak-admin/*" element={<AdminDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
