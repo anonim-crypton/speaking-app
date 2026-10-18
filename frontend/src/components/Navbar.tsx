@@ -103,7 +103,7 @@ export default function Navbar() {
             className={cn(
               "pointer-events-auto transition-all duration-300 ease-out",
               scrolled
-                ? "mx-auto max-w-6xl rounded-2xl border border-white/15 bg-[#090518]/65 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.65)] px-4 sm:px-6"
+                ? "mx-auto max-w-6xl rounded-full border border-white/15 bg-[#090518]/65 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.65)] px-5 sm:px-7"
                 : "w-full border-b border-white/[0.06] bg-[#070414]/90 backdrop-blur-md px-4 sm:px-8"
             )}
           >
@@ -145,7 +145,7 @@ export default function Navbar() {
           className={cn(
             "pointer-events-auto transition-all duration-300 ease-out",
             scrolled
-              ? "mx-auto max-w-6xl rounded-2xl border border-white/15 bg-[#090518]/65 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.65)] px-4 sm:px-6"
+              ? "mx-auto max-w-6xl rounded-full border border-white/15 bg-[#090518]/65 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.65)] px-5 sm:px-7"
               : "w-full border-b border-white/[0.06] bg-[#070414]/90 backdrop-blur-md px-4 sm:px-8"
           )}
         >
