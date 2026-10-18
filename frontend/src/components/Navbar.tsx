@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Mic, Users, LogIn, UserPlus } from "lucide-react";
+import { Home, Mic, Users, LogIn, UserPlus, HelpCircle } from "lucide-react";
 
 import Logo from "@/components/Logo";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -147,6 +147,21 @@ export default function Navbar() {
 
             {/* ── Right actions: Language Switcher and Desktop Auth ── */}
             <div className="flex items-center gap-2">
+              {/* Mobile Help Button in front of LanguageSwitcher */}
+              <Link
+                to="/help"
+                className={cn(
+                  "flex lg:hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] hover:bg-white/[0.12] px-3 py-1.5 text-xs font-bold text-zinc-200 transition-all cursor-pointer backdrop-blur-xl shadow-sm active:scale-95",
+                  location.pathname === "/help"
+                    ? "border-violet-500/50 bg-violet-500/25 text-white shadow-[0_0_12px_rgba(139,92,246,0.35)]"
+                    : "text-zinc-300"
+                )}
+                aria-label="Yordam markazi"
+              >
+                <HelpCircle className="h-3.5 w-3.5 text-violet-400" />
+                <span>{t.account?.help || "Yordam"}</span>
+              </Link>
+
               <LanguageSwitcher />
               <AuthToggle className="hidden lg:grid" />
             </div>
@@ -154,101 +169,79 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* ── Mobile Landing Bottom Navigation Bar (lg:hidden) ── */}
+      {/* ── Mobile Landing Floating Bottom Navigation Bar (lg:hidden) ── */}
       <nav
         aria-label="Mobil pastki navigatsiya"
-        className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-white/[0.1] bg-[#090518]/95 px-2 backdrop-blur-2xl backdrop-saturate-[180%] lg:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.5)]"
+        className="fixed bottom-4 left-0 right-0 z-40 flex items-center justify-center gap-2.5 px-3 pointer-events-none lg:hidden"
       >
-        {/* 1. Bosh sahifa */}
-        <button
-          type="button"
-          onClick={() => goToSection("home")}
-          className={cn(
-            "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
-            active === "home" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
-          )}
-        >
-          <div
+        {/* Connected capsule with border: Bosh sahifa, Amaliyot, Biz haqimizda */}
+        <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/15 bg-[#0e0924]/90 p-1.5 shadow-[0_12px_35px_rgba(0,0,0,0.6)] backdrop-blur-2xl backdrop-saturate-[180%]">
+          {/* 1. Bosh sahifa */}
+          <button
+            type="button"
+            onClick={() => goToSection("home")}
+            title={t.nav.home}
+            aria-label={t.nav.home}
             className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-xl transition-all",
-              active === "home" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+              "flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+              active === "home" && location.pathname === "/"
+                ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
+                : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
             )}
           >
-            <Home className="h-4 w-4" />
-          </div>
-          <span className="text-[10px] font-medium tracking-tight truncate max-w-[64px]">
-            {t.nav.home}
-          </span>
-        </button>
+            <Home className="h-5 w-5" />
+          </button>
 
-        {/* 2. Amaliyot */}
-        <button
-          type="button"
-          onClick={() => goToSection("practice")}
-          className={cn(
-            "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
-            active === "practice" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
-          )}
-        >
-          <div
+          {/* 2. Amaliyot */}
+          <button
+            type="button"
+            onClick={() => goToSection("practice")}
+            title={t.nav.practice}
+            aria-label={t.nav.practice}
             className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-xl transition-all",
-              active === "practice" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+              "flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+              active === "practice" && location.pathname === "/"
+                ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
+                : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
             )}
           >
-            <Mic className="h-4 w-4" />
-          </div>
-          <span className="text-[10px] font-medium tracking-tight truncate max-w-[64px]">
-            {t.nav.practice}
-          </span>
-        </button>
+            <Mic className="h-5 w-5" />
+          </button>
 
-        {/* 3. Biz haqimizda */}
-        <button
-          type="button"
-          onClick={() => goToSection("about")}
-          className={cn(
-            "flex flex-1 flex-col items-center justify-center gap-1 py-1 transition-all cursor-pointer",
-            active === "about" ? "text-violet-400" : "text-zinc-400 hover:text-zinc-200"
-          )}
-        >
-          <div
+          {/* 3. Biz haqimizda */}
+          <button
+            type="button"
+            onClick={() => goToSection("about")}
+            title={t.nav.about}
+            aria-label={t.nav.about}
             className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-xl transition-all",
-              active === "about" ? "bg-violet-500/20 shadow-[0_0_12px_rgba(139,92,246,0.4)]" : ""
+              "flex h-11 w-11 items-center justify-center rounded-full transition-all cursor-pointer",
+              active === "about" && location.pathname === "/"
+                ? "bg-white/15 text-white shadow-[0_0_14px_rgba(255,255,255,0.18)]"
+                : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
             )}
           >
-            <Users className="h-4 w-4" />
-          </div>
-          <span className="text-[10px] font-medium tracking-tight truncate max-w-[64px]">
-            {t.nav.about}
-          </span>
-        </button>
+            <Users className="h-5 w-5" />
+          </button>
+        </div>
 
-        {/* 4. Login */}
+        {/* Oxirgi qism: Login va Register alohida dumaloq tugmalar */}
         <Link
           to="/login"
-          className="flex flex-1 flex-col items-center justify-center gap-1 py-1 text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer"
+          title={t.nav.login}
+          aria-label={t.nav.login}
+          className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[#0e0924]/90 text-zinc-300 shadow-[0_12px_30px_rgba(0,0,0,0.55)] backdrop-blur-2xl backdrop-saturate-[180%] transition-all hover:scale-105 hover:border-violet-500/50 hover:bg-violet-500/20 hover:text-white active:scale-95 cursor-pointer"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl">
-            <LogIn className="h-4 w-4" />
-          </div>
-          <span className="text-[10px] font-medium tracking-tight truncate max-w-[64px]">
-            {t.nav.login}
-          </span>
+          <LogIn className="h-5 w-5" />
         </Link>
 
-        {/* 5. Register */}
         <Link
           to="/register"
-          className="flex flex-1 flex-col items-center justify-center gap-1 py-1 text-violet-300 hover:text-white transition-all cursor-pointer"
+          title={t.nav.register}
+          aria-label={t.nav.register}
+          className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-violet-400/50 bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.45)] backdrop-blur-xl transition-all hover:scale-105 hover:brightness-110 active:scale-95 cursor-pointer"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-[0_0_10px_rgba(139,92,246,0.5)]">
-            <UserPlus className="h-3.5 w-3.5" />
-          </div>
-          <span className="text-[10px] font-bold tracking-tight truncate max-w-[64px]">
-            {t.nav.register}
-          </span>
+          <UserPlus className="h-5 w-5" />
         </Link>
       </nav>
     </>
