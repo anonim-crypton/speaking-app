@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 
 import Hero from "@/components/Hero";
 import FeatureGrid from "@/components/FeatureGrid";
-import StatsBar from "@/components/StatsBar";
+import PlatformHighlights from "@/components/PlatformHighlights";
 import CtaBanner from "@/components/CtaBanner";
 import SiteFooter from "@/components/SiteFooter";
 
@@ -25,7 +25,7 @@ export default function Home() {
     <>
       <Hero />
       <FeatureGrid />
-      <StatsBar />
+      <PlatformHighlights />
       <CtaBanner />
       <SiteFooter />
     </>
