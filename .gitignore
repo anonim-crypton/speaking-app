@@ -23,6 +23,7 @@ frontend/dist/
 video/out/
 video/.remotion/
 video/node_modules/
+video/public/*.mp4
 
 # Logs & caches
 npm-debug.log*
